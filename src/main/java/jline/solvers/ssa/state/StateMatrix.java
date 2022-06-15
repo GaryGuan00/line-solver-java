@@ -102,11 +102,9 @@ public class StateMatrix {
     public boolean stateArrival(int nodeIdx, int classIdx) {
         // arrive 1 instance of [class] at [node]
         // returns: true if successful, false otherwise
-        /*if (state[nodeIdx][classIdx] == capacities[nodeIdx][classIdx]) {
-            if (!this.allowIllegalStates) {
-                return false;
-            }
-        }*/
+        if (state[nodeIdx][classIdx] == capacities[nodeIdx][classIdx]) {
+            return false;
+        }
         this.addToBuffer(nodeIdx, classIdx);
         this.state[nodeIdx][classIdx]++;
 

@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Function;
+
 import jline.lang.*;
 import jline.lang.constant.DropStrategy;
 import jline.lang.constant.SchedStrategy;
@@ -40,10 +42,10 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
             case FCFS:
             case LCFS:
             case SIRO:
-            /*case SEPT:
+            case SEPT:
             case LEPT:
             case SJF:
-            case LJF:*/
+            case LJF:
                 this.schedPolicy = SchedStrategyType.NP;
                 this.server = new Server(model.getClasses());
                 break;
@@ -52,17 +54,24 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
                 this.server = new InfiniteServer(model.getClasses());
                 this.numberOfServers = Integer.MAX_VALUE;
                 break;
-            /*case HOL:
+            case HOL:
                 this.schedPolicy = SchedStrategyType.NP;
                 this.server = new Server(model.getClasses());
-                break;*/
+                break;
             case PS:
-            //case DPS:
-            //case GPS:
-            default:
+            case DPS:
+            case GPS:
                 this.schedPolicy = SchedStrategyType.PR;
                 this.server = new Server(model.getClasses());
+                //this.server = new SharedServer(model.getClasses);
                 break;
+            case LCFSPR:
+                this.schedPolicy = SchedStrategyType.PR;
+                this.server = new Server(model.getClasses());
+                //this.server = new PreemptiveServer(model.getClasses);
+                break;
+            default:
+            	throw new RuntimeException("Routing Strategy is not supported in JLINE");
         }
     }
 
@@ -82,12 +91,17 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
     public void setSchedStrategyPar(JobClass jobClass, double weight) {
         this.schedStrategyPar.put(jobClass, weight);
     }
+    
+    public double getSchedStrategyPar(JobClass jobClass) {
+    	return this.schedStrategyPar.getOrDefault(jobClass, 0.0);
+    }
 
     public final Distribution getServiceProcess(JobClass jobClass) {
         for (ServiceBinding serviceProcess : this.serviceProcesses) {
             if (serviceProcess.getJobClass() == jobClass) {
                 return serviceProcess.getDistribution();
-            }        }
+            }        
+       }
 
         return new Immediate();
     }
@@ -106,8 +120,10 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
         this.input.setInputJobProcess(new InputBinding(jobClass, this.schedPolicy, DropStrategy.WaitingQueue));
         if (distribution.isImmediate()) {
             this.serviceProcesses.add(new ServiceBinding(jobClass, ServiceStrategy.LI, new Immediate()));
+            this.server.setServiceProcesses(new ServiceBinding(jobClass, ServiceStrategy.LI, new Immediate()));
         } else {
             this.serviceProcesses.add(new ServiceBinding(jobClass, ServiceStrategy.LI, distribution));
+            this.server.setServiceProcesses(new ServiceBinding(jobClass, ServiceStrategy.LI, distribution));
         }
 
         this.classCap.put(jobClass, Double.POSITIVE_INFINITY);
@@ -116,6 +132,8 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
         if (resetState) {
             this.model.setInitialized(false);
         }
+        
+        this.dropRule.put(jobClass, DropStrategy.WaitingQueue);
     }
 
     private boolean hasJobClass(JobClass jobClass) {
@@ -126,10 +144,20 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
         this.classCap.remove(jobClass);
         this.schedStrategyPar.remove(jobClass);
         this.serviceProcesses.removeIf(serviceProcess -> serviceProcess.getJobClass() == jobClass);
+        this.server.removeServiceProcess(jobClass);
     }
 
     public void setService(JobClass jobClass, Distribution distribution) {
         setService(jobClass, distribution, 1);
+    }
+    
+    public boolean containsJobClass(JobClass jobClass) {
+        for (ServiceBinding serviceProcess : this.serviceProcesses) {
+            if (serviceProcess.getJobClass() == jobClass) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -150,6 +178,29 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
 
     public SchedStrategyType getSchedPolicy() {
         return this.schedPolicy;
+    }
+    
+    public void setLoadDependence(JLineMatrix alpha) {
+    	switch (this.schedStrategy) {
+    		case PS:
+    		case FCFS:
+    			this.setLimitedLoadDependence(alpha);
+    			break;
+    		default:
+    			throw new RuntimeException("Load-dependence supported only for processor sharing (PS) and first-come first-serve (FCFS) stations.");
+    	}			
+    }
+    
+    public void setClassDependence(Function<JLineMatrix, Double> beta) {
+    	switch (this.schedStrategy) {
+	    	case PS:
+	    	case FCFS:
+	    		this.setLimitedClassDependence(beta);
+	    		break;
+    		default:
+    			throw new RuntimeException("Class-dependence supported only for processor sharing (PS) and first-come first-serve (FCFS) stations.");
+    			
+    	}
     }
 
     public double minRate() {

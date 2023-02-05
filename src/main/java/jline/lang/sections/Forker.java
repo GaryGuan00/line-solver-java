@@ -9,10 +9,12 @@ import jline.lang.sections.*;
 import jline.solvers.ssa.events.ForkOutputEvent;
 
 public class Forker extends OutputSection {
+	public double taskPerLink;
     protected List<JobClass> jobClasses;
     public Forker(Network model) {
         super("Forker");
         this.jobClasses = model.getClasses();
+        this.taskPerLink = 1.0;
     }
 
     @Override

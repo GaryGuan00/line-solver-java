@@ -14,6 +14,7 @@ public class OpenClass extends JobClass  implements Serializable {
         model.addJobClass(this);
         this.classIndex = -1;
         this.model = model;
+        this.priority = priority;
     }
     public OpenClass(Network model, String name) {
         this(model, name,0);

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -44,7 +45,7 @@ class EventStackTest {
         schedStrategies[0] = SchedStrategy.FCFS;
         schedStrategies[1] = SchedStrategy.FCFS;
         schedStrategies[2] = SchedStrategy.FCFS;
-        NetworkStruct networkStruct = new NetworkStruct();
+        SSAStruct networkStruct = new SSAStruct();
         networkStruct.nStateful = 3;
         networkStruct.nClasses = 3;
         networkStruct.schedStrategies = schedStrategies;
@@ -52,10 +53,14 @@ class EventStackTest {
         networkStruct.nodeCapacity = nodeCapacities;
         networkStruct.numberOfServers = servers;
         networkStruct.isDelay = new boolean[3];
-        networkStruct.isDelay[0] = false;
-        networkStruct.isDelay[1] = false;
-        networkStruct.isDelay[2] = false;
-        this.stateMatrix = new StateMatrix(networkStruct);
+        networkStruct.nPhases = new int[3][3];
+        networkStruct.startingPhaseProbabilities = new Map[3];
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                networkStruct.nPhases[i][j] = 1;
+            }
+        }
+        this.stateMatrix = new StateMatrix(networkStruct, new Random());
         this.timeline = new Timeline(networkStruct);
 
         this.eventStack = new EventStack();
@@ -84,7 +89,6 @@ class EventStackTest {
         for (int i = 0; i < 500; i++) {
             this.eventStack.updateState(this.stateMatrix,this.timeline,0, random);
         }
-        System.out.format("Final state: %d\n", this.stateMatrix.getState(0,0));
         assertTrue(this.stateMatrix.getState(0,0)>-50);
         assertTrue(this.stateMatrix.getState(0,0)<50);
     }

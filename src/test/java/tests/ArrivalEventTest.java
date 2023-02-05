@@ -9,6 +9,7 @@ import jline.lang.*;
 import jline.lang.constant.SchedStrategy;
 import jline.lang.nodes.Queue;
 
+import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -50,7 +51,7 @@ class ArrivalEventTest {
         schedStrategies[0] = SchedStrategy.FCFS;
         schedStrategies[1] = SchedStrategy.LCFS;
         schedStrategies[2] = SchedStrategy.LCFS;
-        NetworkStruct networkStruct = new NetworkStruct();
+        SSAStruct networkStruct = new SSAStruct();
         networkStruct.nStateful = 3;
         networkStruct.nClasses = 3;
         networkStruct.schedStrategies = schedStrategies;
@@ -61,8 +62,16 @@ class ArrivalEventTest {
         networkStruct.isDelay[0] = false;
         networkStruct.isDelay[1] = false;
         networkStruct.isDelay[2] = false;
-        this.stateMatrix = new StateMatrix(networkStruct);
-        this.timeline = new Timeline(networkStruct,CutoffStrategy.None);
+        networkStruct.nPhases = new int[3][3];
+
+        networkStruct.startingPhaseProbabilities = new Map[3];
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                networkStruct.nPhases[i][j] = 1;
+            }
+        }
+        this.stateMatrix = new StateMatrix(networkStruct, new Random());
+        this.timeline = new Timeline(networkStruct);
 
         this.eventStack = new EventStack();
         this.network = new Network("Test Network");

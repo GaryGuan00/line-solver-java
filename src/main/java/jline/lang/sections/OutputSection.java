@@ -11,6 +11,7 @@ import jline.lang.distributions.*;
 import jline.lang.nodes.*;
 import jline.lang.sections.*;
 import jline.solvers.ssa.events.OutputEvent;
+import jline.util.Pair;
 
 
 public class OutputSection extends Section implements Serializable {
@@ -123,7 +124,43 @@ public class OutputSection extends Section implements Serializable {
         return this.outputEvents.get(outputStrategyCdf.generate());
     }
 
+    public ArrayList<Pair<OutputEvent,Double>>  getOutputEvents(JobClass jobClass, Random random) {
+        Cdf<OutputStrategy> outputStrategyCdf = new Cdf<OutputStrategy>(random);
+
+        if (this.outputStrategies.size() == 0) {
+            throw new RuntimeException("No output strategies found!");
+        }
+
+        for (OutputStrategy outputStrategy : this.outputStrategies) {
+            if (outputStrategy.getDestination() == null) {
+                continue;
+            } else if (outputStrategy.getJobClass() != jobClass) {
+                continue;
+            }
+
+            outputStrategyCdf.addElement(outputStrategy, outputStrategy.getProbability());
+        }
+        ArrayList<Pair<Double,OutputStrategy>> outputStrategies = outputStrategyCdf.getPossibleEventProbability();
+        ArrayList<Pair<OutputEvent,Double>> outputEvents = new ArrayList<>();
+        for(Pair<Double,OutputStrategy> pair : outputStrategies){
+            outputEvents.add(new Pair(this.outputEvents.get(pair.getRight()),pair.getLeft()));
+        }
+        return outputEvents;
+    }
+
+
+
     public OutputEvent getOutputEvent(JobClass jobClass) {
         return this.getOutputEvent(jobClass, new Random());
+    }
+
+    public List<OutputStrategy> getOutputStrategyByClass(JobClass jobClass) {
+    	List<OutputStrategy> res = new ArrayList<OutputStrategy>();
+    	for(OutputStrategy outputStrategy : outputStrategies) {
+    		if (outputStrategy.getJobClass().equals(jobClass)) {
+    			res.add(outputStrategy);
+    		}
+    	}
+    	return res;
     }
 }

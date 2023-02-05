@@ -1,60 +1,118 @@
 package jline.lang.distributions;
 
-import jline.util.Interval;
+import jline.lang.JLineMatrix;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import static java.lang.Math.exp;
 
+@SuppressWarnings("unchecked")
 public class HyperExp extends MarkovianDistribution  implements Serializable {
-    int nPhases;
-    public HyperExp(List<Double> p, List<Double> lambda) {
-        super("HyperExponential", 1);
-        this.setParam(1, "p", p);
-        this.setParam(2, "lambda", lambda);
-
-        nPhases = lambda.size();
+	
+    private long nPhases;
+    
+    public HyperExp(double p, double lambda1, double lambda2) {
+    	super("HyperExponential", 1);
+    	
+    	this.setParam(1, "p", p);
+    	this.setParam(2, "lambda1", lambda1);
+    	this.setParam(3, "lambda2", lambda2);
+    	
+    	nPhases = 2;
+    }
+    
+    public HyperExp(double p, double lambda) {
+    	this(p, lambda, lambda);
     }
 
     public List<Double> sample(int n)  {
         throw new RuntimeException("Not Implemented!");
     }
 
-    public long getNumberOfPhases() {
-        return ((List)this.getParam(2)).size();
+	public long getNumberOfPhases() {
+        return nPhases;
     }
 
     public double evalCDF(double t) {
-        throw new RuntimeException("Not Implemented!");
+    	if (this.nPhases == 2) {
+    		double p = (double) this.getParam(1).getValue();
+    		double mu1 = (double) this.getParam(2).getValue();
+    		double mu2 = (double) this.getParam(3).getValue();
+    		return p*(1-Math.exp(-mu1*t)) + (1-p)*(1-Math.exp(-mu2*t));
+    	} else {
+    		return super.evalCDF(t);
+    	}
     }
 
-    public Interval getPH() {
-        throw new RuntimeException("Not Implemented!");
+	public Map<Integer, JLineMatrix> getPH() {
+    	Map<Integer, JLineMatrix> res = new HashMap<Integer, JLineMatrix>();
+    	
+    	double p = (double) this.getParam(1).getValue();
+    	double mu1 = (double) this.getParam(2).getValue();
+    	double mu2 = (double) this.getParam(3).getValue();
+		JLineMatrix D0 = new JLineMatrix(2,2,4);
+		JLineMatrix D1 = new JLineMatrix(2,2,4);
+		D0.set(0, 0, -mu1); D0.set(1, 1, -mu2);
+		D1.set(0, 0, mu1*p); D1.set(0, 1, mu1*(1-p)); D1.set(1, 0, mu2*p); D1.set(1, 1, mu2*(1-p));
+		res.put(0, D0);
+		res.put(1, D1);
+    	
+    	return res;
+//	NOT USED (FOR N-PHASES)
+//    		JLineMatrix D0 = new JLineMatrix(nPhases, nPhases, nPhases);
+//    		for(int i = 0; i < nPhases; i++) 
+//    			D0.set(i, i, -lambda.get(i));
+//    		
+//    		JLineMatrix D1 = new JLineMatrix(nPhases, nPhases);
+//    		JLineMatrix temP = new JLineMatrix(nPhases, 1, nPhases);
+//    		JLineMatrix ones = new JLineMatrix(1, nPhases, nPhases);
+//    		CommonOps_DSCC.fill(ones, 1.0);
+//    		for(int i = 0; i < nPhases; i++)
+//    			temP.set(i, 0, p.get(i));
+//    		CommonOps_DSCC.mult(CommonOps_DSCC.mult(D0, temP, null), ones, D1);
+//    		CommonOps_DSCC.changeSign(D1, D1);
+//    		res.put(0, D0);
+//    		res.put(1, D1);
     }
 
     public double evalLST(double s) {
-        throw new RuntimeException("Not Implemented!");
+        return super.evalLST(s);
     }
 
     public double getSCV() {
-        return 1;
+    	if (this.nPhases == 2) {
+    		double p = (double) this.getParam(1).getValue();
+    		double mu1 = (double) this.getParam(2).getValue();
+    		double mu2 = (double) this.getParam(3).getValue();
+    		return (2*(p/Math.pow(mu1, 2) + (1-p)/Math.pow(mu2, 2)) - Math.pow(p/mu1 + (1-p)/mu2, 2)) / Math.pow(p/mu1 + (1-p)/mu2, 2);
+    	} else {
+    		return super.getSCV();
+    	}
     }
 
     public double getRate() {
-        throw new RuntimeException("Not Implemented!");
+    	return 1/getMean();
     }
 
     public double getMean() {
-        throw new RuntimeException("Not Implemented!");
+    	if (this.nPhases == 2) {
+    		double p = (double) this.getParam(1).getValue();
+    		double mu1 = (double) this.getParam(2).getValue();
+    		double mu2 = (double) this.getParam(3).getValue();
+    		return p/mu1 + (1-p)/mu2;
+    	} else {
+    		return super.getMean();
+    	}
     }
 
     public double getVar() {
-        throw new RuntimeException("Not Implemented!");
+    	return this.getSCV()*Math.pow(this.getMean(), 2);
     }
 
     public double getSkew() {
-        throw new RuntimeException("Not Implemented!");
+        return super.getSkew();
     }
 
     public String toString() {
@@ -62,6 +120,9 @@ public class HyperExp extends MarkovianDistribution  implements Serializable {
     }
 
     public double getRateFromPhase(int phase) {
-        return ((List<Double>)this.getParam(2)).get(phase);
+    	if (phase > this.nPhases)
+    		throw new RuntimeException("Exceed the number of phases");
+
+        return ((List<Double>)this.getParam(2)).get(phase - 1);
     }
 }

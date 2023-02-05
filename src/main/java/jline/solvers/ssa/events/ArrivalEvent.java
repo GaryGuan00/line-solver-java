@@ -57,7 +57,7 @@ public class ArrivalEvent extends Event implements NodeEvent, Serializable {
 
         if (this.isStateful) {
             res = stateMatrix.stateArrivalN(n, this.statefulIndex, this.classIndex);
-        } else if (!(this.node instanceof Sink)){
+        } else if (!(this.node instanceof Sink)) {
             throw new RuntimeException(String.format("ArrivalEvent at %s not supported!", this.node.getName()));
         }
 

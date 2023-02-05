@@ -34,6 +34,27 @@ public class Cdf<T> implements Serializable {
         return null;
     }
 
+    public ArrayList<T> getPossibleEvents(){
+        ArrayList<T> arrayList = new ArrayList<>();
+        Iterator<Pair<Double, T>> pdfIter = this.pdf.iterator();
+        while (pdfIter.hasNext()) {
+            Pair<Double, T> tPair = pdfIter.next();
+            arrayList.add(tPair.getRight());
+        }
+        return arrayList;
+    }
+
+    public ArrayList<Pair<Double, T>> getPossibleEventProbability(){
+        ArrayList<Pair<Double, T>> arrayList = new ArrayList<>();
+        Iterator<Pair<Double, T>> pdfIter = this.pdf.iterator();
+        while (pdfIter.hasNext()) {
+            Pair<Double, T> tPair = pdfIter.next();
+            arrayList.add(tPair);
+        }
+        return arrayList;
+    }
+
+
     public void normalize(double factor) {
         Iterator<Pair<Double, T>> pdfIter = this.pdf.iterator();
         while (pdfIter.hasNext()) {

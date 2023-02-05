@@ -20,6 +20,8 @@ public class RandomSource extends InputSection implements Serializable {
             serviceProcesses.add(new ServiceBinding(jobClass, ServiceStrategy.LI));
         }
     }
+    
+    @Override
     public void setServiceProcess(ServiceBinding serviceProcess) {
         removeServiceProcess(serviceProcess.getJobClass());
         serviceProcesses.add(serviceProcess);

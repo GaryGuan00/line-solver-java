@@ -12,6 +12,7 @@ import jline.lang.sections.ServiceSection;
 import jline.solvers.ssa.events.ArrivalEvent;
 import jline.solvers.ssa.events.NodeArrivalEvent;
 import jline.solvers.ssa.events.OutputEvent;
+import jline.util.Pair;
 
 import java.io.Serializable;
 import java.util.*;
@@ -26,6 +27,8 @@ public class Node extends NetworkElement implements Serializable {
     protected Map<JobClass, ArrivalEvent> arrivalEvents;
 
     protected int statefulIdx;
+    protected int nodeIndex;
+    protected int stationIdx;
 
     public Node(String nodeName) {
         super(nodeName);
@@ -35,6 +38,8 @@ public class Node extends NetworkElement implements Serializable {
         this.input = new InputSection("Generic Input");
         this.dropStrategy = DropStrategy.Drop;
         this.statefulIdx = -1;
+        this.nodeIndex = -1;
+        this.stationIdx = -1;
     }
 
     public void setModel(Network model) {
@@ -89,6 +94,11 @@ public class Node extends NetworkElement implements Serializable {
         return this.output.getOutputEvent(jobClass, random);
     }
 
+    public ArrayList<Pair<OutputEvent,Double>>  getOutputEvents(JobClass jobClass, Random random) {
+        return this.output.getOutputEvents(jobClass, random);
+    }
+
+
     public List<OutputStrategy> getOutputStrategies() {
         return this.output.getOutputStrategies();
     }
@@ -105,5 +115,37 @@ public class Node extends NetworkElement implements Serializable {
         }
 
         return this.statefulIdx;
+    }
+
+    public boolean isStateful() {
+        return this.statefulIdx != -1;
+    }
+
+    public int getNodeIdx() {
+    	if (this.nodeIndex == -1) {
+    		this.nodeIndex = this.model.getNodeIndex(this);
+    	}
+
+    	return this.nodeIndex;
+    }
+
+    public int getStationIdx() {
+    	if (this.stationIdx == -1) {
+    		this.stationIdx = this.model.getStationIndex(this);
+    	}
+
+    	return this.stationIdx;
+    }
+
+    public InputSection getInput() {
+    	return this.input;
+    }
+
+    public OutputSection getOutput() {
+    	return this.output;
+    }
+    
+    public ServiceSection getServer() {
+    	return this.server;
     }
 }

@@ -9,6 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import jline.solvers.ssa.*;
 import jline.solvers.ssa.state.StateMatrix;
 
+import java.util.Map;
+import java.util.Random;
+
 class StateMatrixTest {
     private StateMatrix stateMatrix;
 
@@ -34,69 +37,33 @@ class StateMatrixTest {
         servers[2] = 2;
         SchedStrategy[] schedStrategies = new SchedStrategy[3];
         schedStrategies[0] = SchedStrategy.FCFS;
-        schedStrategies[1] = SchedStrategy.LCFS;
-        schedStrategies[2] = SchedStrategy.LCFS;
-        NetworkStruct networkStruct = new NetworkStruct();
+        schedStrategies[1] = SchedStrategy.LCFSPR;
+        schedStrategies[2] = SchedStrategy.LCFSPR;
+        SSAStruct networkStruct = new SSAStruct();
         networkStruct.nStateful = 3;
         networkStruct.nClasses = 3;
         networkStruct.schedStrategies = schedStrategies;
         networkStruct.capacities = capacityMatrix;
         networkStruct.nodeCapacity = nodeCapacities;
         networkStruct.numberOfServers = servers;
-        this.stateMatrix = new StateMatrix(networkStruct);
+        networkStruct.isDelay = new boolean[3];
+        networkStruct.isDelay[0] = false;
+        networkStruct.isDelay[1] = false;
+        networkStruct.isDelay[2] = false;
+        networkStruct.nPhases = new int[3][3];
+        networkStruct.startingPhaseProbabilities = new Map[3];
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                networkStruct.nPhases[i][j] = 1;
+            }
+        }
+        this.stateMatrix = new StateMatrix(networkStruct, new Random());
     }
 
     @org.junit.jupiter.api.AfterEach
     void tearDown() {
     }
-
-    @org.junit.jupiter.api.Test
-    void addToBuffer() {
-        // adding FCFS
-        stateMatrix.addToBuffer(0,0);
-        stateMatrix.addToBuffer(0,1);
-        stateMatrix.addToBuffer(0,2);
-        assertEquals(stateMatrix.peakBuffer(0),0);
-        stateMatrix.popFromBuffer(0);
-        assertEquals(stateMatrix.peakBuffer(0),1);
-        stateMatrix.popFromBuffer(0);
-        assertEquals(stateMatrix.peakBuffer(0),2);
-
-        // adding LCFS
-        stateMatrix.addToBuffer(1,0);
-        stateMatrix.addToBuffer(1,1);
-        stateMatrix.addToBuffer(1,2);
-        assertEquals(stateMatrix.peakBuffer(1),2);
-        stateMatrix.popFromBuffer(1);
-        assertEquals(stateMatrix.peakBuffer(1),1);
-        stateMatrix.popFromBuffer(1);
-        assertEquals(stateMatrix.peakBuffer(1),0);
-    }
-
-    @org.junit.jupiter.api.Test
-    void popFromBuffer() {
-        stateMatrix.addToBuffer(0,0);
-        stateMatrix.addToBuffer(0,1);
-        stateMatrix.addToBuffer(0,2);
-        assertEquals(stateMatrix.popFromBuffer(0),0);
-        assertEquals(stateMatrix.peakBuffer(0),1);
-        assertEquals(stateMatrix.popFromBuffer(0),1);
-        assertEquals(stateMatrix.peakBuffer(0),2);
-    }
-
-    @org.junit.jupiter.api.Test
-    void peakBuffer() {
-        stateMatrix.addToBuffer(0,0);
-        stateMatrix.addToBuffer(1,0);
-        assertEquals(stateMatrix.peakBuffer(0),0);
-        assertEquals(stateMatrix.peakBuffer(1),0);
-        stateMatrix.addToBuffer(0,1);
-        stateMatrix.addToBuffer(1,1);
-        assertEquals(stateMatrix.peakBuffer(0),0);
-        assertEquals(stateMatrix.peakBuffer(1),1);
-
-    }
-
+    
     @org.junit.jupiter.api.Test
     void totalStateAtNode() {
         stateMatrix.incrementState(0,0);

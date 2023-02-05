@@ -4,6 +4,7 @@ import jline.solvers.ssa.events.ArrivalEvent;
 import jline.solvers.ssa.events.ClassSwitchArrivalEvent;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import jline.lang.*;
@@ -14,13 +15,13 @@ import jline.lang.distributions.*;
 import jline.lang.nodes.*;
 import jline.lang.sections.*;
 
-public class ClassSwitch extends Station implements Serializable {
+public class ClassSwitch extends Node implements Serializable {
     protected SchedStrategyType schedPolicy;
     protected SchedStrategy schedStrategy;
 
-    protected Map<JobClass, Map<JobClass, Double>> csMatrix;
+    protected Map<JobClass, Map<JobClass, Double>> csMatrix; //This to align the solver SSA.
 
-    public ClassSwitch(Network model, String name, Map<JobClass, Map<JobClass, Double>> csMatrix) {
+    public ClassSwitch(Network model, String name, Map<JobClass, Map<JobClass, Double>> csMatrix, JLineMatrix csFun) {
         super(name);
 
         List<JobClass> jobClasses = model.getClasses();
@@ -34,7 +35,7 @@ public class ClassSwitch extends Station implements Serializable {
 
         this.schedPolicy = SchedStrategyType.NP;
         this.schedStrategy = SchedStrategy.FCFS;
-        this.server = new StatelessClassSwitcher(jobClasses, csMatrix);
+        this.server = new StatelessClassSwitcher(jobClasses, csFun);
     }
 
     public void setProbRouting(JobClass jobClass, Node destination, double probability) {

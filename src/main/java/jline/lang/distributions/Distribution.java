@@ -12,17 +12,18 @@ import jline.util.Param;
 
 abstract public class Distribution  implements Serializable  {
     protected double mean;
+    protected boolean immediate;
 
     protected String name;
     protected int numParam;
     protected Interval support;
     protected List<Param> params;
 
-    protected final double zeroRn = 1e-8; // right neighborhood of zero
-    protected final double tolerance = 1e-3; // tolerance for distribution fitting
-    protected final double infRep = 1e8; // generic representation of infinity
-    protected final double infTimeRep = 1e8; // generic representation of infinite time
-    protected final double infRateRep = 1e8; // generic representation of an infinite rate
+    public final static double zeroRn = 1e-8; // right neighborhood of zero
+    public final static double tolerance = 1e-3; // tolerance for distribution fitting
+    public final static double infRep = 1e8; // generic representation of infinity
+    public final static double infTimeRep = 1e8; // generic representation of infinite time
+    public final static double infRateRep = 1e8; // generic representation of an infinite rate
 
     public abstract List<Double> sample(int n);
     public abstract double getMean();

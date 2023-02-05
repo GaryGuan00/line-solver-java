@@ -2,9 +2,11 @@ package jline.lang.constant;
 
 public enum RoutingStrategy {
     RAND,
-    RRB,
     PROB,
+    RROBIN,
+    WRROBIN,
     JSQ,
     DISABLED,
-    FIRING
+    FIRING,
+    KCHOICES
 }

@@ -2,9 +2,19 @@ package jline.solvers.ssa.state;
 
 import jline.lang.NetworkStruct;
 import jline.lang.constant.SchedStrategy;
-import jline.solvers.ssa.events.PhaseEvent;
-import jline.util.Pair;
+import jline.lang.constant.SchedStrategyType;
 
+
+import jline.solvers.ssa.SSAStruct;
+import jline.solvers.ssa.events.Event;
+
+import jline.solvers.ssa.events.OutputEvent;
+import jline.util.Pair;
+import org.javatuples.Quartet;
+import org.javatuples.Triplet;
+
+
+import java.lang.reflect.Array;
 import java.util.*;
 
 public class StateMatrix {
@@ -19,11 +29,11 @@ public class StateMatrix {
     protected int[] nodeCapacity; // [node]
     protected int nStateful;
     protected int nClasses;
+    protected int[][] nPhases;
 
     // information on the state (jobs at each station, value at other StatefulNode objects, and phases)
-    protected int[][] state; // [node][class]
+    public int[][] state; // [node][class]
     protected StateCell[] buffers;
-    protected Map<PhaseEvent, PhaseList> phaseTracker;
 
     // caching, for TimeWarp
     protected int[][] stateCache;
@@ -31,6 +41,7 @@ public class StateMatrix {
 
     // used to temporarily allow illegal states, e.g. negative jobs at a station or more jobs than capacity. - REMOVED (MS)
     //protected boolean allowIllegalStates;
+    protected Random random;
 
     private static int[] defaultNodeCapacity(int nStateful, int nClasses, int[][] capacities) {
         // initialize node capacities
@@ -47,12 +58,13 @@ public class StateMatrix {
         return outArr;
     }
 
-    public StateMatrix(NetworkStruct networkStruct) {
+    public StateMatrix(SSAStruct networkStruct, Random random) {
         this.nStateful = networkStruct.nStateful;
         this.nClasses = networkStruct.nClasses;
         this.capacities = networkStruct.capacities;
         this.nodeCapacity = networkStruct.nodeCapacity;
-        //this.allowIllegalStates = false;
+        this.nPhases = networkStruct.nPhases;
+        this.random = random;
 
         this.state = new int[this.nStateful][this.nClasses];
         for (int i = 0; i < this.nStateful; i++) {
@@ -67,28 +79,54 @@ public class StateMatrix {
         this.buffers = new StateCell[nStateful];
         this.bufferCache = new StateCell[nStateful];
         for (int i = 0; i < nStateful; i++) {
-            if ((networkStruct.schedStrategies[i] == SchedStrategy.FCFS) || (networkStruct.schedStrategies[i] == SchedStrategy.EXT)
-                || (networkStruct.schedStrategies[i] == SchedStrategy.INF)) {
-                this.buffers[i] = new FCFSClassBuffer(nClasses, networkStruct.numberOfServers[i]);
+            PhaseList phaseList = new PhaseList(this.nPhases[i], this.nClasses, this.random);
+            if (networkStruct.startingPhaseProbabilities[i] != null) {
+                for (int j = 0; j < nClasses; j++) {
+                    if (networkStruct.startingPhaseProbabilities[i].containsKey(j)) {
+                        phaseList.setPhaseStart(j, networkStruct.startingPhaseProbabilities[i].get(j));
+                    }
+                }
+            }
+            if (networkStruct.schedStrategies[i] == SchedStrategy.FCFS) {
+                this.buffers[i] = new FCFSClassBuffer(nClasses, networkStruct.numberOfServers[i], phaseList);
+            } else if(networkStruct.schedStrategies[i] == SchedStrategy.INF) {
+                this.buffers[i] = new INFClassBuffer(this.random, nClasses, phaseList);
+            } else if (networkStruct.schedStrategies[i] == SchedStrategy.EXT) {
+                this.buffers[i] = new SourceBuffer(nClasses, phaseList);
             } else if (networkStruct.schedStrategies[i] == SchedStrategy.LCFS) {
-                this.buffers[i] = new LCFSClassBuffer(nClasses, networkStruct.numberOfServers[i]);
+                    this.buffers[i] = new LCFSNonPreBuffer(nClasses, networkStruct.numberOfServers[i], phaseList);
+            } else if (networkStruct.schedStrategies[i] == SchedStrategy.LCFSPR) {
+                this.buffers[i] = new LCFSPreBuffer(nClasses, networkStruct.numberOfServers[i], phaseList);
             } else if (networkStruct.schedStrategies[i] == SchedStrategy.PS) {
-                this.buffers[i] = new ProcessorSharingBuffer(new Random(), networkStruct.numberOfServers[i]);
+                this.buffers[i] = new ProcessorSharingBuffer(this.random, nClasses, networkStruct.numberOfServers[i], phaseList);
             } else if (networkStruct.schedStrategies[i] == SchedStrategy.SIRO) {
-                this.buffers[i] = new SIROClassBuffer(new Random(), networkStruct.numberOfServers[i]);
+                this.buffers[i] = new SIROClassBuffer(this.random, nClasses, networkStruct.numberOfServers[i], phaseList, false);
+            /*} else if (networkStruct.schedStrategies[i] == SchedStrategy.SIROPR) {
+                this.buffers[i] = new SIROClassBuffer(this.random, nClasses, networkStruct.numberOfServers[i], phaseList, true);*/
             } else {
                 System.out.println(networkStruct.schedStrategies[i]);
                 throw new RuntimeException("Unsupported Scheduling Strategy");
             }
         }
-        this.phaseTracker = new HashMap<PhaseEvent, PhaseList>();
     }
 
     public StateMatrix(StateMatrix that) {
         this.nStateful = that.nStateful;
         this.nClasses = that.nClasses;
         this.capacities = that.capacities.clone();
-        this.state = that.state.clone();
+        this.state = new int[that.state.length][that.state[0].length];
+        for(int i=0;i<state.length;i++){
+            for (int j=0;j<state[0].length;j++){
+                this.state[i][j] = that.state[i][j];
+            }
+        }
+
+        this.nPhases = that.nPhases;
+        this.random = that.random;
+        this.buffers = new StateCell[that.nStateful];
+        for (int i = 0 ; i < that.nStateful; i++) {
+            this.buffers[i] = that.buffers[i].createCopy();
+        }
     }
 
     public void addToBuffer(int nodeIdx, int classIdx) {
@@ -102,9 +140,10 @@ public class StateMatrix {
     public boolean stateArrival(int nodeIdx, int classIdx) {
         // arrive 1 instance of [class] at [node]
         // returns: true if successful, false otherwise
-        if (state[nodeIdx][classIdx] == capacities[nodeIdx][classIdx]) {
+        if (state[nodeIdx][classIdx] >= capacities[nodeIdx][classIdx]) {
             return false;
         }
+
         this.addToBuffer(nodeIdx, classIdx);
         this.state[nodeIdx][classIdx]++;
 
@@ -119,9 +158,6 @@ public class StateMatrix {
         int curState = this.state[nodeIdx][classIdx];
         int maxState = this.capacities[nodeIdx][classIdx];
 
-        /*if (this.allowIllegalStates) {
-            maxState = Integer.MAX_VALUE;
-        }*/
 
         int nToApply = Math.min(n, maxState - curState);
         int rem = Math.min(n - nToApply, n);
@@ -149,48 +185,10 @@ public class StateMatrix {
         int curState = this.state[nodeIdx][classIdx];
         int nToApply = Math.min(curState, n);
 
-        /*if (this.allowIllegalStates) {
-            nToApply = n;
-        }*/
-
         this.buffers[nodeIdx].removeNClass(nToApply, classIdx);
         this.state[nodeIdx][classIdx] -= nToApply;
 
-
         return n-nToApply;
-    }
-
-    public Pair<Map<Integer, Integer>, Integer> stateDepartureN(int n, int nodeIdx) {
-        // depart n instances of [class] from [node]
-        // returns: <<index of class departed, number departed>, number of unapplied departures>
-        int res = n;
-
-        Map<Integer, Integer> classOutputs = new HashMap<Integer, Integer>();
-        for (int i = 0; i < this.nClasses; i++) {
-            classOutputs.put(i, 0);
-        }
-
-        for (int i = 0; i < n; i++) {
-            if (this.buffers[nodeIdx].isEmpty()) {
-                break;
-            }
-
-            int classRemoved = this.buffers[nodeIdx].popFromBuffer();
-            classOutputs.put(classRemoved, classOutputs.get(classRemoved) + 1);
-            res--;
-        }
-
-        return new Pair<Map<Integer, Integer>, Integer>(classOutputs, res);
-    }
-
-    public int popFromBuffer(int nodeIdx) {
-        // remove one job from the buffer at node, this doesn't necessarily update the state
-        return this.buffers[nodeIdx].popFromBuffer();
-    }
-
-    public int peakBuffer(int nodeIdk) {
-        // find the job class of the "next" job at a node, usually the one in service
-        return this.buffers[nodeIdk].peakBuffer();
     }
 
     public int totalStateAtNode(int nodeIdx) {
@@ -246,112 +244,41 @@ public class StateMatrix {
         return this.buffers[nodeIdx].getInService(classIdx);
     }
 
-    public int getNInPhase(PhaseEvent phaseEvent) {
-        // Total jobs that have a phase value.
-        // This might not accurately reflect the true amount,
-        // since not all jobs that are in service (which theoretically have a phase) are tracked.
-        // Refer to PhaseList for more info
-        if (this.phaseTracker.containsKey(phaseEvent)) {
-            return this.phaseTracker.get(phaseEvent).getListSize();
-        }
-
-        return 0;
+    public int psTotalCapacity(int nodeIdx) {
+        return ((ProcessorSharingBuffer)this.buffers[nodeIdx]).getTotalCapacity();
     }
 
-    public int getPhase(PhaseEvent phaseEvent) {
-        // Find the *scalar* phase of a PhaseEvent
-        // ErlangPhase event has multiple phases for each job in service, while MAPPhaseEvent has one phase
-        if (!this.phaseTracker.containsKey(phaseEvent)) {
-            this.phaseTracker.put(phaseEvent, new PhaseList((int)phaseEvent.getNPhases()));
-        }
-
-        return this.phaseTracker.get(phaseEvent).getPhase();
-    }
-
-    public boolean phaseUpdate(PhaseEvent phaseEvent, int newPhase) {
+    public boolean incrementPhase(int nodeIdx, int classIdx) {
         /*
-            Signal a phase update
+            Signal a class-specific phase update
          */
-        if (!this.phaseTracker.containsKey(phaseEvent)) {
-            this.phaseTracker.put(phaseEvent, new PhaseList((int)phaseEvent.getNPhases()));
-        }
-
-        PhaseList phaseList = this.phaseTracker.get(phaseEvent);
-        phaseList.setPhase(newPhase);
-        return true;
+        return this.buffers[nodeIdx].incrementPhase(classIdx);
     }
 
-    public boolean phaseUpdate(PhaseEvent phaseEvent, int activeServers, Random random) {
+    public int incrementPhaseN(int n, int nodeIdx, int classIdx) {
+        return this.buffers[nodeIdx].incrementPhaseN(n, classIdx);
+    }
+
+    public boolean updatePhase (int nodeIdx, int classIdx, int startingPhase, int endingPhase) {
+        return this.buffers[nodeIdx].updatePhase(classIdx, startingPhase, endingPhase);
+    }
+
+    public boolean updateGlobalPhase(int nodeIdx, int classIdx, int newPhase) {
         /*
-            Signal a phase update, for ErlangPhaseEvent
+            Signal a global phase update
          */
-        if (!this.phaseTracker.containsKey(phaseEvent)) {
-            this.phaseTracker.put(phaseEvent, new PhaseList((int)phaseEvent.getNPhases(), random));
-        }
-        PhaseList phaseList = this.phaseTracker.get(phaseEvent);
-        return phaseList.updatePhase(activeServers);
+        return this.buffers[nodeIdx].updateGlobalPhase(classIdx, newPhase);
     }
 
-    public boolean phaseUpdate(PhaseEvent phaseEvent, Random random) {
-        /*
-            Signal a *scalar* phase update, for MAPPhaseEvent
-         */
-        if (!this.phaseTracker.containsKey(phaseEvent)) {
-            this.phaseTracker.put(phaseEvent, new PhaseList((int)phaseEvent.getNPhases(), random));
-        }
-        PhaseList phaseList = this.phaseTracker.get(phaseEvent);
-        return phaseList.updatePhase();
+    public int getGlobalPhase(int nodeIdx, int classIdx) {
+        return this.buffers[nodeIdx].getGlobalPhase(classIdx);
     }
 
-    public int phaseUpdateN(int n, PhaseEvent phaseEvent, int activeServers, Random random) {
-        int nDepartures = 0;
-        for (int i = 0; i < n; i++) {
-            if (this.phaseUpdate(phaseEvent, activeServers, random)) {
-                nDepartures++;
-            }
-        }
 
-        return nDepartures;
-    }
-    public int phaseUpdateN(int n, PhaseEvent phaseEvent, Random random) {
-        int nDepartures = 0;
-        for (int i = 0; i < n; i++) {
-            if (this.phaseUpdate(phaseEvent, random)) {
-                nDepartures++;
-            }
-        }
-
-        return nDepartures;
+    public int getInPhase(int nodeIdx, int classIdx, int phase) {
+        return this.buffers[nodeIdx].getPhaseList().getNInPhase(classIdx, phase);
     }
 
-    public int getPhaseListSize(PhaseEvent phaseEvent) {
-        if (!this.phaseTracker.containsKey(phaseEvent)) {
-            return 0;
-        }
-
-        return this.phaseTracker.get(phaseEvent).getListSize();
-    }
-
-    /*public void allowIllegalStates() {
-        this.allowIllegalStates = true;
-    }
-
-    public void forbidIllegalStates() {
-        // set allowIllegalStates to false and then clip the state at proper values.
-        this.allowIllegalStates = false;
-
-        for (int i = 0; i < this.nStateful; i++) {
-            for (int j = 0; j < this.nClasses; j++) {
-                int oldState = this.state[i][j];
-                int newState = Math.min(oldState, this.capacities[i][j]);
-                int bufferSize = this.buffers[i].getInQueue(j);
-                if (bufferSize > newState) {
-                    this.buffers[i].removeNClass(bufferSize-newState, j);
-                }
-                this.state[i][j] = Math.max(newState, 0);
-            }
-        }
-    }*/
 
     public void cacheState() {
         /*
@@ -371,4 +298,185 @@ public class StateMatrix {
         this.state = this.stateCache;
         this.buffers = this.bufferCache;
     }
+
+    public List<Integer>[] getStateVectors() {
+        /*
+            Return state vectors for transient analysis:
+
+            Ext: [Inf, s11, ... S1K,...sR1, ...SRk]
+            FCFS, HOL, LCFS: [cb,...c1, s11, ... S1K,...sR1, ...SRk]
+         */
+        List<Integer>[] outList = new List[this.nStateful];
+
+        for (int i = 0; i < this.nStateful; i++) {
+            outList[i] = this.buffers[i].stateVector();
+        }
+
+        return outList;
+    }
+
+    public int[][] copy(){
+        return this.state.clone();
+    }
+
+    public boolean checkIfVisited(ArrayList<StateMatrix> stateSpace){
+        List<Integer>[] newState = getStateVectors();
+
+        boolean checkIfPresent = false;
+        for (StateMatrix stateMatrix : stateSpace) {
+            boolean ifMatches = true;
+            List<Integer>[] visitedState = stateMatrix.getStateVectors();
+            for (int j = 0; j < visitedState.length; j++) {
+                if(newState[j].size()!=visitedState[j].size()){
+                    ifMatches=false;
+                    break;
+                }
+                for (int k = 0; k < visitedState[j].size(); k++) {
+                    if (!Objects.equals(newState[j].get(k), visitedState[j].get(k))) {
+                        ifMatches = false;
+                    }
+                }
+            }
+            if (ifMatches) {
+                checkIfPresent = true;
+                break;
+            }
+        }
+        return  checkIfPresent;
+    }
+
+    public boolean checkIfVisited(ArrayList<Quartet<Event, Pair<OutputEvent,Double>,StateMatrix,StateMatrix>>  eventSpace, StateMatrix oldState, Event event, OutputEvent outputEvent){
+        List<Integer>[] newState = getStateVectors();
+        List<Integer>[] oldStateVector = oldState.getStateVectors();
+
+        boolean checkIfPresent = false;
+
+        for (Quartet<Event, Pair<OutputEvent,Double>,StateMatrix,StateMatrix> eventMatrix : eventSpace) {
+            boolean ifMatches = true;
+            if(eventMatrix.getValue3()!=null) {
+                for (int j = 0; j < eventMatrix.getValue3().getStateVectors().length; j++) {
+                    if (newState[j].size() != eventMatrix.getValue3().getStateVectors()[j].size()) {
+                        ifMatches = false;
+                        break;
+                    }
+                    for (int k = 0; k < eventMatrix.getValue3().getStateVectors()[j].size(); k++) {
+                        if (!Objects.equals(newState[j].get(k), eventMatrix.getValue3().getStateVectors()[j].get(k))) {
+                            ifMatches = false;
+                        }
+                    }
+                }
+            }else{
+                ifMatches=false;
+            }
+            if(eventMatrix.getValue2()!=null) {
+                for (int j = 0; j < eventMatrix.getValue2().getStateVectors().length; j++) {
+                    if(oldStateVector[j].size()!=eventMatrix.getValue2().getStateVectors()[j].size()){
+                        ifMatches=false;
+                        break;
+                    }
+                    for (int k = 0; k < eventMatrix.getValue2().getStateVectors()[j].size(); k++) {
+                        if (!Objects.equals(oldStateVector[j].get(k), eventMatrix.getValue2().getStateVectors()[j].get(k))) {
+                            ifMatches = false;
+                        }
+                    }
+                }
+            }else{
+                ifMatches=false;
+            }
+            if (ifMatches && event==eventMatrix.getValue0() && outputEvent==eventMatrix.getValue1().getLeft()) {
+                checkIfPresent = true;
+            }
+        }
+        return  checkIfPresent;
+    }
+
+    public void stateChangePrint(StateMatrix that){
+        List<Integer>[] newState = that.getStateVectors();
+        List<Integer>[] oldStateVector = this.getStateVectors();
+        assert newState.length==oldStateVector.length;
+        for(int i = 0; i < oldStateVector.length;i++){
+            for(int j=0; j < oldStateVector[i].size();j++){
+                System.out.print(oldStateVector[i].get(j)+"  ");
+            }
+            System.out.print("\t\t");
+            for(int j=0; j < newState[i].size();j++){
+                System.out.print(newState[i].get(j)+"  ");
+            }
+            System.out.println();
+        }
+    }
+
+    public static boolean sameState(List<Integer>[] state1, List<Integer>[] state2){
+        assert state1.length==state2.length;
+        for(int i=0;i<state1.length;i++){
+            if(state1[i].size()!=state2[i].size()){
+                return false;
+            }
+            for(int j = 0;j<state1[i].size();j++){
+                if(state1[i].get(j)!=state2[i].get(j)){
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public static boolean multipleEventSameState(Quartet<Event, OutputEvent,StateMatrix,StateMatrix> quartet1, Quartet<Event, OutputEvent,StateMatrix,StateMatrix> quartet2){
+        List<Integer>[] q1s1 = quartet1.getValue2().getStateVectors();
+        List<Integer>[] q1s2 = quartet1.getValue3().getStateVectors();
+        List<Integer>[] q2s1 = quartet2.getValue2().getStateVectors();
+        List<Integer>[] q2s2 = quartet2.getValue3().getStateVectors();
+        if(sameState(q1s1,q2s1)&&sameState(q1s2,q2s2)){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+//    public StateMatrix stateToStateMatrix(int[][] state){
+//        StateMatrix stateMatrix = new StateMatrix(this);
+//
+//        for(int i = 0; i< this.state.length; i++){
+//            for(int j=0;j<this.state[0].length;j++){
+//                stateMatrix.state[i][j] = state[i][j];
+//            }
+//        }
+//
+//        return stateMatrix;
+//    }
+
+    public void printStateVector(){
+        List<Integer>[] state = this.getStateVectors();
+        for (List<Integer> list : state){
+            for (int i : list){
+                System.out.print(i + " ");
+            }
+            System.out.println();
+        }
+    }
+
+    @Override
+    public boolean equals(Object o){
+        StateMatrix that = (StateMatrix) o;
+        List<Integer>[] state1 = this.getStateVectors();
+        List<Integer>[] state2 = that.getStateVectors();
+        assert state1.length==state2.length;
+        for(int i=0;i<state1.length;i++){
+            if(state1[i].size()!=state2[i].size()){
+                return false;
+            }
+            for(int j = 0;j<state1[i].size();j++){
+                if(!Objects.equals(state1[i].get(j), state2[i].get(j))){
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.deepHashCode(this.getStateVectors());
+    }
+
 }

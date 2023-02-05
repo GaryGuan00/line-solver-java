@@ -62,6 +62,12 @@ public class ErlangPhaseEvent extends PhaseEvent implements NodeEvent {
     public double getRate(StateMatrix stateMatrix) {
         int activeServers = 1;
 
+        if (this.isProcessorSharing) {
+            double serviceRatio = (double)stateMatrix.getState(this.statefulIndex, this.classIndex)/(double)stateMatrix.totalStateAtNode(this.statefulIndex);
+            serviceRatio *= stateMatrix.psTotalCapacity(this.statefulIndex);
+            return this.serviceProcess.getRate()*serviceRatio;
+        }
+
         if (this.node instanceof StatefulNode) {
             activeServers = stateMatrix.inProcess(this.statefulIndex, this.classIndex);
             if (this.node instanceof Source) {
@@ -77,56 +83,43 @@ public class ErlangPhaseEvent extends PhaseEvent implements NodeEvent {
 
     @Override
     public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
-        int nInPhase = 1;
-
         if (this.node instanceof StatefulNode) {
-            nInPhase = stateMatrix.inProcess(this.statefulIndex, this.classIndex);
             if (this.node instanceof Source) {
-                if (stateMatrix.phaseUpdate(this, random)) {
+                if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
                     this.departureEvent.stateUpdate(stateMatrix, random, timeline);
                     timeline.record(this, stateMatrix);
                 }
 
                 return true;
-            } else if (nInPhase == 0) {
+            } else if (stateMatrix.getState(this.statefulIndex, this.classIndex) == 0) {
                 return true;
             }
         }
 
-        if (this.isProcessorSharing) {
-            nInPhase = stateMatrix.getState(this.statefulIndex, this.classIndex);
-        }
-
-        if (stateMatrix.phaseUpdate(this, nInPhase, random)) {
+        if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
             this.departureEvent.stateUpdate(stateMatrix, random, timeline);
             timeline.record(this, stateMatrix);
             return true;
         }
 
+        timeline.record(this, stateMatrix);
         return true;
     }
 
     @Override
     public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
-        int nInPhase = 1;
-
         if (this.node instanceof StatefulNode) {
-            nInPhase = stateMatrix.inProcess(this.statefulIndex, this.classIndex);
             if (this.node instanceof Source) {
-                int nDepartures = stateMatrix.phaseUpdateN(n,this,random);
+                int nDepartures = stateMatrix.incrementPhaseN(n,this.statefulIndex, this.classIndex);
                 int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures,stateMatrix, random, timeline);
                 timeline.preRecord(this, stateMatrix, nDepartures-nRemDepartures);
                 return 0;
-            } else if (nInPhase == 0) {
+            } else if (stateMatrix.getState(this.statefulIndex, this.classIndex) == 0) {
                 return 0;
             }
         }
 
-        if (this.isProcessorSharing) {
-            nInPhase = stateMatrix.getState(this.statefulIndex, this.classIndex);
-        }
-
-        int nDepartures = stateMatrix.phaseUpdateN(n, this, nInPhase, random);
+        int nDepartures = stateMatrix.incrementPhaseN(n, this.statefulIndex, this.classIndex);
         int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures, stateMatrix, random, timeline);
         timeline.preRecord(this, stateMatrix, nDepartures-nRemDepartures);
         return nRemDepartures;

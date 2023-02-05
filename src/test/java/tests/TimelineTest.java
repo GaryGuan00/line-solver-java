@@ -3,14 +3,15 @@ package tests;
 import jline.lang.NetworkStruct;
 import jline.lang.constant.SchedStrategy;
 
-import static org.junit.jupiter.api.Assertions.*;
 import jline.solvers.ssa.*;
 import jline.solvers.ssa.state.StateMatrix;
-import jline.solvers.ssa.strategies.CutoffStrategy;
+
+import java.util.Map;
+import java.util.Random;
 
 class TimelineTest {
     Timeline timeline;
-    NetworkStruct networkStruct;
+    SSAStruct networkStruct;
     StateMatrix stateMatrix;
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
@@ -34,9 +35,9 @@ class TimelineTest {
         servers[2] = 2;
         SchedStrategy[] schedStrategies = new SchedStrategy[3];
         schedStrategies[0] = SchedStrategy.FCFS;
-        schedStrategies[1] = SchedStrategy.LCFS;
-        schedStrategies[2] = SchedStrategy.LCFS;
-        this.networkStruct = new NetworkStruct();
+        schedStrategies[1] = SchedStrategy.LCFSPR;
+        schedStrategies[2] = SchedStrategy.LCFSPR;
+        this.networkStruct = new SSAStruct();
         this.networkStruct.nStateful = 3;
         this.networkStruct.nClasses = 3;
         this.networkStruct.schedStrategies = schedStrategies;
@@ -47,8 +48,16 @@ class TimelineTest {
         networkStruct.isDelay[0] = false;
         networkStruct.isDelay[1] = false;
         networkStruct.isDelay[2] = false;
-        this.stateMatrix = new StateMatrix(networkStruct);
-        this.timeline = new Timeline(networkStruct, CutoffStrategy.None);
+        networkStruct.nPhases = new int[3][3];
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                networkStruct.nPhases[i][j] = 1;
+            }
+        }
+
+        networkStruct.startingPhaseProbabilities = new Map[3];
+        this.stateMatrix = new StateMatrix(networkStruct, new Random());
+        this.timeline = new Timeline(networkStruct);
     }
 
     @org.junit.jupiter.api.Test

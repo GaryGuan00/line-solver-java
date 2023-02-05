@@ -13,10 +13,12 @@ public class SinkArrivalEvent extends ArrivalEvent{
 
     @Override
     public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+        timeline.record(this, stateMatrix);
         return true;
     }
     @Override
     public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+        timeline.preRecord(this, stateMatrix, n);
         return 0;
     }
 }

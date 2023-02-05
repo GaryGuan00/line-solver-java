@@ -15,7 +15,7 @@ public class DisabledDistribution extends Distribution implements Serializable {
     }
 
     public double getRate() {
-        return Double.POSITIVE_INFINITY;
+        return Double.NaN;
     }
 
     public double getMean() {

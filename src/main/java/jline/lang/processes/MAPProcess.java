@@ -1,12 +1,15 @@
 package jline.lang.processes;
 
+import jline.lang.JLineMatrix;
 import jline.lang.distributions.MarkovianDistribution;
 import jline.util.Cdf;
 import jline.util.Interval;
+import jline.util.Pair;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class MAPProcess extends MarkovianDistribution implements Serializable {
@@ -116,7 +119,7 @@ public class MAPProcess extends MarkovianDistribution implements Serializable {
         throw new RuntimeException("Not Implemented!");
     }
 
-    public Interval getPH()  {
+    public Map<Integer, JLineMatrix> getPH()  {
         throw new RuntimeException("Not Implemented!");
     }
     public double evalLST(double s) {

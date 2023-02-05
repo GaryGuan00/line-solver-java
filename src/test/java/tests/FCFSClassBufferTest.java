@@ -1,294 +1,164 @@
 package tests;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
 import jline.solvers.ssa.*;
 import jline.solvers.ssa.state.FCFSClassBuffer;
+import jline.solvers.ssa.state.PhaseList;
 import jline.util.Pair;
 
 class FCFSClassBufferTest {
     private FCFSClassBuffer classBuffer;
+    private Random random;
+    private int nClasses;
+    private int nServers;
+    private int nRuns;
+    private int maxBatch;
+
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        this.classBuffer = new FCFSClassBuffer(50,10);
+        this.random = new Random();
+        this.nClasses = this.random.nextInt(100);
+        this.nServers = this.random.nextInt(100);
+        this.nRuns = 200;
+        this.maxBatch = 15;
+
+        int[] nPhases = new int[this.nClasses];
+        for (int i = 0; i < this.nClasses; i++) {
+            nPhases[i] += 1;
+        }
+        this.classBuffer = new FCFSClassBuffer(nClasses,this.nServers, new PhaseList(nPhases,nClasses,new Random()));
+
     }
 
 
     @org.junit.jupiter.api.Test
     void testAddToBuffer() {
-        this.classBuffer.addToBuffer(1);
-        this.classBuffer.addToBuffer(2);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.popFromBuffer(),1);
-        assertEquals(this.classBuffer.popFromBuffer(),2);
-        assertEquals(this.classBuffer.popFromBuffer(),3);
+        List<Integer> parallelBuffer = new ArrayList<Integer>();
+        int[] inService = new int[this.nClasses];
+        int[] inQueue = new int[this.nClasses];
+
+        for (int i = 0; i < this.nClasses; i++) {
+            inService[i] = 0;
+            inQueue[i] = 0;
+        }
+
+        for (int i = 0; i < this.nServers; i++) {
+            int nextClass = this.random.nextInt(this.nClasses);
+            parallelBuffer.add(nextClass);
+            inService[nextClass] += 1;
+            inQueue[nextClass] += 1;
+            this.classBuffer.addToBuffer(nextClass);
+        }
+        for (int i = this.nServers; i < this.nRuns; i++) {
+            int nextClass = this.random.nextInt(this.nClasses);
+            parallelBuffer.add(nextClass);
+            inQueue[nextClass] += 1;
+            this.classBuffer.addToBuffer(nextClass);
+        }
+
+
+        for (int i = 0; i < this.nClasses; i++) {
+            assertEquals(inService[i], this.classBuffer.getInService(i));
+            assertEquals(inQueue[i], this.classBuffer.getInQueue(i));
+        }
     }
 
 
     @org.junit.jupiter.api.Test
     void testAddNToBuffer() {
-        Random random = new Random();
-        List<Pair<Integer, Integer>> addList = new ArrayList<Pair<Integer,Integer>>();
-        for (int i = 0; i < 10; i++) {
-            int classIdx = random.nextInt(50);
-            int nToAdd = random.nextInt(50);
-            addList.add(new Pair<Integer, Integer>(classIdx, nToAdd));
-            this.classBuffer.addNToBuffer(classIdx, nToAdd);
+        List<Integer> parallelBuffer = new ArrayList<Integer>();
+        int[] inService = new int[this.nClasses];
+        int[] inQueue = new int[this.nClasses];
+
+        for (int i = 0; i < this.nClasses; i++) {
+            inService[i] = 0;
+            inQueue[i] = 0;
         }
 
-        for (Pair<Integer, Integer> curPair : addList) {
-            int classIdx = curPair.getLeft();
-            int nAdded = curPair.getRight();
+        int totalInService = 0;
 
-            for (int i = 0; i < nAdded; i++) {
-                assertEquals(this.classBuffer.popFromBuffer(), classIdx);
+        for (int i = 0; i < this.nRuns; i++) {
+            int nextClass = this.random.nextInt(this.nClasses);
+            int n = this.random.nextInt(this.maxBatch);
+            for (int j = 0; j < n; j++) {
+                parallelBuffer.add(nextClass);
             }
+
+            if (totalInService < this.nServers) {
+                int addToService = Math.min(this.nServers-totalInService, n);
+                inService[nextClass] += addToService;
+                totalInService += addToService;
+            }
+
+            inQueue[nextClass] += n;
+            this.classBuffer.addNToBuffer(nextClass, n);
         }
 
-        assertTrue(this.classBuffer.deque.size() == 0);
-    }
 
-
-
-    @org.junit.jupiter.api.Test
-    void testGetInService() {
-        this.classBuffer.addToBuffer(1);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),0);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(2);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),1);
-        assertEquals(this.classBuffer.getInService(3),0);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(2);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),0);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),1);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),2);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),3);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),4);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),5);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),6);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),7);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),7);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),7);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),7);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInService(1),1);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),7);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),2);
-        assertEquals(this.classBuffer.getInService(3),8);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),1);
-        assertEquals(this.classBuffer.getInService(3),9);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),10);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),10);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),9);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),8);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),7);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),6);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),5);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),4);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),3);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),2);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),1);
-        assertEquals(this.classBuffer.getInService(4),0);
-        this.classBuffer.popFromBuffer();
-        assertEquals(this.classBuffer.getInService(1),0);
-        assertEquals(this.classBuffer.getInService(2),0);
-        assertEquals(this.classBuffer.getInService(3),0);
-        assertEquals(this.classBuffer.getInService(4),0);
-    }
-
-    @org.junit.jupiter.api.Test
-    void testCreateCopy() {
-        /*this.classBuffer.addToBuffer(4);
-        this.classBuffer.addToBuffer(4);
-        this.classBuffer.addToBuffer(4);
-        this.classBuffer.addToBuffer(4);
-        this.classBuffer.addToBuffer(3);
-        this.classBuffer.addToBuffer(3);
-        this.classBuffer.addToBuffer(3);
-        this.classBuffer.addToBuffer(2);
-        this.classBuffer.addToBuffer(2);
-        this.classBuffer.addToBuffer(1);
-        assertEquals(this.classBuffer.getInService(1, 15),1);
-        assertEquals(this.classBuffer.getInService(2, 15),2);
-        assertEquals(this.classBuffer.getInService(3, 15),3);
-        assertEquals(this.classBuffer.getInService(4, 15),4);
-
-        JobClassBuffer classBufferCopy = this.classBuffer.createCopy();
-        classBufferCopy.addToBuffer(1);
-        assertEquals(this.classBuffer.getInService(1, 15),1);
-        assertEquals(this.classBuffer.getInService(2, 15),2);
-        assertEquals(this.classBuffer.getInService(3, 15),3);
-        assertEquals(this.classBuffer.getInService(4, 15),4);
-        assertEquals(classBufferCopy.getInService(1, 15),2);
-        assertEquals(classBufferCopy.getInService(2, 15),2);
-        assertEquals(classBufferCopy.getInService(3, 15),3);
-        assertEquals(classBufferCopy.getInService(4, 15),4);
-
-        this.classBuffer.addToBuffer(4);
-
-        assertEquals(this.classBuffer.getInService(1, 15),1);
-        assertEquals(this.classBuffer.getInService(2, 15),2);
-        assertEquals(this.classBuffer.getInService(3, 15),3);
-        assertEquals(this.classBuffer.getInService(4, 15),5);
-        assertEquals(classBufferCopy.getInService(1, 15),2);
-        assertEquals(classBufferCopy.getInService(2, 15),2);
-        assertEquals(classBufferCopy.getInService(3, 15),3);
-        assertEquals(classBufferCopy.getInService(4, 15),4);*/
+        for (int i = 0; i < this.nClasses; i++) {
+            assertEquals(inService[i], this.classBuffer.getInService(i));
+            assertEquals(inQueue[i], this.classBuffer.getInQueue(i));
+        }
     }
 
 
     @org.junit.jupiter.api.Test
-    void testGetInQueue() {
-        this.classBuffer.addToBuffer(4);
-        assertEquals(this.classBuffer.getInQueue(1),0);
-        assertEquals(this.classBuffer.getInQueue(2),0);
-        assertEquals(this.classBuffer.getInQueue(3),0);
-        assertEquals(this.classBuffer.getInQueue(4),1);
-        this.classBuffer.addToBuffer(4);
-        assertEquals(this.classBuffer.getInQueue(1),0);
-        assertEquals(this.classBuffer.getInQueue(2),0);
-        assertEquals(this.classBuffer.getInQueue(3),0);
-        assertEquals(this.classBuffer.getInQueue(4),2);
-        this.classBuffer.addToBuffer(4);
-        assertEquals(this.classBuffer.getInQueue(1),0);
-        assertEquals(this.classBuffer.getInQueue(2),0);
-        assertEquals(this.classBuffer.getInQueue(3),0);
-        assertEquals(this.classBuffer.getInQueue(4),3);
-        this.classBuffer.addToBuffer(4);
-        assertEquals(this.classBuffer.getInQueue(1),0);
-        assertEquals(this.classBuffer.getInQueue(2),0);
-        assertEquals(this.classBuffer.getInQueue(3),0);
-        assertEquals(this.classBuffer.getInQueue(4),4);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInQueue(1),0);
-        assertEquals(this.classBuffer.getInQueue(2),0);
-        assertEquals(this.classBuffer.getInQueue(3),1);
-        assertEquals(this.classBuffer.getInQueue(4),4);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInQueue(1),0);
-        assertEquals(this.classBuffer.getInQueue(2),0);
-        assertEquals(this.classBuffer.getInQueue(3),2);
-        assertEquals(this.classBuffer.getInQueue(4),4);
-        this.classBuffer.addToBuffer(3);
-        assertEquals(this.classBuffer.getInQueue(1),0);
-        assertEquals(this.classBuffer.getInQueue(2),0);
-        assertEquals(this.classBuffer.getInQueue(3),3);
-        assertEquals(this.classBuffer.getInQueue(4),4);
-        this.classBuffer.addToBuffer(2);
-        assertEquals(this.classBuffer.getInQueue(1),0);
-        assertEquals(this.classBuffer.getInQueue(2),1);
-        assertEquals(this.classBuffer.getInQueue(3),3);
-        assertEquals(this.classBuffer.getInQueue(4),4);
-        this.classBuffer.addToBuffer(2);
-        assertEquals(this.classBuffer.getInQueue(1),0);
-        assertEquals(this.classBuffer.getInQueue(2),2);
-        assertEquals(this.classBuffer.getInQueue(3),3);
-        assertEquals(this.classBuffer.getInQueue(4),4);
-        this.classBuffer.addToBuffer(1);
-        assertEquals(this.classBuffer.getInQueue(1),1);
-        assertEquals(this.classBuffer.getInQueue(2),2);
-        assertEquals(this.classBuffer.getInQueue(3),3);
-        assertEquals(this.classBuffer.getInQueue(4),4);
+    public void testRemoveFirstOfClass() {
+        List<Integer> parallelBuffer = new ArrayList<Integer>();
+        int[] inService = new int[this.nClasses];
+        int[] inQueue = new int[this.nClasses];
+
+        for (int i = 0; i < this.nClasses; i++) {
+            inService[i] = 0;
+            inQueue[i] = 0;
+        }
+
+        for (int i = 0; i < this.nServers; i++) {
+            int nextClass = this.random.nextInt(this.nClasses);
+            parallelBuffer.add(nextClass);
+            inService[nextClass] += 1;
+            inQueue[nextClass] += 1;
+            this.classBuffer.addToBuffer(nextClass);
+        }
+        for (int i = this.nServers; i < this.nRuns; i++) {
+            int nextClass = this.random.nextInt(this.nClasses);
+            parallelBuffer.add(nextClass);
+            inQueue[nextClass] += 1;
+            this.classBuffer.addToBuffer(nextClass);
+        }
+
+        for (int i = 0; i < this.nRuns-this.nServers; i++) {
+            int nToRemove = this.random.nextInt(this.nServers);
+            int classToRemove = parallelBuffer.get(nToRemove);
+            int classToAdd = parallelBuffer.get(this.nServers);
+            parallelBuffer.remove(nToRemove);
+            this.classBuffer.removeFirstOfClass(classToRemove);
+            inService[classToRemove] -= 1;
+            inQueue[classToRemove] -= 1;
+            inService[classToAdd] += 1;
+            assertEquals(inService[classToRemove], this.classBuffer.getInService(classToRemove));
+            assertEquals(inQueue[classToRemove], this.classBuffer.getInQueue(classToRemove));
+            assertEquals(inService[classToAdd], this.classBuffer.getInService(classToAdd));
+            assertEquals(inQueue[classToAdd], this.classBuffer.getInQueue(classToAdd));
+        }
+        for (int i = 0; i < this.nServers; i++) {
+            int nToRemove = this.random.nextInt(Math.min(this.nServers, parallelBuffer.size()));
+            int classToRemove = parallelBuffer.get(nToRemove);
+            parallelBuffer.remove(nToRemove);
+            this.classBuffer.removeFirstOfClass(classToRemove);
+            inService[classToRemove] -= 1;
+            inQueue[classToRemove] -= 1;
+            assertEquals(inService[classToRemove], this.classBuffer.getInService(classToRemove));
+            assertEquals(inQueue[classToRemove], this.classBuffer.getInQueue(classToRemove));
+        }
+        for (int j = 0; j < this.nClasses; j++) {
+            assertEquals(inService[j], this.classBuffer.getInService(j));
+            assertEquals(inQueue[j], this.classBuffer.getInQueue(j));
+        }
     }
 }

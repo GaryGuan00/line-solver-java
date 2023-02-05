@@ -1,6 +1,8 @@
 package jline.solvers.ssa.events;
 
+import jline.lang.JLineMatrix;
 import jline.lang.distributions.BinomialDistribution;
+import jline.lang.distributions.Exp;
 import jline.lang.distributions.PoissonDistribution;
 import jline.lang.nodes.Node;
 import jline.lang.nodes.Source;
@@ -14,6 +16,8 @@ import jline.solvers.ssa.strategies.TauLeapingStateStrategy;
 import jline.util.Cdf;
 import jline.util.Pair;
 import jline.lang.OutputStrategy;
+import org.javatuples.Quartet;
+import org.javatuples.Triplet;
 
 import java.util.*;
 
@@ -477,4 +481,122 @@ public class EventStack {
 
         return t;
     }
+
+    public double updateStateSpace(Timeline timeline, double t, Random random, ArrayList<StateMatrix> stateSpace, Queue<StateMatrix> queue) {
+        while (!queue.isEmpty()){
+
+            StateMatrix stateMatrix1 = new StateMatrix(queue.remove());
+
+            Cdf<Event> eventCdf = new Cdf<Event>(random);
+            double totalRate = 0;
+
+            boolean foundEvent = false;
+
+            for (Event event : this.eventList) {
+                double eventRate = event.getRate(stateMatrix1);
+                if (eventRate == Double.POSITIVE_INFINITY) {
+                    this.handleImmediate(stateMatrix1, timeline, t, random);
+                    return t;
+                } else if (Double.isNaN(eventRate)) {
+                    continue;
+                }
+
+                foundEvent = true;
+
+                totalRate += eventRate;
+
+                eventCdf.addElement(event, eventRate);
+            }
+
+            eventCdf.normalize(totalRate);
+
+            if (!foundEvent) {
+//            System.out.println("No event found!");
+                return t;
+            }
+
+            double timeDelta = Math.log(1 - random.nextDouble()) / (-totalRate);
+            t += timeDelta;
+            this.curT = t;
+            timeline.setTime(this.curT);
+
+
+            ArrayList<Event> eventArrayList = eventCdf.getPossibleEvents();
+//            System.out.println(eventArrayList.size());
+            for (Event event : eventArrayList) {
+//                System.out.println(event);
+                StateMatrix newMatrix = event.getNextState(stateMatrix1, timeline, stateSpace,queue);
+//                JLineMatrix jLineMatrix1 = new JLineMatrix(stateMatrix1.state.length, stateMatrix1.state[0].length);
+//                jLineMatrix1.array2DtoJLineMatrix(newMatrix.state).print();
+//                if (newMatrix != null && !newMatrix.checkIfVisited(stateSpace)) {
+//                    JLineMatrix jLineMatrix = new JLineMatrix(stateMatrix1.state.length, stateMatrix1.state[0].length);
+//                    stateSpace.add(newMatrix);
+//                    queue.add(newMatrix);
+//                    jLineMatrix.array2DtoJLineMatrix(newMatrix.state).print();
+//                    stateMatrix1.printStateVector();
+//                    newMatrix.printStateVector();
+//                }
+            }
+        }
+
+        return t;
+
+    }
+
+    public double updateEventSpace(Timeline timeline, double t, Random random, ArrayList<Quartet<Event,Pair<OutputEvent,Double>,StateMatrix,StateMatrix>> eventSpace, Queue<StateMatrix> queue) {
+        while (!queue.isEmpty()){
+
+            StateMatrix stateMatrix1 = new StateMatrix(queue.remove());
+
+            Cdf<Event> eventCdf = new Cdf<Event>(random);
+            double totalRate = 0;
+
+            boolean foundEvent = false;
+
+            for (Event event : this.eventList) {
+                double eventRate = event.getRate(stateMatrix1);
+                if (eventRate == Double.POSITIVE_INFINITY) {
+                    this.handleImmediate(stateMatrix1, timeline, t, random);
+                    return t;
+                } else if (Double.isNaN(eventRate) || eventRate==0) {
+                    continue;
+                }
+
+                foundEvent = true;
+
+                totalRate += eventRate;
+
+                eventCdf.addElement(event, eventRate);
+            }
+
+            eventCdf.normalize(totalRate);
+
+            if (!foundEvent) {
+//            System.out.println("No event found!");
+                return t;
+            }
+
+            double timeDelta = Math.log(1 - random.nextDouble()) / (-totalRate);
+            t += timeDelta;
+            this.curT = t;
+            timeline.setTime(this.curT);
+
+
+            ArrayList<Event> eventArrayList = eventCdf.getPossibleEvents();
+            for (Event event : eventArrayList) {
+                StateMatrix copyOfOld = new StateMatrix(stateMatrix1);
+                StateMatrix newMatrix = event.getNextEventState(stateMatrix1, timeline, eventSpace,event,queue,stateMatrix1);
+//                if (newMatrix != null && !newMatrix.checkIfVisited(eventSpace,stateMatrix1,event)) {
+//                    JLineMatrix jLineMatrix = new JLineMatrix(stateMatrix1.state.length, stateMatrix1.state[0].length);
+//                    eventSpace.add(Triplet.with(event,stateMatrix1,newMatrix));
+//                    queue.add(newMatrix);
+//                    jLineMatrix.array2DtoJLineMatrix(newMatrix.state).print();
+//                }
+            }
+        }
+
+        return t;
+
+    }
+
 }

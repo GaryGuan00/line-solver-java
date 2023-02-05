@@ -4,5 +4,6 @@ import java.io.Serializable;
 
 public enum DropStrategy implements Serializable {
     WaitingQueue,
-    Drop
+    Drop,
+    BlockingAfterService
 }

@@ -2,11 +2,7 @@ package jline.solvers.ssa;
 
 import jline.lang.*;
 import jline.lang.constant.SchedStrategy;
-import jline.solvers.ssa.events.ArrivalEvent;
-import jline.solvers.ssa.events.DepartureEvent;
-import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.events.NodeEvent;
-import jline.solvers.ssa.events.OutputEvent;
+import jline.solvers.ssa.events.*;
 import jline.solvers.ssa.metrics.Metric;
 import jline.solvers.ssa.metrics.Metrics;
 import jline.solvers.ssa.metrics.QueueLengthMetric;
@@ -15,6 +11,7 @@ import jline.solvers.ssa.metrics.ResponseTimeMetric;
 import jline.solvers.ssa.metrics.ThroughputMetric;
 import jline.solvers.ssa.metrics.TotalClassMetric;
 import jline.solvers.ssa.metrics.UtilizationMetric;
+import jline.solvers.ssa.state.PhaseList;
 import jline.solvers.ssa.state.StateMatrix;
 import jline.solvers.ssa.strategies.CutoffStrategy;
 import jline.util.Pair;
@@ -26,6 +23,7 @@ public class Timeline {
         Maintains a list of all events in the simulation, acts as an interface point for Metric objects,
             handles steady-state
      */
+    protected List<List<Integer>[]> transientState;
     protected List<Event> eventTimeline;
     protected List<Double> timeList;
     protected int nStateful;
@@ -48,19 +46,26 @@ public class Timeline {
     protected int r5value;
     protected boolean metricRecord;
     protected boolean cacheRecordings;
+    protected boolean recordTransientState;
+    protected boolean inferTimes;
 
-    public Timeline(NetworkStruct networkStruct, CutoffStrategy cutoffStrategy) {
+    public Timeline(SSAStruct networkStruct) {
         this.nStateful = networkStruct.nStateful;
         this.nClasses = networkStruct.nClasses;
         this.nServers = networkStruct.numberOfServers;
         this.schedStrategies = networkStruct.schedStrategies;
         this.eventTimeline = new ArrayList<Event>();
+        this.transientState = new ArrayList<List<Integer>[]>();
         this.timeList = new ArrayList<Double>();
 
         this.useMSER5 = false;
         this.useR5 = false;
         this.r5value = 19;
         this.metricRecord = true;
+        this.recordTransientState = true;
+
+        // this.metrics = new Metric[this.nStateful][this.nClasses][5];
+        // this.totalClassMetrics = new TotalClassMetric[this.nClasses];
 
         this.metrics = new Metric[this.nStateful][this.nClasses][5];
         this.totalClassMetrics = new TotalClassMetric[this.nClasses];
@@ -71,6 +76,8 @@ public class Timeline {
         this.currentTime = 0;
         this.nextTime = 0;
 
+
+        this.inferTimes = false;
         boolean recordMetrics = true;
         if (cutoffStrategy == CutoffStrategy.None) {
             recordMetrics = true;
@@ -83,13 +90,18 @@ public class Timeline {
         // Build all 5 metrics. In the future, it might be desirable to allow configuration of this
         for (int i = 0; i < this.nStateful; i++) {
             for (int j = 0; j < this.nClasses; j++)  {
-                this.metrics[i][j][0] = new QueueLengthMetric(i,j, this.nServers[i], recordMetrics);
-                this.metrics[i][j][1] = new UtilizationMetric(i,j, this.nServers[i], recordMetrics, networkStruct.isDelay[i]);
-                this.metrics[i][j][2] = new ResponseTimeMetric(i,j, this.nServers[i], schedStrategies[i], recordMetrics);
-                this.metrics[i][j][3] = new ResidenceTimeMetric(i,j, this.nServers[i], schedStrategies[i], recordMetrics, totalClassMetrics[j]);
-                this.metrics[i][j][4] = new ThroughputMetric(i,j, this.nServers[i], recordMetrics);
+                this.metrics[i][j][0] = new QueueLengthMetric(i,j, this.nServers[i], this.metricRecord);
+                this.metrics[i][j][1] = new UtilizationMetric(i,j, this.nServers[i], this.metricRecord, networkStruct.isDelay[i]);
+                if (!this.inferTimes) {
+                    this.metrics[i][j][2] = new ResponseTimeMetric(i, j, this.nServers[i], schedStrategies[i], this.metricRecord);
+                    this.metrics[i][j][3] = new ResidenceTimeMetric(i, j, this.nServers[i], schedStrategies[i], this.metricRecord, totalClassMetrics[j]);
+                }
+                this.metrics[i][j][4] = new ThroughputMetric(i,j, this.nServers[i], this.metricRecord);
 
                 for (int k = 0; k < 5; k++) {
+                    if (this.metrics[i][j][k] == null) {
+                        continue;
+                    }
                     this.metrics[i][j][k].setRecord(this.metricRecord);
                     if (this.useMSER5){
                         this.metrics[i][j][k].configureMSER5();
@@ -105,10 +117,6 @@ public class Timeline {
         this.eventCache = new ArrayList<Pair<Event,Integer>>(this.nStateful*this.nClasses);
         this.eventClassMap = new HashMap<Event, Integer>();
         this.eventNodeMap = new HashMap<Event, Integer>();
-    }
-
-    public Timeline(NetworkStruct networkStruct) {
-        this(networkStruct, CutoffStrategy.None);
     }
 
     public void disableResidenceTime() {
@@ -156,6 +164,10 @@ public class Timeline {
         }
     }
 
+    public void disableTransientState() {
+        this.recordTransientState = false;
+    }
+
     public void setTime(double t) {
         this.currentTime = t;
     }
@@ -165,7 +177,7 @@ public class Timeline {
     }
 
     public void record(double t, Event e, StateMatrix stateMatrix) {
-        this.eventTimeline.add(e);
+        //this.eventTimeline.add(e);
         this.timeList.add(t);
         this.maxTime = t;
 
@@ -173,18 +185,39 @@ public class Timeline {
             if (((DepartureEvent) e).isReference()) {
                 this.totalClassMetrics[((DepartureEvent) e).getClassIdx()].increment();
             }
+            NodeEvent ne = (NodeEvent) e;
+
+            if (!this.inferTimes) {
+                for (int k = 2; k < 5; k++) {
+                    this.metrics[ne.getNodeStatefulIdx()][ne.getClassIdx()][k].fromEvent(t, e);
+                }
+            }
+
+            return;
         } else if (e instanceof OutputEvent) {
             if (((OutputEvent) e).isClassSwitched()) {
                 this.totalClassMetrics[((OutputEvent) e).getClassIdx()].increment();
             }
             return;
+        } else if (e instanceof PhaseEvent) {
+            if (this.recordTransientState) {
+                this.transientState.add(stateMatrix.getStateVectors());
+            }
+            return;
         }
 
+        if (this.recordTransientState) {
+            this.transientState.add(stateMatrix.getStateVectors());
+        }
         boolean foundNode = (e instanceof NodeEvent) && ((NodeEvent) e).isStateful();
 
         if (foundNode) {
-            for (int k = 2; k < 5; k++) {
-                this.metrics[((NodeEvent) e).getNodeStatefulIdx()][((NodeEvent) e).getClassIdx()][k].fromEvent(t,e);
+            if (this.inferTimes) {
+                this.metrics[((NodeEvent) e).getNodeStatefulIdx()][((NodeEvent) e).getClassIdx()][4].fromEvent(t,e);
+            } else {
+                for (int k = 2; k < 5; k++) {
+                    this.metrics[((NodeEvent) e).getNodeStatefulIdx()][((NodeEvent) e).getClassIdx()][k].fromEvent(t,e);
+                }
             }
         }
 
@@ -194,8 +227,12 @@ public class Timeline {
                     this.metrics[i][j][k].fromStateMatrix(t, stateMatrix);
                 }
                 if (!foundNode) {
-                    for (int k = 2; k < 5; k++) {
-                        this.metrics[i][j][k].fromEvent(t, e);
+                    if (this.inferTimes) {
+                        this.metrics[i][j][4].fromEvent(t,e);
+                    } else {
+                        for (int k = 2; k < 5; k++) {
+                            this.metrics[i][j][k].fromEvent(t, e);
+                        }
                     }
                 }
             }
@@ -203,13 +240,25 @@ public class Timeline {
     }
 
     public void record(double t, Event e, StateMatrix stateMatrix, int n) {
-        this.eventTimeline.add(e);
+        //this.eventTimeline.add(e);
+        if (this.recordTransientState) {
+            this.transientState.add(stateMatrix.getStateVectors());
+        }
         this.timeList.add(t);
 
         if (e instanceof DepartureEvent) {
             if (((DepartureEvent) e).isReference()) {
                 this.totalClassMetrics[((DepartureEvent) e).getClassIdx()].increment(n);
             }
+            NodeEvent ne = (NodeEvent) e;
+
+            if (!this.inferTimes) {
+                for (int k = 2; k < 5; k++) {
+                    this.metrics[ne.getNodeStatefulIdx()][ne.getClassIdx()][k].fromEvent(t, e, n);
+                }
+            }
+
+            return;
         } else if (e instanceof OutputEvent) {
             if (((OutputEvent) e).isClassSwitched()) {
                 this.totalClassMetrics[((OutputEvent) e).getClassIdx()].increment(n);
@@ -217,12 +266,18 @@ public class Timeline {
             return;
         } else if (!(e instanceof ArrivalEvent)){
             return;
+        } else if (e instanceof PhaseEvent) {
+            return;
         }
 
         NodeEvent ne = (NodeEvent) e;
 
-        for (int k = 2; k < 5; k++) {
-            this.metrics[ne.getNodeStatefulIdx()][ne.getClassIdx()][k].fromEvent(t,e,n);
+        if (!this.inferTimes) {
+            for (int k = 2; k < 5; k++) {
+                this.metrics[ne.getNodeStatefulIdx()][ne.getClassIdx()][k].fromEvent(t, e, n);
+            }
+        } else {
+            this.metrics[ne.getNodeStatefulIdx()][ne.getClassIdx()][4].fromEvent(t,e);
         }
     }
 
@@ -285,7 +340,11 @@ public class Timeline {
             Event e = ePair.getLeft();
             int n = ePair.getRight();
             double t = this.currentTime;
-            this.eventTimeline.add(e);
+            if (this.recordTransientState) {
+                this.transientState.add(stateMatrix.getStateVectors());
+            }
+
+            //this.eventTimeline.add(e);
             this.timeList.add(t);
 
             if (e instanceof DepartureEvent) {
@@ -303,8 +362,12 @@ public class Timeline {
 
             NodeEvent ne = (NodeEvent) e;
 
-            for (int k = 2; k < 5; k++) {
-                this.metrics[ne.getNodeStatefulIdx()][ne.getClassIdx()][k].fromEvent(t,e,n);
+            if (!this.inferTimes) {
+                for (int k = 2; k < 5; k++) {
+                    this.metrics[ne.getNodeStatefulIdx()][ne.getClassIdx()][k].fromEvent(t, e, n);
+                }
+            } else {
+                this.metrics[ne.getNodeStatefulIdx()][ne.getClassIdx()][4].fromEvent(t, e, n);
             }
         }
 
@@ -334,12 +397,12 @@ public class Timeline {
                     mMetrics[i][j].setRecord(false);
                 }
                 for (int k = 0; k < 5; k++) {
+                    if (this.metrics[i][j][k] == null) {continue;}
                     mMetrics[i][j].addMetric(this.metrics[i][j][k]);
                 }
             }
         }
         Metrics.outputSummary(network, mMetrics);
-        //Metrics.outputSummary(network, this.metrics);
     }
 
     public void saveSummary(String filename, Network network, List<String> additionallines) {
@@ -358,6 +421,7 @@ public class Timeline {
                 }
 
                 for (int k = 0; k < 5; k++) {
+                    if (mMetrics[i][j] == null) {continue;}
                     mMetrics[i][j].addMetric(this.metrics[i][j][k]);
                 }
             }
@@ -382,6 +446,7 @@ public class Timeline {
                 }
 
                 for (int k = 0; k < 5; k++) {
+                    if (mMetrics[i][j] == null) {continue;}
                     mMetrics[i][j].addMetric(this.metrics[i][j][k]);
                 }
             }
@@ -405,6 +470,7 @@ public class Timeline {
                 }
 
                 for (int k = 0; k < 5; k++) {
+                    if (mMetrics[i][j] == null) {continue;}
                     mMetrics[i][j].addMetric(this.metrics[i][j][k]);
                 }
             }
@@ -428,6 +494,7 @@ public class Timeline {
                     mMetrics[i][j].setRecord(false);
                 }
                 for (int k = 0; k < 5; k++) {
+                    if (mMetrics[i][j] == null) {continue;}
                     mMetrics[i][j].addMetric(this.metrics[i][j][k]);
                 }
             }
@@ -439,6 +506,8 @@ public class Timeline {
     public Metrics getMetrics(int nodeIdx, int classIdx) {
         Metrics mMetrics = new Metrics();
         for (int k = 0; k < 5; k++) {
+
+            if (this.metrics[nodeIdx][classIdx] == null) {continue;}
             mMetrics.addMetric(this.metrics[nodeIdx][classIdx][k]);
         }
         return mMetrics;
@@ -449,6 +518,9 @@ public class Timeline {
         for (int i = 0; i < this.nStateful; i++) {
             for (int j = 0; j < this.nClasses; j++) {
                 for (int k = 0; k < 5; k++) {
+                    if (this.metrics[i][j][k] == null) {
+                        continue;
+                    }
                     this.metrics[i][j][k].taper(t);
                 }
                 //this.metrics[i][j].taper(t);
@@ -511,5 +583,44 @@ public class Timeline {
                 }
             }
         }
+    }
+
+    public void printTransientState(int start, int end) {
+        if (!this.recordTransientState) {
+            return;
+        }
+        for (int i = start; i < end; i++) {
+            System.out.format("Iteration %d\n", i);
+            for (int j = 0; j < this.transientState.get(i).length; j++) {
+                System.out.format("Node %d", j);
+                System.out.println(Arrays.toString(this.transientState.get(i)[j].toArray()));
+            }
+        }
+    }
+
+    public DepartureEvent getLastDepartureEvent() {
+        for (int i = this.eventTimeline.size()-1; i <= 0; i--) {
+            if (this.eventTimeline.get(i) instanceof DepartureEvent) {
+                return (DepartureEvent) this.eventTimeline.get(i);
+            }
+        }
+        return null;
+    }
+
+    public OutputEvent getLastOutputEvent() {
+        for (int i = this.eventTimeline.size()-1; i >= 0; i--) {
+            if (this.eventTimeline.get(i) instanceof OutputEvent) {
+                return (OutputEvent) this.eventTimeline.get(i);
+            }
+        }
+        return null;
+    }
+
+    public List<List<Integer>[]> getTransientState() {
+        return this.transientState;
+    }
+
+    public List<Double> getT() {
+        return this.timeList;
     }
 }

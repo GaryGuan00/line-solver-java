@@ -24,13 +24,50 @@
                 <configuration>
                     <source>8</source>
                     <target>8</target>
-
                 </configuration>
             </plugin>
+            <plugin>
+		      <artifactId>maven-assembly-plugin</artifactId>
+		      <configuration>
+		        <archive>
+		          <manifest>
+                            <addClasspath>true</addClasspath>
+                            <mainClass>jline.examples.JavaClient</mainClass>
+		          </manifest>
+		        </archive>
+		        <descriptorRefs>
+		          <descriptorRef>jar-with-dependencies</descriptorRef>
+		        </descriptorRefs>
+		      </configuration>
+                <executions>
+                    <execution>
+                        <id>make-my-jar-with-dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+		    </plugin>
         </plugins>
     </build>
-		
+    <repositories>
+    <repository>
+       <id>kpc-toolbox-java-mvn-repo</id>
+        <url>https://raw.githubusercontent.com/imperial-qore/kpc-toolbox-java/main/mvn-artifact/</url>
+        <snapshots>
+            <enabled>true</enabled>
+            <updatePolicy>always</updatePolicy>
+        </snapshots>
+    </repository>		
+    </repositories>	
     <dependencies>
+
+        <dependency>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <version>3.4.2</version>
+        </dependency>
 
       <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -45,12 +82,64 @@
             <version>5.4.2</version>
             <scope>test</scope>
         </dependency>
+        
+        <dependency>
+			  <groupId>org.ejml</groupId>
+			  <artifactId>ejml-all</artifactId>
+			  <version>0.41</version>
+		</dependency>	
+		
+		<dependency>
+			<groupId>org.qore</groupId>
+		    <artifactId>kpc-toolbox-java</artifactId>
+		    <version>1.0.0</version>
+		</dependency>
+		
+        <dependency>
+            <groupId>org.javatuples</groupId>
+            <artifactId>javatuples</artifactId>
+            <version>1.2</version>
+        </dependency>
+
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-lang3</artifactId>
+			<version>3.9</version>
+		</dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-rng-parent</artifactId>
+            <version>1.4</version>
+            <type>pom</type>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jblas</groupId>
+            <artifactId>jblas</artifactId>
+            <version>1.2.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.javatuples</groupId>
+            <artifactId>javatuples</artifactId>
+            <version>1.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>lineclient</groupId>
+            <artifactId>lienclient</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/lib/lineclient.jar</systemPath>
+        </dependency>
     </dependencies>
 
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
-
     
 </project>

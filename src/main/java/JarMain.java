@@ -1,7 +1,7 @@
 public class JarMain {
     public static void main(String[] args) {
-        System.out.format("Hello, welcome to LINE!");
+        System.out.format("JLINE Solver - Command Line Interface");
+        System.out.format("Copyright (c) 2012-2023, QORE group, Imperial College London\n");
         System.out.format("-------------------------");
-        System.out.format("The solvers can be accessed through the LINE MATLAB release.");
     }
 }

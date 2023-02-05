@@ -8,7 +8,6 @@ import jline.lang.*;
 import jline.lang.constant.SchedStrategy;
 import jline.lang.constant.ServiceStrategy;
 import jline.lang.distributions.*;
-import jline.lang.nodes.*;
 import jline.lang.sections.*;
 
 public class Source extends Station implements HasSchedStrategy, Serializable {
@@ -33,16 +32,15 @@ public class Source extends Station implements HasSchedStrategy, Serializable {
 
         for (JobClass jobClass : jobClasses) {
             this.classCap.put(jobClass, Double.POSITIVE_INFINITY);
-            // HACK!!!!!!!!!!!!!!
-            this.setArrivalDistribution(jobClass, new DisabledDistribution());
+            this.setArrival(jobClass, new DisabledDistribution());
         }
     }
 
-    public void setArrivalDistribution(JobClass jobClass, Distribution distribution) {
+    public void setArrival(JobClass jobClass, Distribution distribution) {
         ServiceBinding arrivalProcess = new ServiceBinding(jobClass, ServiceStrategy.LI, distribution);
         this.input.setServiceProcess(arrivalProcess);
         this.setServiceProcess(arrivalProcess);
-        if (distribution == null) {
+        if ((distribution == null) || (distribution instanceof DisabledDistribution)){
             this.classCap.put(jobClass, 0.0);
         } else {
             this.classCap.put(jobClass, Double.POSITIVE_INFINITY);
@@ -56,6 +54,7 @@ public class Source extends Station implements HasSchedStrategy, Serializable {
                 serviceProcessIterator.remove();
             }
         }
+        ((RandomSource)this.input).removeServiceProcess(jobClass);
     }
 
     public void setServiceProcess(ServiceBinding arrivalProcess) {
@@ -80,8 +79,17 @@ public class Source extends Station implements HasSchedStrategy, Serializable {
             }
         }
         return new DisabledDistribution();
-
     }
+    
+    public boolean containsJobClass(JobClass jobClass) {
+        for (ServiceBinding serviceProcess : this.serviceProcesses) {
+            if (serviceProcess.getJobClass() == jobClass) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     @Override
     public void printSummary() {
         System.out.format("jline.Source:\n");

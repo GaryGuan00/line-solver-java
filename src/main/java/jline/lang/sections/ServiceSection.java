@@ -32,4 +32,12 @@ public class ServiceSection extends Section implements Serializable {
     public void setServiceProcesses(ServiceBinding serviceProcess) {
         this.serviceProcesses.put(serviceProcess.getJobClass(), serviceProcess);
     }
+    
+    public boolean containsJobClass(JobClass jobClass) {
+    	return this.serviceProcesses.containsKey(jobClass);
+    }
+    
+    public void removeServiceProcess(JobClass jobClass) {
+    	this.serviceProcesses.remove(jobClass);
+    }
 }

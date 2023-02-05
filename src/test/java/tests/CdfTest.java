@@ -7,9 +7,7 @@ import org.junit.jupiter.api.Test;
 import jline.lang.*;
 import jline.util.Cdf;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -70,5 +68,28 @@ class CdfTest {
 
         assertTrue(testCt > estCt-20);
         assertTrue(testCt < estCt+20);
+    }
+
+    @Test
+    void generateRandom() {
+        for (int i = 0; i < 100; i++) {
+            Random r=  new Random();
+            this.testCdf = new Cdf<Integer>(r);
+
+            int nMembers = r.nextInt(29)+1;
+            List<Double> pdf = new ArrayList<Double>();
+            double totalProb = 0;
+            for (int j = 0; j < nMembers; j++) {
+                double p = r.nextDouble();
+                totalProb += p;
+                pdf.add(p);
+            }
+            for (int j = 0; j < nMembers; j++) {
+                pdf.set(j, pdf.get(j)/totalProb);
+                this.testCdf.addElement(j, pdf.get(j));
+            }
+
+            List<Integer> counts = new ArrayList<Integer>();
+        }
     }
 }

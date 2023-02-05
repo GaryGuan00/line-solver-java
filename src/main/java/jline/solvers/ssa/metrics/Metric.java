@@ -40,7 +40,6 @@ public abstract class Metric<T extends Number, U> {
 
         if (this.record) {
             this.metricHistory = new ArrayList<Pair<Double, T>>(5000);
-            //this.metricHistory = new LinkedList<Pair<Double, T>>();
         }
 
         this.r5Value = 19;

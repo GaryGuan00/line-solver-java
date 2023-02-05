@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Metrics {
-    //protected List<Metric> metrics;
     protected List<Metric> stateMetrics;
     protected List<Metric> eventMetrics;
     protected boolean useMSER5;
@@ -20,7 +19,6 @@ public class Metrics {
     protected boolean record;
 
     public Metrics() {
-        //this.metrics = new ArrayList<Metric>();
         this.stateMetrics = new ArrayList<Metric>();
         this.eventMetrics = new ArrayList<Metric>();
         this.useMSER5 = false;
@@ -80,15 +78,9 @@ public class Metrics {
         if (!this.record) {
             metric.setRecord(false);
         }
-        //this.metrics.add(metric);
     }
 
     public Metric getMetricByName(String name) {
-        /*for (Metric metric : this.metrics) {
-            if (metric.getName().equals(name)) {
-                return metric;
-            }
-        }*/
         for (Metric metric : this.stateMetrics) {
             if (metric.getName().equals(name)) {
                 return metric;
@@ -133,9 +125,7 @@ public class Metrics {
 
     public List<String> getAllMetricNames() {
         List<String> outList = new ArrayList<String>();
-        /*for (Metric metric : this.metrics) {
-            outList.add(metric.getName());
-        }*/
+
         for (Metric metric : this.stateMetrics) {
             outList.add(metric.getName());
         }
@@ -159,6 +149,9 @@ public class Metrics {
         for (int i = 0; i < nStateful; i++) {
             for (int j = 0; j < nClasses; j++) {
                 for (Metric metric : metricList[i][j].allMetrics()) {
+                    if (metric == null) {
+                        continue;
+                    }
                     String metricName = metric.getName();
                     if (!metricNames.contains(metricName)) {
                         metricNames.add(metricName);
@@ -242,22 +235,12 @@ public class Metrics {
     }
 
     public void fromStateMatrix(double t, StateMatrix stateMatrix) {
-        /*for (Metric metric : this.metrics) {
-            if (metric.useMatrix) {
-                metric.fromStateMatrix(t, stateMatrix);
-            }
-        }*/
         for (Metric metric : this.stateMetrics) {
             metric.fromStateMatrix(t, stateMatrix);
         }
     }
 
     public void fromEvent(double t, Event e) {
-        /*for (Metric metric : this.metrics) {
-            if (!metric.useMatrix) {
-                metric.fromEvent(t, e);
-            }
-        }*/
         for (Metric metric : this.eventMetrics) {
             metric.fromEvent(t, e);
         }
@@ -270,9 +253,6 @@ public class Metrics {
         }
     }
     public void taper(double t) {
-        /*for (Metric metric : this.metrics) {
-            metric.taper(t);
-        }*/
         for (Metric metric : this.stateMetrics) {
             metric.taper(t);
         }

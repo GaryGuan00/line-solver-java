@@ -10,6 +10,7 @@ public class JobClass extends NetworkElement implements Serializable {
     protected int priority;
     protected boolean completes;
     protected Node reference;
+    protected boolean isrefclass;
 
     public JobClass(JobClassType type, String name) {
         super(name);
@@ -17,6 +18,7 @@ public class JobClass extends NetworkElement implements Serializable {
         this.reference = new Node("Unallocated");
         this.type = type;
         this.completes = true;
+        this.isrefclass = false;
     }
 
     public void setReference(Node source) throws Exception {
@@ -39,4 +41,21 @@ public class JobClass extends NetworkElement implements Serializable {
     public int getJobClassIdx() {
         return -1;
     }
+    
+    public boolean isReferenceClass() {
+    	return this.isrefclass;
+    }
+    
+    public void setReferenceClass(boolean isrefclass) {
+    	this.isrefclass = isrefclass;
+    }
+    
+    public int getPriority() {
+    	return this.priority;
+    }
+    
+    public void setPriority(int p) {
+    	this.priority = p;
+    }
+    public JobClassType getJobClassType() { return this.type; }
 }

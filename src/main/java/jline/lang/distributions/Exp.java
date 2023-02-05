@@ -1,11 +1,15 @@
 package jline.lang.distributions;
 
+import jline.lang.JLineMatrix;
 import jline.lang.distributions.MarkovianDistribution;
 import jline.util.Interval;
+import jline.util.Pair;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static java.lang.Math.exp;
 import static java.lang.Math.log;
@@ -31,9 +35,16 @@ public class Exp extends MarkovianDistribution  implements Serializable {
         return 1-exp(-lambda*t);
     }
 
-    public Interval getPH() {
+    public Map<Integer, JLineMatrix> getPH() {
         double lambda = (double) this.getParam(1).getValue();
-        return new Interval(-lambda, lambda);
+        JLineMatrix D0 = new JLineMatrix(1,1,1);
+        JLineMatrix D1 = new JLineMatrix(1,1,1);
+        D0.set(0, 0, -lambda);
+        D1.set(0, 0, lambda);
+        Map<Integer, JLineMatrix> res = new HashMap<Integer, JLineMatrix>();
+        res.put(0, D0);
+        res.put(1, D1);
+        return res;
     }
 
     public double evalLST(double s) {

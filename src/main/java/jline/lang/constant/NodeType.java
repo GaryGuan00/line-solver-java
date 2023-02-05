@@ -11,5 +11,6 @@ public enum NodeType {
     Delay,
     Source,
     Sink,
-    Join
+    Join,
+    Queue
 }

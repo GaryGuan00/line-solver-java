@@ -78,17 +78,21 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
         nextState[i] = 0;
       }
 
-      // Solve ode until T = 1 event with slowest exit rate
-      T = (int) min(options.timespan[1], abs(10 * iter / minNonZeroRate));
+      // Solve ode until T = 1 event with slowest exit rate 
+      if (iter == 1) {
+	      T = (int) min(options.timespan[1], abs(10 / minNonZeroRate));
+      } else { 
+	      T = (int) min(options.timespan[1], abs(10 * iter / minNonZeroRate));
+      }
       double[] tRange = {T0, T};
 
       FirstOrderIntegrator odeSolver;
-      if (options.stiff && (options.verbose != SolverOptions.VerboseType.SILENT)) {
+      if (options.stiff && (options.verbose == SolverOptions.VerboseType.DEBUG)) {
         System.err.println(
             "Stiff solvers are not yet available in JLINE. Using non-stiff solver instead.");
 	    options.stiff = false;
       }
-      if (options.tol > 0.001 && (options.verbose != SolverOptions.VerboseType.SILENT) && iter<2) {
+      if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseType.DEBUG)) {
         System.err.println(
             "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
       }

@@ -108,7 +108,7 @@ public class SolverOptions {
         break;
       case FLUID:
         this.config.highVar = "none";
-        this.iter_max = 200;
+        this.iter_max = 5;
         this.timespan[0] = 0;
         break;
       case LN:

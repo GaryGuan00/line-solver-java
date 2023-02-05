@@ -155,11 +155,11 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
     }
 
     FirstOrderIntegrator odeSolver;
-    if (options.stiff && (options.verbose == SolverOptions.VerboseType.DEBUG)) {
+    if (options.stiff && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
       System.err.println(
               "Stiff solvers are not yet available in JLINE. Using non-stiff solver instead.");
     }
-    if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseType.DEBUG)) {
+    if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
       System.err.println(
               "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
     }

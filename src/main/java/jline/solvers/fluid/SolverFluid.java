@@ -418,7 +418,7 @@ public class SolverFluid extends NetworkSolver {
 
     switch (options.method) {
       case "matrix":
-        if (hasOpenClasses && (options.verbose != SolverOptions.VerboseType.SILENT)) {
+        if (hasOpenClasses && (options.verbose != SolverOptions.VerboseLevel.SILENT)) {
           System.err.println(
               "The matrix solver does not support open arrivals. Using options.method = 'closing' instead.");
           options.method = "closing";
@@ -442,7 +442,7 @@ public class SolverFluid extends NetworkSolver {
     result.method = options.method;
 
     if (isInfinite(options.timespan[0])) {
-      if (options.verbose == SolverOptions.VerboseType.DEBUG) {
+      if (options.verbose == SolverOptions.VerboseLevel.DEBUG) {
         System.err.println(
             "SolverFluid requires options.timespan[0] to be finite. Setting it to 0.");
       }
@@ -904,11 +904,11 @@ public class SolverFluid extends NetworkSolver {
 
                 // Solve ODE - y_mean_iter is the transient solution in stage e
                 FirstOrderIntegrator odeSolver;
-                if (options.stiff && (options.verbose == SolverOptions.VerboseType.DEBUG)) {
+                if (options.stiff && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
                   System.err.println(
                       "Stiff solvers are not yet available in JLINE. Using non-stiff solver instead.");
                 }
-                if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseType.DEBUG)) {
+                if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
                   System.err.println(
                       "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
                 }

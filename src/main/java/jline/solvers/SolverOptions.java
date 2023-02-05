@@ -15,7 +15,7 @@ import static java.lang.Double.POSITIVE_INFINITY;
 
 public class SolverOptions {
 
-  public enum VerboseType {
+  public enum VerboseLevel {
     SILENT,
     STD,
     DEBUG
@@ -57,7 +57,7 @@ public class SolverOptions {
   public int seed;
   public boolean stiff;
   public double[] timespan;
-  public VerboseType verbose;
+  public VerboseLevel verbose;
 
   public SolverOptions() {
 
@@ -93,7 +93,7 @@ public class SolverOptions {
     this.timespan = new double[2];
     this.timespan[0] = POSITIVE_INFINITY;
     this.timespan[1] = POSITIVE_INFINITY;
-    this.verbose = VerboseType.STD;
+    this.verbose = VerboseLevel.STD;
   }
 
   public SolverOptions(SolverType solverType) {
@@ -104,7 +104,7 @@ public class SolverOptions {
     switch (solverType) {
       case ENV:
         this.iter_max = 100;
-        this.verbose = VerboseType.SILENT;
+        this.verbose = VerboseLevel.SILENT;
         break;
       case FLUID:
         this.config.highVar = "none";

@@ -91,7 +91,7 @@ public abstract class EnsembleSolver extends Solver {
         }
       }
 
-      if (options.verbose != SolverOptions.VerboseType.SILENT) {
+      if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
         solveRuntimes.add(((System.nanoTime() - solveStartTime) / 1000000000.0));
         totalRuntime = (System.nanoTime() - outerStartTime) / 1000000000.0;
         System.out.format("Iter %d. ", it);
@@ -100,7 +100,7 @@ public abstract class EnsembleSolver extends Solver {
       long synchStartTime = System.nanoTime();
       post(it);
       synchRuntimes.add((System.nanoTime() - synchStartTime) / 1000000000.0);
-      if (options.verbose != SolverOptions.VerboseType.SILENT) {
+      if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
         System.out.format(
             "Analyze time: %fs. Update time: %fs. Runtime: %fs. \n",
             solveRuntimes.get(it - 1), synchRuntimes.get(it - 1), totalRuntime);
@@ -110,7 +110,7 @@ public abstract class EnsembleSolver extends Solver {
     finish();
 
     double finalRuntime = (System.nanoTime() - outerStartTime) / 1000000000.0;
-    if (options.verbose != SolverOptions.VerboseType.SILENT) {
+    if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
       double totalSolveRuntime = 0;
       double totalSynchRuntime = 0;
       for (Double runtime : solveRuntimes) {

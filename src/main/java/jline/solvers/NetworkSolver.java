@@ -466,7 +466,7 @@ public abstract class NetworkSolver extends Solver {
         }
       }
 
-      if (this.options.verbose != SolverOptions.VerboseType.SILENT) {
+      if (this.options.verbose != SolverOptions.VerboseLevel.SILENT) {
         System.out.printf(
                 "%-12s\t %-12s\t %-10s\t %-10s\t %-10s\t %-10s\t %-10s",
                 "Station", "JobClass", "QLen", "Util", "RespT", "ResidT", "Tput");

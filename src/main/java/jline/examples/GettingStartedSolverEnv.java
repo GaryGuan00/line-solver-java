@@ -78,7 +78,7 @@ public class GettingStartedSolverEnv {
     SolverOptions options = new SolverOptions(SolverType.ENV);
     options.iter_tol = 0.01;
     options.timespan[0] = 0;
-    options.verbose = SolverOptions.VerboseType.STD;
+    options.verbose = SolverOptions.VerboseLevel.STD;
 
     SolverOptions fluidOptions = new SolverOptions(SolverType.FLUID);
     fluidOptions.timespan[1] = 1000;
@@ -166,12 +166,12 @@ public class GettingStartedSolverEnv {
     SolverOptions options = new SolverOptions(SolverType.ENV);
     options.iter_tol = 0.05;
     options.timespan[0] = 0;
-    options.verbose = SolverOptions.VerboseType.STD;
+    options.verbose = SolverOptions.VerboseLevel.STD;
 
     SolverOptions fluidOptions = new SolverOptions(SolverType.FLUID);
     fluidOptions.stiff = false;
     fluidOptions.setODEMaxStep(0.25);
-    fluidOptions.verbose = SolverOptions.VerboseType.SILENT;
+    fluidOptions.verbose = SolverOptions.VerboseLevel.SILENT;
 
     NetworkSolver[] solvers = new NetworkSolver[E];
     for (int e = 0; e < E; e++) {
@@ -233,7 +233,7 @@ public class GettingStartedSolverEnv {
     SolverOptions fluidOptions = new SolverOptions(SolverType.FLUID);
     fluidOptions.stiff = false;
     fluidOptions.setODEMaxStep(0.25);
-    fluidOptions.verbose = SolverOptions.VerboseType.SILENT;
+    fluidOptions.verbose = SolverOptions.VerboseLevel.SILENT;
 
     NetworkSolver[] solvers = new NetworkSolver[E];
     for (int e = 0; e < E; e++) {
@@ -301,7 +301,7 @@ public class GettingStartedSolverEnv {
     fluidOptions.method = "matrix";
     fluidOptions.stiff = false;
     fluidOptions.setODEMaxStep(0.1);
-    fluidOptions.verbose = SolverOptions.VerboseType.SILENT;
+    fluidOptions.verbose = SolverOptions.VerboseLevel.SILENT;
 
     NetworkSolver[] solvers = new NetworkSolver[E];
     for (int e = 0; e < E; e++) {
@@ -360,7 +360,7 @@ public class GettingStartedSolverEnv {
     fluidOptions.method = "matrix";
     fluidOptions.stiff = false;
     fluidOptions.setODEMaxStep(0.1);
-    fluidOptions.verbose = SolverOptions.VerboseType.SILENT;
+    fluidOptions.verbose = SolverOptions.VerboseLevel.SILENT;
 
     NetworkSolver[] solvers = new NetworkSolver[E];
     for (int e = 0; e < E; e++) {

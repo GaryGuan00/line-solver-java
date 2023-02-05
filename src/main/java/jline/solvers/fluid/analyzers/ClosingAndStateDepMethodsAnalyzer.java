@@ -87,12 +87,12 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
       double[] tRange = {T0, T};
 
       FirstOrderIntegrator odeSolver;
-      if (options.stiff && (options.verbose == SolverOptions.VerboseType.DEBUG)) {
+      if (options.stiff && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
         System.err.println(
             "Stiff solvers are not yet available in JLINE. Using non-stiff solver instead.");
 	    options.stiff = false;
       }
-      if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseType.DEBUG)) {
+      if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
         System.err.println(
             "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
       }
@@ -107,7 +107,7 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
         odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
 	//System.out.println("done.");
       } catch (RuntimeException e) {
-        if (options.verbose != SolverOptions.VerboseType.SILENT) {
+        if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
           System.out.println(
               "The initial point is invalid, Fluid solver switching to default initialization.");
         }

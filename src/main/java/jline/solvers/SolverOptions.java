@@ -6,7 +6,7 @@ package jline.solvers;
 import jline.lang.JLineMatrix;
 import jline.lang.constant.SolverType;
 import org.apache.commons.math3.ode.FirstOrderIntegrator;
-import org.apache.commons.math3.ode.nonstiff.DormandPrince54Integrator;
+import org.apache.commons.math3.ode.nonstiff.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,12 +77,13 @@ public class SolverOptions {
     this.remote = false;
     // TODO: this.remote_endpoint = '127.0.0.1';
 
-    this.odeMinStep = 0.00000001;
+    this.odeMinStep = 0.001;
+    //this.odeMinStep = 0.00000001;
     this.odeMaxStep = POSITIVE_INFINITY;
     this.odeSolvers = new ODESolvers();
     this.odeSolvers.fastODESolver = null; // TODO
     this.odeSolvers.accurateODESolver =
-        new DormandPrince54Integrator(odeMinStep, odeMaxStep, tol, tol);
+	new DormandPrince54Integrator(odeMinStep, odeMaxStep, tol, tol);
     this.odeSolvers.fastStiffODESolver = null; // TODO
     this.odeSolvers.accurateStiffODESolver = null; // TODO
 

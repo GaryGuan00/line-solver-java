@@ -919,7 +919,9 @@ public class SolverFluid extends NetworkSolver {
                 odeSolver.addStepHandler(stepHandler);
 
                 try {
+		  System.out.print("Starting ODE integration cycle...");
                   odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
+		  System.out.println("done");
                 } catch (RuntimeException e) {
                   throw new RuntimeException("ODE Solver Failed.");
                 }

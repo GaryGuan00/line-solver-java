@@ -178,7 +178,9 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
       ode = new MatrixMethodODE(W, SQ, S, Qa, ALambda, initSolLength, sn, options.config.pStar);
     }
 
+    System.out.print("Starting ODE integration cycle...");
     odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
+    System.out.println("done.");
 
     // Retrieve Transient Data
     result.t = stepHandler.tVec;

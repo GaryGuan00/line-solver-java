@@ -83,11 +83,12 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
       double[] tRange = {T0, T};
 
       FirstOrderIntegrator odeSolver;
-      if (options.stiff) {
+      if (options.stiff && (options.verbose != SolverOptions.VerboseType.SILENT)) {
         System.err.println(
             "Stiff solvers are not yet available in JLINE. Using non-stiff solver instead.");
+	    options.stiff = false;
       }
-      if (options.tol > 0.001) {
+      if (options.tol > 0.001 && (options.verbose != SolverOptions.VerboseType.SILENT) && iter<2) {
         System.err.println(
             "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
       }
@@ -98,7 +99,9 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
       odeSolver.addStepHandler(stepHandler);
 
       try {
+        //System.out.print("Start ODE integration cycle...");
         odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
+	//System.out.println("done.");
       } catch (RuntimeException e) {
         if (options.verbose != SolverOptions.VerboseType.SILENT) {
           System.out.println(

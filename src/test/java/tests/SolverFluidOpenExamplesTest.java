@@ -6,7 +6,7 @@ import jline.solvers.fluid.SolverFluid;
 import jline.solvers.fluid.SolverFluidResult;
 import org.junit.jupiter.api.Test;
 
-import static examples.GettingStartedSolverFluid.*;
+import static jline.examples.GettingStartedSolverFluid.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class SolverFluidOpenExamplesTest {

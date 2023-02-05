@@ -4,7 +4,7 @@ import jline.solvers.SolverResult;
 import jline.solvers.env.SolverEnv;
 import org.junit.jupiter.api.Test;
 
-import static examples.GettingStartedSolverEnv.*;
+import static jline.examples.GettingStartedSolverEnv.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class SolverEnvExamplesTest {

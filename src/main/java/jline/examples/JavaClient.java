@@ -1,4 +1,4 @@
-package examples;
+package jline.examples;
 
 import jline.lang.*;
 import jline.lang.constant.SchedStrategy;

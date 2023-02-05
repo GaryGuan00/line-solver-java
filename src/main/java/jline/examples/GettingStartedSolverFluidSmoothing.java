@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2022, Imperial College London
 // All rights reserved.
 
-package examples;
+package jline.examples;
 
 import jline.lang.*;
 import jline.lang.constant.SchedStrategy;
@@ -13,7 +13,7 @@ import jline.solvers.fluid.SolverFluid;
 import jline.solvers.fluid.smoothing.PStarSearcher;
 import org.apache.commons.math3.optim.*;
 
-import static examples.GettingStartedSolverFluid.closed_ex1;
+import static jline.examples.GettingStartedSolverFluid.closed_ex1;
 
 public class GettingStartedSolverFluidSmoothing {
 

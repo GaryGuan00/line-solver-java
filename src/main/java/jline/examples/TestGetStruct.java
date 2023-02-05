@@ -1,4 +1,4 @@
-package examples;
+package jline.examples;
 
 import java.util.Arrays;
 

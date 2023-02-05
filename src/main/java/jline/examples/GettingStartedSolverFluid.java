@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2022, Imperial College London
 // All rights reserved.
 
-package examples;
+package jline.examples;
 
 import jline.lang.ClosedClass;
 import jline.lang.Network;

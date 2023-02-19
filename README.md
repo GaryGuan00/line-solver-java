@@ -6,3 +6,7 @@ Generate linesolver.jar with:
 ```
 mvn clean package 
 ```
+Generate javadoc documentation with:
+```
+mvn javadoc:javadoc
+```

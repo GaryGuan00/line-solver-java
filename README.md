@@ -10,3 +10,4 @@ Generate javadoc documentation with:
 ```
 mvn javadoc:javadoc
 ```
+Browse javadoc at [this page](https://htmlpreview.github.io/?https://raw.githubusercontent.com/imperial-qore/line-solver-java/main/docs/javadoc/index.html).

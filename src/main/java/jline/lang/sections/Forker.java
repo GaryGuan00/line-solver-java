@@ -1,20 +1,32 @@
 package jline.lang.sections;
 
-import java.util.List;
-import jline.lang.*;
+import jline.lang.JobClass;
+import jline.lang.Network;
+import jline.lang.OutputStrategy;
 import jline.lang.constant.RoutingStrategy;
-import jline.lang.distributions.*;
-import jline.lang.nodes.*;
-import jline.lang.sections.*;
+import jline.lang.nodes.Node;
 import jline.solvers.ssa.events.ForkOutputEvent;
 
+import java.util.List;
+
+/**
+ * Output section that forks incoming jobs into sibling tasks
+ */
 public class Forker extends OutputSection {
 	public double taskPerLink;
     protected List<JobClass> jobClasses;
-    public Forker(Network model) {
+
+    public Forker(List<JobClass> customerClasses) {
         super("Forker");
-        this.jobClasses = model.getClasses();
+        this.jobClasses = customerClasses;
         this.taskPerLink = 1.0;
+        this.initDispatcherJobClasses(customerClasses);
+    }
+
+    private void initDispatcherJobClasses(List<JobClass> customerClasses){
+        for(JobClass jobClass : customerClasses){
+            this.outputStrategies.add(new OutputStrategy(jobClass, RoutingStrategy.RAND));
+        }
     }
 
     @Override

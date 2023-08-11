@@ -3,15 +3,15 @@ package jline.solvers.ssa.events;
 import jline.lang.JobClass;
 import jline.lang.nodes.Node;
 import jline.lang.sections.OutputSection;
+import jline.solvers.ctmc.EventData;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.util.Pair;
-import org.javatuples.Quartet;
-import org.javatuples.Triplet;
 
 import java.util.ArrayList;
 import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
 
 public class OutputEvent extends Event {
     protected OutputSection outputSection;
@@ -19,6 +19,7 @@ public class OutputEvent extends Event {
     protected JobClass jobClass;
     protected boolean isClassSwitched;
     protected int jobClassIdx;
+    private boolean isDummy = false;
 
     public OutputEvent(OutputSection outputSection, Node node, JobClass jobClass) {
         super();
@@ -33,29 +34,31 @@ public class OutputEvent extends Event {
         this.isClassSwitched = isClassSwitched;
     }
 
+    //WARNING: THIS IS ONLY USED AS A DUMMY EVENT FOR SELF-LOOPING EVENTS IN CTMC
+    public OutputEvent(int jobClassIdx) {
+        this.jobClassIdx = jobClassIdx;
+        this.isDummy = true;
+    }
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
-        timeline.record(this, stateMatrix);
-        return this.node.getArrivalEvent(this.jobClass).stateUpdate(stateMatrix, random, timeline);
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
+        timeline.record(this, networkState);
+        return this.node.getArrivalEvent(this.jobClass).stateUpdate(networkState, random, timeline);
     }
 
     @Override
-    public boolean updateStateSpace(StateMatrix stateMatrix, Random random, Timeline timeline, ArrayList<StateMatrix> stateSpace, Queue<StateMatrix> queue) {
-        timeline.record(this, stateMatrix);
-        return this.node.getArrivalEvent(this.jobClass).stateUpdate(stateMatrix, random, timeline);
+    public boolean updateStateSpace(SSAStateMatrix networkState, Random random, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
+        return this.node.getArrivalEvent(this.jobClass).updateStateSpace(networkState, random, stateSpace, queue, stateSet);
     }
 
-    @Override
-    public boolean updateEventSpace(StateMatrix stateMatrix, Random random, Timeline timeline, ArrayList<Quartet<Event, Pair<OutputEvent,Double>,StateMatrix,StateMatrix>>  eventSpace, Event event, Queue<StateMatrix> queue, StateMatrix copy) {
-        timeline.record(this, stateMatrix);
-        return this.node.getArrivalEvent(this.jobClass).stateUpdate(stateMatrix, random, timeline);
+    public boolean updateEventSpace(SSAStateMatrix networkState, Random random, ArrayList<EventData> eventSpace, Event event, Queue<SSAStateMatrix> queue, SSAStateMatrix copy, Set<EventData> eventSet, Pair<OutputEvent, Double> outputEventDoublePair) {
+        return this.node.getArrivalEvent(this.jobClass).updateEventSpace(networkState, random, eventSpace, event, queue, copy, eventSet, outputEventDoublePair) ;
     }
 
 
     @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
-        timeline.record(n, this, stateMatrix);
-        return this.node.getArrivalEvent(this.jobClass).stateUpdateN(n, stateMatrix, random, timeline);
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
+        timeline.record(n, this, networkState);
+        return this.node.getArrivalEvent(this.jobClass).stateUpdateN(n, networkState, random, timeline);
     }
 
     public boolean isClassSwitched() {
@@ -70,11 +73,11 @@ public class OutputEvent extends Event {
         return this.outputSection;
     }
 
-    public StateMatrix getNextState(StateMatrix startingState, Timeline timeline, ArrayList<StateMatrix> stateSpace,Queue<StateMatrix> queue) {
+    public SSAStateMatrix getNextState(SSAStateMatrix startingState, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
 
-        StateMatrix endingState = new StateMatrix(startingState);
+        SSAStateMatrix endingState = new SSAStateMatrix(startingState);
 
-        if(updateStateSpace(endingState, new Random(), timeline, stateSpace,queue)){
+        if(updateStateSpace(endingState, new Random(), stateSpace,queue, stateSet)){
             return endingState;
         }
 
@@ -82,15 +85,23 @@ public class OutputEvent extends Event {
 
     }
 
-    public StateMatrix getNextEventState(StateMatrix startingState, Timeline timeline, ArrayList<Quartet<Event,Pair<OutputEvent,Double>,StateMatrix,StateMatrix>>  eventSpace,Event event, Queue<StateMatrix> queue,StateMatrix copy) {
+    public SSAStateMatrix getNextEventState(SSAStateMatrix startingState, ArrayList<EventData> eventSpace, Event event, Queue<SSAStateMatrix> queue, SSAStateMatrix copy, Set<EventData> eventSet, Pair<OutputEvent, Double> outputEventDoublePair) {
 
-        StateMatrix endingState = new StateMatrix(startingState);
+        SSAStateMatrix endingState = new SSAStateMatrix(startingState);
 
-        if(updateEventSpace(endingState, new Random(), timeline, eventSpace,event,queue,copy)){
+        if(updateEventSpace(endingState, new Random(), eventSpace,event,queue,copy, eventSet, outputEventDoublePair)){
             return endingState;
         }
 
         return null;
     }
 
+    @Override
+    public Node getNode() {
+        return node;
+    }
+
+    public boolean isDummy() {
+        return this.isDummy;
+    }
 }

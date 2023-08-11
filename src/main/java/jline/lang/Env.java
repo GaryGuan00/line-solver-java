@@ -2,29 +2,30 @@
 // All rights reserved.
 
 package jline.lang;
-
 import jline.api.CTMC;
 import jline.lang.distributions.MarkovianDistribution;
-import m3a.Mmap;
-import org.ejml.data.DMatrixRMaj;
-import org.qore.KPC.MAP;
+import jline.util.Matrix;
+
 
 import java.util.*;
+import static jline.lib.KPCToolbox.*;
+import static jline.lib.M3A.*;
+
 
 // An environment model defined by a collection of network sub-models coupled with an environment
 // transition rule that selects the active sub-model.
 public class Env extends Ensemble {
 
   public interface ResetQueueLengthsFunction {
-    JLineMatrix reset(JLineMatrix input);
+    Matrix reset(Matrix input);
   }
 
   public interface ResetEnvRatesFunction {
     MarkovianDistribution reset(
         MarkovianDistribution originalDist,
-        JLineMatrix QExit,
-        JLineMatrix UExit,
-        JLineMatrix TExit);
+        Matrix QExit,
+        Matrix UExit,
+        Matrix TExit);
   }
 
   public final MarkovianDistribution[][] env;
@@ -33,13 +34,14 @@ public class Env extends Ensemble {
   private final Network[] models;
 
   // Markovian representation of each stage transition
-  public Map<Integer, JLineMatrix>[][] proc;
-  public Map<Integer, JLineMatrix>[] holdTime; // Holding times
-  public JLineMatrix probEnv; // Steady-stage probability of the environment
-  public JLineMatrix probOrig; // Probability that a request originated from phase
+  public Map<Integer, Matrix>[][] proc;
+  public Map<Integer, Matrix>[] holdTime; // Holding times
+  public Matrix probEnv; // Steady-stage probability of the environment
+  public Matrix probOrig; // Probability that a request originated from phase
   public ResetQueueLengthsFunction[][] resetQLFun; // Function implementing the reset policy
   public ResetEnvRatesFunction[][] resetEnvRatesFun;
 
+  @SuppressWarnings("unchecked")
   public Env(String name, int numStages) {
     super(new ArrayList<>());
     this.setName(name);
@@ -49,8 +51,8 @@ public class Env extends Ensemble {
     this.models = new Network[numStages];
     this.proc = new HashMap[numStages][numStages];
     this.holdTime = new HashMap[numStages];
-    this.probEnv = new JLineMatrix(0, 0);
-    this.probOrig = new JLineMatrix(0, 0);
+    this.probEnv = new Matrix(0, 0);
+    this.probOrig = new Matrix(0, 0);
     this.resetQLFun = new ResetQueueLengthsFunction[numStages][numStages];
     this.resetEnvRatesFun = new ResetEnvRatesFunction[numStages][numStages];
   }
@@ -78,19 +80,19 @@ public class Env extends Ensemble {
     this.env[fromStageIdx][toStageIdx] = distrib;
     this.resetQLFun[fromStageIdx][toStageIdx] = resetFun;
   }
-
+  @SuppressWarnings("unchecked")
   public void init() {
     int E = this.models.length;
-    JLineMatrix Pemb = new JLineMatrix(E, E);
+    Matrix Pemb = new Matrix(E, E);
 
     // Analyse holding times
-    Map<Integer, JLineMatrix>[][] emmap = new HashMap[E][E];
+    Map<Integer, Matrix>[][] emmap = new HashMap[E][E];
     for (int e = 0; e < E; e++) {
       for (int h = 0; h < E; h++) {
         // Multiclass MMAP representation
         if (this.env[e][h] == null) {
-          JLineMatrix zero = new JLineMatrix(1, 1);
-          Map<Integer, JLineMatrix> zeroMap = new HashMap<>();
+          Matrix zero = new Matrix(1, 1);
+          Map<Integer, Matrix> zeroMap = new HashMap<>();
           zeroMap.put(0, zero);
           zeroMap.put(1, zero);
           emmap[e][h] = zeroMap;
@@ -115,19 +117,19 @@ public class Env extends Ensemble {
           this.holdTime[e].put(0, this.holdTime[e].get(0).krons(emmap[e][h].get(0)));
           for (int j = 1; j < E + 2; j++) {
             this.holdTime[e].put(j, this.holdTime[e].get(j).krons(emmap[e][h].get(j)));
-            JLineMatrix ones = new JLineMatrix(holdTime[e].get(j).length(), 1);
+            Matrix ones = new Matrix(holdTime[e].get(j).length(), 1);
             ones.ones();
-            JLineMatrix completionRates = holdTime[e].get(j).mult(ones, new JLineMatrix(0, 0));
+            Matrix completionRates = holdTime[e].get(j).mult(ones, new Matrix(0, 0));
             holdTime[e].get(j).zero();
             for (int row = 0; row < completionRates.getNumRows(); row++) {
               holdTime[e].get(j).set(row, 0, completionRates.get(row, 0));
             }
           }
-          holdTime[e] = Mmap.mmapNormalize(holdTime[e]);
+          holdTime[e] = mmap_normalize(holdTime[e]);
         }
       }
       // Completion rates for the different transitions
-      JLineMatrix countLambda = Mmap.mmapCountLambda(holdTime[e]);
+      Matrix countLambda = mmap_count_lambda(holdTime[e]);
       double sumCountLambda = countLambda.sumRows(0);
       for (int col = 0; col < Pemb.getNumCols(); col++) {
         Pemb.set(e, col, countLambda.get(0, col) / sumCountLambda);
@@ -135,16 +137,15 @@ public class Env extends Ensemble {
     }
     this.proc = emmap;
 
-    JLineMatrix lambda = new JLineMatrix(1, E);
-    JLineMatrix A = new JLineMatrix(E, E);
-    JLineMatrix I = JLineMatrix.identity(E);
+    Matrix lambda = new Matrix(1, E);
+    Matrix A = new Matrix(E, E);
+    Matrix I = Matrix.eye(E);
     for (int e = 0; e < E; e++) {
       lambda.set(
           0,
           e,
           1
-              / new MAP(new DMatrixRMaj(holdTime[e].get(0)), new DMatrixRMaj(holdTime[e].get(1)))
-                  .getMean());
+              / map_mean( holdTime[e].get(0), holdTime[e].get(1)));
       for (int h = 0; h < E; h++) {
         A.set(e, h, -lambda.get(0, e) * (I.get(e, h) - Pemb.get(e, h)));
       }
@@ -158,7 +159,7 @@ public class Env extends Ensemble {
     }
     if (countLambdaValuesLEQZero == 0) {
       this.probEnv = CTMC.ctmc_solve(A);
-      this.probOrig = new JLineMatrix(E, E);
+      this.probOrig = new Matrix(E, E);
       for (int e = 0; e < E; e++) {
         for (int h = 0; h < E; h++) {
           probOrig.set(h, e, probEnv.get(0, h) * lambda.get(0, h) * Pemb.get(h, e));

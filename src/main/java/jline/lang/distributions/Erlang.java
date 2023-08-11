@@ -4,25 +4,27 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
-import org.ejml.data.DMatrixRMaj;
-import org.ejml.ops.DConvertMatrixStruct;
-import org.qore.KPC.MAP;
-
-import jline.lang.JLineMatrix;
+import jline.lang.constant.GlobalConstants;
+import jline.util.Matrix;
 
 public class Erlang extends MarkovianDistribution implements Serializable {
     public Erlang(double phaseRate, long nPhases) {
-        super("jline.Erlang", 2);
+        super("Erlang", 2);
         this.setParam(1, "alpha", phaseRate);
         this.setParam(2, "r", nPhases);
-    }
-
-    public List<Double> sample(int n)  {
         double alpha = (double)this.getParam(1).getValue();
         long r = (long) this.getParam(2).getValue();
-        //return exprnd(1/lambda, n, 1);
-        throw new RuntimeException("Not Implemented!");
+    }
+
+    @Override
+    public List<Double> sample(long n) {
+        throw new RuntimeException("Not implemented");
+    }
+
+    public List<Double> sample(long n, Random random) {
+        return this.sample(n,random);
     }
 
     public long getNumberOfPhases() {
@@ -71,26 +73,24 @@ public class Erlang extends MarkovianDistribution implements Serializable {
         return ft;
     }
 
-    public Map<Integer, JLineMatrix> getPH()  {
-        long r = (long) this.getParam(2).getValue();
-		double mu = r/getMean();
-		int size = (int) r;
-		DMatrixRMaj D0 = new DMatrixRMaj(size, size);
-		DMatrixRMaj D1 = new DMatrixRMaj(size, size);
-		
+    public Map<Integer, Matrix> getPH()  {
+        // This function has to be independent of getD0, getD1, getRepres
+        double mu =  (double) this.getParam(1).getValue();
+        long r =  (long) this.getParam(2).getValue();
+        int size = (int) r;
+		Matrix D0 = new Matrix(size, size);
+        Matrix D1 = new Matrix(size, size);
+
 		for(int i = 0; i < size - 1; i++) {
+            D0.set(i, i, -mu);
 			D0.set(i, i+1, mu);
 		}
+        D0.set(size-1, size-1, -mu);
 		D1.set(size - 1, 0, mu);
-		
-		MAP map = new MAP(D0, D1);
-		map.normalize();
-		
-		Map<Integer, JLineMatrix> res = new HashMap<Integer, JLineMatrix>();
-		res.put(0, new JLineMatrix(size, size));
-		res.put(1, new JLineMatrix(size, size));
-		DConvertMatrixStruct.convert(map.D0, res.get(0), 0);
-		DConvertMatrixStruct.convert(map.D1, res.get(1), 0);
+
+		Map<Integer, Matrix> res = new HashMap<Integer, Matrix>();
+		res.put(0, D0);
+		res.put(1, D1);
         return res;
     }
     
@@ -100,10 +100,10 @@ public class Erlang extends MarkovianDistribution implements Serializable {
         return Math.pow(alpha/(alpha+s), r);
     }
 
-    public static Erlang fitMeanAndSCV(double mean, double scv) {
-        double r = Math.ceil(scv);
+    public static Erlang fitMeanAndSCV(double mean, double SCV) {
+        long r = (long)  Math.ceil(1 / SCV);
         double alpha = r/mean;
-        return new Erlang(alpha, (long)r);
+        return new Erlang(alpha, r);
     }
 
     public static Erlang fitMeanAndStdDev(double mean, double stdDev) {
@@ -111,13 +111,12 @@ public class Erlang extends MarkovianDistribution implements Serializable {
     }
 
     // Fit distribution with given mean and number of phases
-    public static Erlang fitMeanAndOrder(double mean, double numPhases) {
-
-        double SCV = 1 / numPhases;
+    public static Erlang fitMeanAndOrder(double mean, long numPhases) {
+        double SCV = (double) 1 / numPhases;
         long r = (long) Math.ceil(1 / SCV);
         double alpha = r / mean;
         Erlang er = new Erlang(alpha, r);
-        er.immediate = mean < Distribution.tolerance;
+        er.immediate = mean < GlobalConstants.CoarseTol;
         return er;
     }
 }

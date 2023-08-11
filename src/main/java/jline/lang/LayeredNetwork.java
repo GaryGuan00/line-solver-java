@@ -1,8 +1,12 @@
 package jline.lang;
 
+import jline.lang.constant.CallType;
 import jline.lang.constant.SchedStrategy;
+import jline.lang.distributions.DiscreteDistribution;
 import jline.lang.distributions.Distribution;
+import jline.lang.distributions.Geometric;
 import jline.lang.distributions.Immediate;
+import jline.util.Matrix;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -22,11 +26,12 @@ import static jline.lang.constant.ActivityPrecedenceType.*;
 public class LayeredNetwork extends Ensemble {
 
 
-    private Aux aux;
+    private final Aux aux;
     private Indexes indexes;
-    private JLineMatrix lqnGraph;
-    private JLineMatrix taskGraph;
+    private Matrix lqnGraph;
+    private Matrix taskGraph;
     private Param param;
+
 
 
     protected Map<Integer, Host> hosts;
@@ -34,7 +39,6 @@ public class LayeredNetwork extends Ensemble {
     protected Map<Integer, Task> reftasks;
     protected Map<Integer, Activity> activities;
     protected Map<Integer, Entry> entries;
-
 
     private class Aux {
     }
@@ -99,8 +103,8 @@ public class LayeredNetwork extends Ensemble {
     public LayeredNetwork(String name, String filename) {
         super(name);
         this.aux = new Aux();
-        this.lqnGraph = new JLineMatrix(0,0,0);
-        this.taskGraph = new JLineMatrix(0,0,0);
+        this.lqnGraph = new Matrix(0,0,0);
+        this.taskGraph = new Matrix(0,0,0);
         this.ensemble = new ArrayList<>();
         this.hosts = new HashMap<>();
         this.tasks = new HashMap<>();
@@ -361,63 +365,64 @@ public class LayeredNetwork extends Ensemble {
         }
     }
 
+
+
     public LayeredNetworkStruct getStruct() {
 
         LayeredNetworkStruct lqn = new LayeredNetworkStruct();
+
         lqn.nidx = 0;
+        lqn.hshift =  0;
+        lqn.cshift = 0;
         lqn.nhosts = this.hosts.size();
         lqn.ntasks = this.tasks.size();
-        lqn.nreftasks = this.reftasks.size();
-        lqn.nacts = this.activities.size();
         lqn.nentries = this.entries.size();
-        lqn.ntasksof = new JLineMatrix(0, 0, 0);
-        lqn.nentriesof = new JLineMatrix(0, 0, 0);
-        lqn.nactsof = new JLineMatrix(0, 0, 0);
+        lqn.nacts = this.activities.size();
         lqn.tshift = lqn.nhosts;
         lqn.eshift = lqn.nhosts + lqn.ntasks;
         lqn.ashift = lqn.nhosts + lqn.ntasks + lqn.nentries;
 
-        for (int i = 0; i < lqn.nhosts; i++) {
-            Host host = this.hosts.get(0);
-            lqn.ntasksof.set(0, i, host.tasks.size());
-        }
-
+        // analyze static properties
         lqn.nidx = lqn.nhosts + lqn.ntasks + lqn.nentries + lqn.nacts;
         int idx = 1;
-        lqn.hostidx = new JLineMatrix(0, 0, 0);
-        lqn.taskidx = new JLineMatrix(0, 0, 0);
-        lqn.entryidx = new JLineMatrix(0, 0, 0);
-        lqn.actidx = new JLineMatrix(0, 0, 0);
+
         lqn.tasksof = new HashMap<>(lqn.nhosts);
         lqn.entriesof = new HashMap<>(lqn.nhosts + lqn.ntasks);
-        lqn.callsof = new HashMap<>(lqn.nhosts + lqn.ntasks);
+        lqn.actsof = new HashMap<>(lqn.nhosts + lqn.ntasks);
+        lqn.callsof = new HashMap<>(lqn.nacts);
 
         lqn.hostdem = new HashMap<>();
         lqn.think = new HashMap<>();
         lqn.sched = new HashMap<>();
-        lqn.schedid = new JLineMatrix(0, 0, 0);
+        lqn.schedid = new Matrix(1, lqn.nhosts+lqn.ntasks+1, lqn.nhosts+lqn.ntasks);
+
         lqn.names = new HashMap<>();
         lqn.hashnames = new HashMap<>();
 
-        lqn.mult = new JLineMatrix(1, lqn.nhosts + lqn.ntasks, lqn.nhosts + lqn.ntasks);
-        lqn.repl = new JLineMatrix(1, lqn.nhosts + lqn.ntasks, lqn.nhosts + lqn.ntasks);
-        lqn.type = new JLineMatrix(1, lqn.nidx, lqn.nidx);
-        lqn.graph = new JLineMatrix(0, 0, 0);
-        lqn.replygraph = new JLineMatrix(0, 0, 0);
+        lqn.mult = new Matrix(1, lqn.nhosts + lqn.ntasks+1, lqn.nhosts + lqn.ntasks);
+        lqn.repl = new Matrix(1, lqn.nhosts + lqn.ntasks+1, lqn.nhosts + lqn.ntasks);
+        lqn.type = new Matrix(1, lqn.nidx+1, lqn.nidx);
+        lqn.graph = new Matrix(lqn.nidx+1, lqn.nidx+1, lqn.nidx * lqn.nidx);
+        lqn.replygraph = new Matrix(lqn.nidx+1, lqn.nidx+1, lqn.nentries*lqn.nacts);
 
-        lqn.nitems = new HashMap<>(lqn.nhosts + lqn.ntasks);
-        lqn.itemlevelcap = new HashMap<>();
-        lqn.replacementpolicy = new HashMap<>();
-        lqn.nitemsof = new HashMap<>();
-        lqn.itemsdistribution = new HashMap<>();
-        lqn.iscache = new JLineMatrix(1, lqn.nhosts + lqn.ntasks, lqn.nhosts + lqn.ntasks);
 
-        lqn.parent = new JLineMatrix(0, 0, 0);
+        lqn.nitems = new Matrix(1, lqn.nhosts + lqn.ntasks+lqn.nentries+1, lqn.ntasks + lqn.nacts);
+
+        lqn.itemcap = new HashMap<>();
+        lqn.itemproc = new HashMap<>();
+
+
+
+        lqn.iscache = new Matrix(1, lqn.nhosts + lqn.ntasks+1, lqn.nhosts + lqn.ntasks);
+        lqn.replacement = new Matrix(1,lqn.nhosts+lqn.ntasks+1,lqn.nhosts+lqn.ntasks);
+
+
+        lqn.parent = new Matrix(1, lqn.nidx+1, lqn.nidx);
 
         for (int i = 0; i < lqn.nhosts; i++) {
-            lqn.hostidx.set(0, lqn.hostidx.length(), idx);
+
             lqn.sched.put(idx, this.hosts.get(i).scheduling);
-            lqn.schedid.set(0, SchedStrategy.toID(lqn.sched.get(idx)));
+            lqn.schedid.set(0, idx, SchedStrategy.toID(lqn.sched.get(idx)));
             lqn.mult.set(0, idx, this.hosts.get(i).multiplicity);
             lqn.repl.set(0, idx, this.hosts.get(i).replication);
             lqn.names.put(idx, this.hosts.get(i).name);
@@ -427,7 +432,7 @@ public class LayeredNetwork extends Ensemble {
         }
 
         for (int i = 0; i < lqn.ntasks; i++) {
-            lqn.taskidx.set(0, lqn.taskidx.length(), idx);
+
             lqn.sched.put(idx, this.tasks.get(i).scheduling);
             lqn.schedid.set(0, idx, SchedStrategy.toID(lqn.sched.get(idx)));
             lqn.hostdem.put(idx, new Immediate());
@@ -435,164 +440,185 @@ public class LayeredNetwork extends Ensemble {
             lqn.mult.set(0, idx, this.tasks.get(i).multiplicity);
             lqn.repl.set(0, idx, this.tasks.get(i).replication);
             lqn.names.put(idx, this.tasks.get(i).name);
+
             if(lqn.schedid.get(0, idx) == SchedStrategy.toID(SchedStrategy.REF)){
                 lqn.hashnames.put(idx,"R:"+lqn.names.get(idx));
             }else{
                 lqn.hashnames.put(idx,"T:"+lqn.names.get(idx));
             }
 
-            //if(this.tasks.get(i).getClass() == CacheTask.getClass)
-            int pidx;
-            for (pidx = 0;pidx<this.hosts.size();pidx++){
-                if(this.hosts.get(pidx).name.equals(this.tasks.get(i).parent.getName())){
+            if(this.tasks.get(i) instanceof CacheTask){
+                lqn.nitems.set(0,idx, ((CacheTask)this.tasks.get(i)).items);
+                lqn.itemcap.put(idx, ((CacheTask)this.tasks.get(i)).itemLevelCap);
+                lqn.replacement.set(0,idx, ((CacheTask)this.tasks.get(i)).replacementPolicy);
+                lqn.hashnames.put(idx,"C:"+lqn.names.get(idx));
+            }
+
+            int pidx=0;
+            for (int id = 0;id<this.hosts.size();id++){
+                if(this.hosts.get(id).name.equals(this.tasks.get(i).parent.getName())){
+                    pidx = id+1;
                     break;
                 }
             }
 
             lqn.parent.set(0,idx,pidx);
             lqn.graph.set(idx,pidx,1);//col,row?
-            lqn.nentriesof.set(0,idx,this.tasks.get(i).entries.size());
-            lqn.nactsof.set(0,idx,this.tasks.get(i).activities.size());
+
             lqn.type.set(0,idx,LayeredNetworkElement.TASK);
             idx++;
         }
 
-        for(int p=0; p<lqn.ntasks; p++){
-            for(int id =0;id<lqn.parent.length();id++){
-                if (lqn.parent.get(id) == p) {
-                    lqn.tasksof.put(p, id);
-                }
+
+        for(int p=1; p<=lqn.nhosts; p++){
+
+            if(!lqn.tasksof.containsKey(p)){
+                lqn.tasksof.put(p,new ArrayList<>());
+            }
+            for(int id =1;id<lqn.parent.length();id++){
+
+                if (lqn.parent.get(0,id) == p) {
+                  lqn.tasksof.get(p).add(id);
+               }
             }
         }
 
         for(int e=0; e<lqn.nentries; e++){
-            lqn.entryidx.set(0, entries.size(),idx);
+
             lqn.names.put(idx, this.entries.get(e).name);
-            if(this.entries.get(e) instanceof Entry){
-                lqn.hashnames.put(idx,"E:"+lqn.names.get(idx));
-            }
+
+            lqn.hashnames.put(idx,"E:"+lqn.names.get(idx));
+
             if(this.entries.get(e) instanceof ItemEntry){
                 lqn.hashnames.put(idx,"I:"+lqn.names.get(idx));
-                lqn.nitemsof.put(idx,((ItemEntry) this.entries.get(e)).cardinality);
-                lqn.itemsdistribution.put(idx, ((ItemEntry) this.entries.get(e)).popularity);
+                lqn.nitems.set(0,idx,((ItemEntry) this.entries.get(e)).cardinality);
+                lqn.itemproc.put(idx, (DiscreteDistribution) ((ItemEntry) this.entries.get(e)).popularity);
             }
             lqn.hostdem.put(idx, new Immediate());
             int tidx = 0;
             for(int id = 0; id<this.tasks.size();id++){
-                if(this.entries.get(e).parent.name.equals(this.tasks.get(id))){
-                    tidx = lqn.nhosts + id;
+                if(this.entries.get(e).parent.name.equals(this.tasks.get(id).name)){
+                    tidx = lqn.nhosts + id+1;
                     break;
                 }
             }
             lqn.parent.set(0,idx,tidx);
             lqn.graph.set(tidx,idx,1);
-            List<Integer> tempEntries = lqn.entriesof.get(tidx);
-            tempEntries.add(idx);
-            lqn.entriesof.put(tidx,tempEntries);
-            lqn.type.set(0,idx,LayeredNetworkElement.ACTIVITY);
+            if(!lqn.entriesof.containsKey(tidx)){
+                lqn.entriesof.put(tidx,new ArrayList<>());
+
+            }
+            lqn.entriesof.get(tidx).add(idx);
+
+            lqn.type.set(0,idx,LayeredNetworkElement.ENTRY);
             idx++;
         }
 
         for(int a=0; a<lqn.nacts; a++){
-            lqn.actidx.set(0, lqn.actidx.length(),idx);
+
             lqn.names.put(idx,this.activities.get(a).name);
             lqn.hashnames.put(idx, "A:"+lqn.names.get(idx));
             lqn.hostdem.put(idx, this.activities.get(a).hostDemand);
             int tidx = 0;
             for(int id = 0; id<this.tasks.size();id++){
-                if(this.activities.get(a).parent.name.equals(this.tasks.get(id))){
-                    tidx = lqn.nhosts + id;
+                if(this.activities.get(a).parent.name.equals(this.tasks.get(id).name)){
+                    tidx = lqn.nhosts + id+1;
                     break;
                 }
             }
             lqn.parent.set(0,idx,tidx);
-            List<Integer> tempActs = lqn.actsof.get(tidx);
-            tempActs.add(idx);
-            lqn.actsof.put(tidx,tempActs);
+            if(!lqn.actsof.containsKey(tidx)){
+                lqn.actsof.put(tidx,new ArrayList<>());
+            }
+            lqn.actsof.get(tidx).add(idx);
             lqn.type.set(0,idx,LayeredNetworkElement.ACTIVITY);
             idx++;
         }
 
-        int nidx = idx-1;
-        lqn.graph.set(nidx,nidx,0);
+
+        lqn.graph.set(lqn.nidx,lqn.nidx,0);
 
         Map<Integer, Task> tasks = this.tasks;
         int cidx = 0;
-        lqn.callidx = new JLineMatrix(lqn.nidx,lqn.nidx,lqn.nidx*lqn.nidx);
-        lqn.calltype = new JLineMatrix(0,lqn.nidx,lqn.nidx);
-        lqn.iscaller = new JLineMatrix(lqn.nidx,lqn.nidx);
-        lqn.issynccaller = new JLineMatrix(lqn.nidx,lqn.nidx);
-        lqn.isasynccaller = new JLineMatrix(lqn.nidx, lqn.nidx);
-        lqn.callpair = new JLineMatrix(0,0,0);
-        lqn.callproc = new HashMap<Integer, Geometric>();
-        lqn.callnames = new HashMap<Integer, String>();
-        lqn.taskgrpaph = new JLineMatrix(0,lqn.ntasks,lqn.ntasks);
-        lqn.actpretype = new JLineMatrix(1,lqn.nidx);
-        lqn.actposttype = new JLineMatrix(1,lqn.nidx);
+
+        lqn.calltype = new HashMap<>();
+        lqn.iscaller = new Matrix(lqn.nidx+1,lqn.nidx+1,(lqn.ntasks+lqn.nacts)*(lqn.ntasks+lqn.nentries));
+        lqn.issynccaller = new Matrix(lqn.nidx+1,lqn.nidx+1,(lqn.ntasks+lqn.nacts)*(lqn.ntasks+lqn.nentries));
+        lqn.isasynccaller = new Matrix(lqn.nidx+1,lqn.nidx+1,(lqn.ntasks+lqn.nacts)*(lqn.ntasks+lqn.nentries));
+        lqn.callpair = new Matrix(lqn.nacts*lqn.nentries+1,3,lqn.nacts*lqn.nentries);
+        lqn.callproc = new HashMap<>();
+        lqn.callnames = new HashMap<>();
+        lqn.callhashnames = new HashMap<>();
+        lqn.taskgraph = new Matrix(lqn.ntasks + lqn.tshift+1,lqn.ntasks + lqn.tshift+1,(lqn.ntasks + lqn.tshift)*(lqn.ntasks + lqn.tshift));
+        lqn.actpretype = new Matrix(1,lqn.nidx+1,lqn.nacts);
+        lqn.actposttype = new Matrix(1,lqn.nidx+1,lqn.nacts);
 
         for(int t=0; t<lqn.ntasks; t++){
-            int tidx = (int) lqn.taskidx.get(t);
-            lqn.actsof.put(tidx, new ArrayList<>());
-            for(int a=0;a<lqn.nactsof.get(tidx);a++){
+            int tidx = lqn.tshift+t+1;
+
+            for(int a=0;a<tasks.get(t).activities.size();a++){
                 int aidx = findString(lqn.hashnames,"A:"+tasks.get(t).activities.get(a).name);
                 lqn.callsof.put(aidx,new ArrayList<>());
-                List<Integer> tempActs = lqn.actsof.get(tidx);
-                tempActs.set(a,aidx);
-                lqn.actsof.put(tidx,tempActs);
+
                 String boundToEntry = tasks.get(t).activities.get(a).boundToEntry;
                 int eidx = findString(lqn.hashnames,"E:"+boundToEntry);
-                if(eidx<=0){
+                if(eidx<0){
                     eidx = findString(lqn.hashnames,"I:"+boundToEntry);
-                }else{
+                }
+                if(eidx>0){
                     lqn.graph.set(eidx,aidx,1);
                 }
 
                 for(int s=0; s<tasks.get(t).activities.get(a).syncCallDests.size();s++){
-                    int target_eidx = findString(lqn.hashnames,"E"+tasks.get(t).activities.get(a).syncCallDests.get(s));
+
+                    int target_eidx = findString(lqn.hashnames,"E:"+tasks.get(t).activities.get(a).syncCallDests.get(s));
+
                     if(target_eidx<=0){
                         target_eidx = findString(lqn.hashnames,"I:"+ tasks.get(t).activities.get(a).syncCallDests.get(s));
                     }
                     int target_tidx = (int) lqn.parent.get(target_eidx);
                     cidx++;
-                    lqn.callidx.set(aidx,target_eidx,cidx);
-                    //lqn.calltype.set(cidx,0,CallType.ID_SYNC);//TODO
-                    lqn.callpair.set(cidx,0,aidx);
-                    lqn.callpair.set(cidx,1,target_eidx);
+
+                    lqn.calltype.put(cidx,CallType.SYNC);
+                    lqn.callpair.set(cidx,1,aidx);
+                    lqn.callpair.set(cidx,2,target_eidx);
                     lqn.callnames.put(cidx,lqn.names.get(aidx)+"=>"+lqn.names.get(target_eidx));
                     lqn.callhashnames.put(cidx,lqn.hashnames.get(aidx)+"=>"+lqn.hashnames.get(target_eidx));
-                    //lqn.callproc.put(cidx, Geometric(1/tasks.get(t).activities.get(a).syncCallMeans.get(s)));
-                    List<Integer> tempCalls = lqn.callsof.get(aidx);
-                    tempCalls.add(cidx);
-                    lqn.callsof.put(aidx,tempCalls);
+                    lqn.callproc.put(cidx, new Geometric(1/tasks.get(t).activities.get(a).syncCallMeans.get(s)));
+
+                    lqn.callsof.get(aidx).add(cidx);
+                    lqn.iscaller.set(aidx,target_tidx,1);
+                    lqn.iscaller.set(aidx,target_eidx,1);
                     lqn.iscaller.set(tidx, target_tidx,1);//1 -> true
                     lqn.iscaller.set(tidx,target_eidx,1);
-                    lqn.iscaller.set(aidx,target_eidx,1);
                     lqn.issynccaller.set(tidx,target_tidx,1);
                     lqn.issynccaller.set(tidx,target_eidx,1);
                     lqn.issynccaller.set(aidx,target_eidx,1);
+                    lqn.issynccaller.set(aidx,target_tidx,1);
                     lqn.taskgraph.set(tidx,target_tidx,1);
                     lqn.graph.set(aidx,target_eidx,1);
                 }
 
                 for(int s=0; s<tasks.get(t).activities.get(a).asyncCallDests.size();s++){
-                    int target_eidx = findString(lqn.hashnames,"E"+tasks.get(t).activities.get(a).asyncCallDests.get(s));
+                    int target_eidx = findString(lqn.hashnames,"E:"+tasks.get(t).activities.get(a).asyncCallDests.get(s));
                     int target_tidx = (int) lqn.parent.get(target_eidx);
                     cidx++;
-                    lqn.callidx.set(aidx,target_eidx,cidx);
-                    //lqn.calltype.set(cidx,0,CallType.ID_ASYNC);
-                    lqn.callpair.set(cidx,0,aidx);
-                    lqn.callpair.set(cidx,1,target_eidx);
+
+                    lqn.calltype.put(cidx, CallType.ASYNC);
+                    lqn.callpair.set(cidx,1,aidx);
+                    lqn.callpair.set(cidx,2,target_eidx);
                     lqn.callnames.put(cidx,lqn.names.get(aidx)+"->"+lqn.names.get(target_eidx));
                     lqn.callhashnames.put(cidx,lqn.hashnames.get(aidx)+"->"+lqn.hashnames.get(target_eidx));
-                    //lqn.callproc.put(cidx, Geometric(1/tasks.get(t).activities.get(a).syncCallMeans.get(s)));
-                    List<Integer> tempCalls = lqn.callsof.get(aidx);
-                    tempCalls.add(cidx);
-                    lqn.callsof.put(aidx,tempCalls);
+                    lqn.callproc.put(cidx, new Geometric(1/tasks.get(t).activities.get(a).syncCallMeans.get(s)));
+                    lqn.callsof.get(aidx).add(cidx);
                     lqn.iscaller.set(tidx, target_tidx,1);//1 -> true
                     lqn.iscaller.set(tidx,target_eidx,1);
+                    lqn.iscaller.set(aidx,target_eidx,1);
+                    lqn.iscaller.set(aidx,target_tidx,1);
                     lqn.isasynccaller.set(tidx,target_tidx,1);
                     lqn.isasynccaller.set(tidx,target_eidx,1);
                     lqn.isasynccaller.set(aidx,target_eidx,1);
+                    lqn.isasynccaller.set(aidx,target_tidx,1);
                     lqn.taskgraph.set(tidx,target_tidx,1);
                     lqn.graph.set(aidx,target_eidx,1);
                 }
@@ -605,43 +631,42 @@ public class LayeredNetwork extends Ensemble {
                     for(int prea=0;prea<preacts.size();prea++){
                         int preaidx = findString(lqn.hashnames,"A:"+tasks.get(t).precedences.get(ap).preActs.get(prea));
                         double preParam =1;
-                        switch (pretype){
-                            case PRE_AND:
-                                JLineMatrix quorum = tasks.get(t).precedences.get(ap).preParams;
-                                if (!quorum.isEmpty()){
-                                    preParam = ((double) quorum.get(0))/preacts.size();
-                                }
+                        if (pretype.equals(PRE_AND)) {
+                            Matrix quorum = tasks.get(t).precedences.get(ap).preParams;
+                            if (!quorum.isEmpty()) {
+                                preParam = quorum.get(0) / preacts.size();
+                            }
                         }
 
                         switch (posttype){
                             case POST_OR:
                                 for(int posta = 0; posta<postacts.size();posta++){
-                                    int postaidx = findString(lqn.hashnames,"A"+tasks.get(t).precedences.get(ap).postActs.get(posta));
-                                    JLineMatrix probs = tasks.get(t).precedences.get(ap).postParams;
+                                    int postaidx = findString(lqn.hashnames,"A:"+tasks.get(t).precedences.get(ap).postActs.get(posta));
+                                    Matrix probs = tasks.get(t).precedences.get(ap).postParams;
                                     double postParam = probs.get(posta);
                                     lqn.graph.set(preaidx,postaidx,preParam*postParam);
                                     lqn.actpretype.set(0,preaidx,ActivityPrecedence.getPrecedenceId(tasks.get(t).precedences.get(ap).preType));//TODO:String to ASCII array
                                     lqn.actposttype.set(0,postaidx,ActivityPrecedence.getPrecedenceId(tasks.get(t).precedences.get(ap).postType));
                                 }
                             case POST_LOOP:
-                                JLineMatrix counts = tasks.get(t).precedences.get(ap).postParams;
+                                Matrix counts = tasks.get(t).precedences.get(ap).postParams;
                                 int enda = postacts.size();
                                 int endaidx = findString(lqn.hashnames,"A:"+tasks.get(t).precedences.get(ap).postActs.get(enda));
                                 for(int posta=0; posta<postacts.size()-1;posta++){
                                     int postaidx = findString(lqn.hashnames,"A:"+tasks.get(t).precedences.get(ap).postActs.get(posta));
-                                    double postParam = 1/(postacts.size()-1);
+                                    double postParam = 1.0/(postacts.size()-1);
                                     lqn.graph.set(preaidx,postaidx, preParam*postParam);
-                                    lqn.graph.set(postaidx,postaidx,1-1/counts.length());
-                                    lqn.graph.set(postaidx,endaidx,1/counts.length());
-                                    lqn.actposttype.set(0,endaidx,sparse(ActivityPrecedence.getPrecedenceId(tasks.get(t).precedences.get(ap).postType)));
+                                    lqn.graph.set(postaidx,postaidx,1-1.0/counts.length());
+                                    lqn.graph.set(postaidx,endaidx,1.0/counts.length());
+                                    lqn.actposttype.set(0,endaidx,ActivityPrecedence.getPrecedenceId(tasks.get(t).precedences.get(ap).postType));
                                 }
                             default:
                                 for(int posta=0;posta<postacts.size();posta++){
                                     int postaidx = findString(lqn.hashnames,"A:"+tasks.get(t).precedences.get(ap).postActs.get(posta));
                                     double postParam = 1;
                                     lqn.graph.set(preaidx,postaidx, preParam*postParam);
-                                    lqn.actpretype.set(0,preaidx,sparse(ActivityPrecedence.getPrecedenceId(tasks.get(t).precedences.get(ap).preType)));
-                                    lqn.actposttype.set(0,postaidx,sparse(ActivityPrecedence.getPrecedenceId(tasks.get(t).precedences.get(ap).postType)));
+                                    lqn.actpretype.set(0,preaidx,ActivityPrecedence.getPrecedenceId(tasks.get(t).precedences.get(ap).preType));
+                                    lqn.actposttype.set(0,postaidx,ActivityPrecedence.getPrecedenceId(tasks.get(t).precedences.get(ap).postType));
                                 }
                         }
                     }
@@ -649,10 +674,9 @@ public class LayeredNetwork extends Ensemble {
             }
 
         }
-        lqn.replies = new ArrayList<>(lqn.nidx);
-        lqn.replygraph = new JLineMatrix(lqn.graph.numRows,lqn.graph.numCols);
+
         for(int t=0;t<lqn.ntasks;t++){
-            int tidx =(int) lqn.taskidx.get(t);
+            int tidx =lqn.tshift+t+1;
             for(int aidx: lqn.actsof.get(tidx)){
                 List<Integer> postaidxs = new ArrayList<>();
                 for(int col=0;col<lqn.graph.numCols;col++){
@@ -671,7 +695,7 @@ public class LayeredNetwork extends Ensemble {
                     }
                 }
                 if(isreply){
-                    lqn.replies.set(aidx,true);
+
                     int parentidx = aidx;
                     while(lqn.type.get(parentidx)!=LayeredNetworkElement.ENTRY){
                         List<Integer> ancestors=new ArrayList<>();
@@ -683,12 +707,12 @@ public class LayeredNetwork extends Ensemble {
                         parentidx = ancestors.get(0);
                     }
                     if(lqn.type.get(parentidx) == LayeredNetworkElement.ENTRY){
-                        lqn.replygraph.get(aidx,parentidx,1);
+                        lqn.replygraph.set(aidx,parentidx,1);
                     }
                 }
             }
         }
-        lqn.ncalls = lqn.calltype.length();
+        lqn.ncalls = lqn.calltype.size();
 
         List<Integer> tidxs = new ArrayList<>();
         for(int i=0;i<lqn.schedid.length();i++){
@@ -715,26 +739,32 @@ public class LayeredNetwork extends Ensemble {
                 }
             }
         }
+        lqn.isref = new Matrix(1,lqn.nhosts+lqn.ntasks+1,lqn.ntasks);
+        for(int col=1;col<lqn.schedid.numCols;col++){
+            if(lqn.schedid.get(0,col)==SchedStrategy.toID(SchedStrategy.REF)){
+                lqn.isref.set(0,col,1);
 
-        for(int col=0;col<lqn.schedid.numCols;col++){
-            if(lqn.schedid.get(0,col)!=SchedStrategy.toID(SchedStrategy.REF)){
-                lqn.isref = false;
-                break;
             }
         }
 
-        for(int i=0;i<lqn.nitems.size();i++){
-            if(lqn.nitems.get(i)==0){
-                lqn.iscache.set(0,i,0);
-            }
+        lqn.iscache = new Matrix(1,lqn.nhosts+lqn.ntasks+1,lqn.ntasks);
+        for(int i=1;i<lqn.nitems.length();i++){
+          if(lqn.nitems.get(i)>0){
+               lqn.iscache.set(0,i,1);
+           }
         }
+
+        // TODO:
+        // lqn.refset = zeros(lqn.nidx,1);
+        //  [conncomps, roots]=graph_connected_components(lqn.taskgraph(lqn.nhosts+1:end, lqn.nhosts+1:end));
+        // lqn.conntasks = conncomps;
+        // for r=1:length(roots)
+        // lqn.conntasks(find(lqn.conntasks == r)) = lqn.tshift+roots(r);
+        // end
 
         return lqn;
     }
 
-    private double sparse(int precedenceId) {
-        return 0;
-    }
 
     private int findString(Map<Integer,String> map,  String target) {
         int res = 0;
@@ -757,6 +787,11 @@ public class LayeredNetwork extends Ensemble {
 
     public List<Network> getLayers(){
         return getEnsemble();
+    }
+
+    public void summary(){
+        LayeredNetworkStruct this_lqn = getStruct();
+        this_lqn.print();
     }
 
 
@@ -788,7 +823,7 @@ public class LayeredNetwork extends Ensemble {
         
         if(verbose>0){
             System.out.println("Parsing LQN file"+filename);
-            System.out.println("Root element:" + doc.getDocumentElement().getNodeName().toString());
+            System.out.println("Root element:" + doc.getDocumentElement().getNodeName());
         }
 
         Map<Integer,String> hosts = new HashMap<>(); //list of hosts - Proc
@@ -1012,7 +1047,7 @@ public class LayeredNetwork extends Ensemble {
                           }
 
                           Element preElement = (Element) preList.item(0);
-                          JLineMatrix preParams = new JLineMatrix(0,0,0);
+                          Matrix preParams = new Matrix(0,0,0);
                           NodeList preActList = preElement.getElementsByTagName("activity");
                           Map<Integer, String> preActs = new HashMap<>();
                           if(preType.equals(PRE_OR)){
@@ -1047,7 +1082,7 @@ public class LayeredNetwork extends Ensemble {
                           Element postElement = (Element) postList.item(0);
                           NodeList postActList = postElement.getElementsByTagName("activity");
                           Map<Integer, String> postActs = new HashMap<>();
-                          JLineMatrix postParams = new JLineMatrix(0,0,0);
+                          Matrix postParams = new Matrix(0,0,0);
                           if(postType.equals(POST_OR)){
                               for(int m=0;m<postActList.getLength()-1;m++){
                                   Element postActElement = (Element) postActList.item(m);

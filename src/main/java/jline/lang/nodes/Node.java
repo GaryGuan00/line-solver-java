@@ -1,9 +1,6 @@
 package jline.lang.nodes;
 
-import jline.lang.JobClass;
-import jline.lang.Network;
-import jline.lang.NetworkElement;
-import jline.lang.OutputStrategy;
+import jline.lang.*;
 import jline.lang.constant.DropStrategy;
 import jline.lang.constant.RoutingStrategy;
 import jline.lang.sections.InputSection;
@@ -30,6 +27,8 @@ public class Node extends NetworkElement implements Serializable {
     protected int nodeIndex;
     protected int stationIdx;
 
+    private final NodeAttribute attribute;
+
     public Node(String nodeName) {
         super(nodeName);
         this.arrivalEvents = new HashMap<JobClass, ArrivalEvent>();
@@ -40,6 +39,7 @@ public class Node extends NetworkElement implements Serializable {
         this.statefulIdx = -1;
         this.nodeIndex = -1;
         this.stationIdx = -1;
+        this.attribute = new NodeAttribute();
     }
 
     public void setModel(Network model) {
@@ -50,8 +50,16 @@ public class Node extends NetworkElement implements Serializable {
         return this.model;
     }
 
+    public void setRouting(JobClass jobClass, RoutingStrategy routingStrategy) {
+        this.output.setOutputStrategy(jobClass, routingStrategy);
+    }
+
     public void setRouting(JobClass jobClass, RoutingStrategy routingStrategy, Node destination, double probability) {
         this.output.setOutputStrategy(jobClass, routingStrategy, destination, probability);
+    }
+
+    public void setProbRouting(JobClass jobClass, Node destination, double probability) {
+        this.output.setOutputStrategy(jobClass, RoutingStrategy.PROB, destination, probability);
     }
 
     public void resetRouting() {
@@ -110,9 +118,7 @@ public class Node extends NetworkElement implements Serializable {
     public boolean isRefstat() { return false; }
 
     public int getStatefulIdx() {
-        if (this.statefulIdx == -1) {
-            this.statefulIdx = this.model.getStatefulNodeIndex(this);
-        }
+        this.statefulIdx = this.model.getStatefulNodeIndex(this);
 
         return this.statefulIdx;
     }
@@ -147,5 +153,15 @@ public class Node extends NetworkElement implements Serializable {
     
     public ServiceSection getServer() {
     	return this.server;
+    }
+
+    public NodeAttribute getAttribute() {
+        return attribute;
+    }
+
+    public void reset() {
+            // Reset internal data structures when the network model is
+            // reset
+            /* no-op */
     }
 }

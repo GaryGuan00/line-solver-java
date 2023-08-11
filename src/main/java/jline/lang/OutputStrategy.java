@@ -8,13 +8,13 @@ import jline.lang.constant.RoutingStrategy;
 import jline.lang.nodes.Node;
 
 public class OutputStrategy implements Serializable {
-    private JobClass jobClass;
+    private final JobClass jobClass;
     private RoutingStrategy routingStrategy;
     private double probability;
     private Node destination;
 
 
-    public static List<RoutingStrategy> legalStrategies = Arrays.asList(new RoutingStrategy[]{RoutingStrategy.DISABLED, RoutingStrategy.PROB, RoutingStrategy.RAND});
+    public static List<RoutingStrategy> legalStrategies = Arrays.asList(RoutingStrategy.DISABLED, RoutingStrategy.PROB, RoutingStrategy.RAND);
 
     public OutputStrategy (JobClass jobClass, RoutingStrategy routingStrategy, Node destination, double probability) {
         this.jobClass = jobClass;
@@ -55,4 +55,7 @@ public class OutputStrategy implements Serializable {
         return this.destination;
     }
 
+    public void setDestination(Node destination) {
+        this.destination = destination;
+    }
 }

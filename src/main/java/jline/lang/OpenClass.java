@@ -9,12 +9,14 @@ import jline.lang.nodes.Source;
 public class OpenClass extends JobClass  implements Serializable {
     protected int classIndex;
     protected Network model;
+
     public OpenClass(Network model, String name, int priority) {
         super(JobClassType.Open, name);
+        this.index = model.getNumberOfClasses()+1;
         model.addJobClass(this);
         this.classIndex = -1;
         this.model = model;
-        this.priority = priority;
+        this.setPriority(priority);
     }
     public OpenClass(Network model, String name) {
         this(model, name,0);

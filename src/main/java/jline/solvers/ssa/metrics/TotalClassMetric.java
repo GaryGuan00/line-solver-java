@@ -1,7 +1,7 @@
 package jline.solvers.ssa.metrics;
 
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 public class TotalClassMetric extends Metric<Double, Double>{
     int classIdx;
@@ -21,7 +21,7 @@ public class TotalClassMetric extends Metric<Double, Double>{
         return (double) this.totalCt;
     }
 
-    public void fromStateMatrix(double t, StateMatrix stateMatrix) {
+    public void fromStateMatrix(double t, SSAStateMatrix networkState) {
     }
 
     public void fromEvent(double t, Event e) {

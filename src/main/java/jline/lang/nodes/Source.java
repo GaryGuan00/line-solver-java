@@ -32,7 +32,7 @@ public class Source extends Station implements HasSchedStrategy, Serializable {
 
         for (JobClass jobClass : jobClasses) {
             this.classCap.put(jobClass, Double.POSITIVE_INFINITY);
-            this.setArrival(jobClass, new DisabledDistribution());
+            this.setArrival(jobClass, new Disabled());
         }
     }
 
@@ -40,7 +40,7 @@ public class Source extends Station implements HasSchedStrategy, Serializable {
         ServiceBinding arrivalProcess = new ServiceBinding(jobClass, ServiceStrategy.LI, distribution);
         this.input.setServiceProcess(arrivalProcess);
         this.setServiceProcess(arrivalProcess);
-        if ((distribution == null) || (distribution instanceof DisabledDistribution)){
+        if ((distribution == null) || (distribution instanceof Disabled)){
             this.classCap.put(jobClass, 0.0);
         } else {
             this.classCap.put(jobClass, Double.POSITIVE_INFINITY);
@@ -69,7 +69,7 @@ public class Source extends Station implements HasSchedStrategy, Serializable {
             }
         }
 
-        return new DisabledDistribution();
+        return new Disabled();
     }
 
     public Distribution getArrivalDistribution(JobClass jobClass) {
@@ -78,7 +78,7 @@ public class Source extends Station implements HasSchedStrategy, Serializable {
                 return serviceProcess.getDistribution();
             }
         }
-        return new DisabledDistribution();
+        return new Disabled();
     }
     
     public boolean containsJobClass(JobClass jobClass) {

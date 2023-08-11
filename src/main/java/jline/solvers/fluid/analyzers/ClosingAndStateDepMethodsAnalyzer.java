@@ -3,10 +3,11 @@
 
 package jline.solvers.fluid.analyzers;
 
-import jline.lang.JLineMatrix;
+
+import jline.lang.constant.GlobalConstants;
+import jline.util.Matrix;
 import jline.lang.JobClass;
 import jline.lang.NetworkStruct;
-import jline.lang.distributions.Distribution;
 import jline.lang.nodes.Station;
 import jline.solvers.SolverOptions;
 import jline.solvers.SolverResult;
@@ -14,27 +15,29 @@ import jline.solvers.fluid.odes.ClosingAndStateDepMethodsODE;
 import jline.solvers.fluid.odes.TransientDataHandler;
 import org.apache.commons.math3.ode.FirstOrderDifferentialEquations;
 import org.apache.commons.math3.ode.FirstOrderIntegrator;
-import org.ejml.data.DMatrixRMaj;
-import org.qore.KPC.MAP;
+
 
 import java.util.*;
 
 import static java.lang.Double.POSITIVE_INFINITY;
 import static java.lang.Math.*;
 import static jline.lang.constant.SchedStrategy.*;
+import static jline.lib.KPCToolbox.*;
+
+import odesolver.LSODA;
 
 public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
 
-  public JLineMatrix xvec_t;
-  public JLineMatrix xvec_it;
+  public Matrix xvec_t;
+  public Matrix xvec_it;
 
   private void solver_fluid_iteration(
       NetworkStruct sn,
-      Map<Station, Map<JobClass, JLineMatrix>> mu,
-      Map<Station, Map<JobClass, JLineMatrix>> phi,
-      JLineMatrix S,
+      Map<Station, Map<JobClass, Matrix>> mu,
+      Map<Station, Map<JobClass, Matrix>> phi,
+      Matrix S,
       double[] yDefault,
-      JLineMatrix slowrate,
+      Matrix slowrate,
       SolverOptions options,
       SolverResult result) {
 
@@ -48,9 +51,9 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
     double minNonZeroRate = POSITIVE_INFINITY;
     for (int i = 0; i < slowrateRows; i++) {
       for (int j = 0; j < slowrateCols; j++) {
-        if ((slowrate.get(i, j) > Distribution.tolerance)
-            && Double.isFinite(slowrate.get(i, j))
-            && (slowrate.get(i, j) < minNonZeroRate)) {
+        if ((slowrate.get(i, j) > GlobalConstants.CoarseTol)
+                && Double.isFinite(slowrate.get(i, j))
+                && (slowrate.get(i, j) < minNonZeroRate)) {
           minNonZeroRate = slowrate.get(i, j);
         }
       }
@@ -58,15 +61,16 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
 
     // Initialise ODE
     FirstOrderDifferentialEquations ode =
-        new ClosingAndStateDepMethodsODE(sn, mu, phi, sn.proc, sn.rt, S, options);
+            new ClosingAndStateDepMethodsODE(sn, mu, phi, sn.proc, sn.rt, S, options);
 
     double T0 = options.timespan[0];
     int T = 0;
 
-    List<JLineMatrix> tIterations = new LinkedList<>();
-    List<JLineMatrix> xVecIterations = new LinkedList<>();
+    List<Matrix> tIterations = new LinkedList<>();
+    List<Matrix> xVecIterations = new LinkedList<>();
+
     while (((Double.isFinite(options.timespan[1])) && T < options.timespan[1])
-        || (goOn && iter < options.iter_max)) {
+            || (goOn && iter < options.iter_max)) {
 
       iter++;
 
@@ -78,49 +82,85 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
         nextState[i] = 0;
       }
 
-      // Solve ode until T = 1 event with slowest exit rate 
+      // Solve ode until T = 1 event with slowest exit rate
       if (iter == 1) {
-	      T = (int) min(options.timespan[1], abs(10 / minNonZeroRate));
-      } else { 
-	      T = (int) min(options.timespan[1], abs(10 * iter / minNonZeroRate));
+        T = (int) min(options.timespan[1], abs(10 / minNonZeroRate));
+      } else {
+        T = (int) min(options.timespan[1], abs(10 * iter / minNonZeroRate));
       }
       double[] tRange = {T0, T};
 
-      FirstOrderIntegrator odeSolver;
-      if (options.stiff && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
+      if (options.tol > GlobalConstants.CoarseTol && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
         System.err.println(
-            "Stiff solvers are not yet available in JLINE. Using non-stiff solver instead.");
-	    options.stiff = false;
+                "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
       }
-      if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
-        System.err.println(
-            "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
-      }
-      odeSolver = options.odeSolvers.accurateODESolver;
 
-      odeSolver.clearStepHandlers();
-      TransientDataHandler stepHandler = new TransientDataHandler(initialState.length);
-      odeSolver.addStepHandler(stepHandler);
-
-      try {
-        //System.out.print("Start ODE integration cycle...");
-        odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
-	//System.out.println("done.");
-      } catch (RuntimeException e) {
-        if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
-          System.out.println(
-              "The initial point is invalid, Fluid solver switching to default initialization.");
+      int Tmax;
+      if (options.stiff) {
+        LSODA odeSolver;
+        if (options.tol > GlobalConstants.CoarseTol){
+          odeSolver = options.odesolvers.fastStiffODESolver;
+        } else {
+          odeSolver = options.odesolvers.accurateStiffODESolver;
         }
-        odeSolver.integrate(ode, tRange[0], yDefault, tRange[1], nextState);
+
+        try {
+          //System.out.print("Start ODE integration cycle...");
+          odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
+          //System.out.println("done.");
+
+        } catch (RuntimeException e) {
+          if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
+            System.out.println(
+                    "The initial point is invalid, Fluid solver switching to default initialization.");
+          }
+          odeSolver.integrate(ode, tRange[0], yDefault, tRange[1], nextState);
+        }
+        // transform the output format
+        Tmax = odeSolver.getStepsTaken()+1;
+        Matrix tVec = new Matrix(Tmax, 1);
+        Matrix xVec = new Matrix(Tmax,ode.getDimension());
+        ArrayList<Double> tHistory = odeSolver.getTvec();
+        ArrayList<Double[]> yHistory = odeSolver.getYvec();
+        for (int i = 0; i < Tmax; i++) {
+          tVec.set(i,0,tHistory.get(i));
+          for (int j = 0; j < ode.getDimension(); j++)
+            xVec.set(i,j,Math.max(0,yHistory.get(i)[j]));
+        }
+        tIterations.add(tVec);
+        xVecIterations.add(xVec);
+        this.xvec_it = Matrix.extractRows(xVec, Tmax - 1, Tmax, null);
+      } else {
+        FirstOrderIntegrator odeSolver;
+        if (options.tol > GlobalConstants.CoarseTol && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
+          System.err.println(
+                  "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
+        }
+        odeSolver = options.odesolvers.accurateODESolver;
+        odeSolver.clearStepHandlers();
+        TransientDataHandler stepHandler = new TransientDataHandler(initialState.length);
+        odeSolver.addStepHandler(stepHandler);
+
+        try {
+          //System.out.print("Start ODE integration cycle...");
+          odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
+          //System.out.println("done.");
+
+        } catch (RuntimeException e) {
+          if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
+            System.out.println(
+                    "The initial point is invalid, Fluid solver switching to default initialization.");
+          }
+          odeSolver.integrate(ode, tRange[0], yDefault, tRange[1], nextState);
+        }
+
+        // Retrieve Transient Data
+        tIterations.add(stepHandler.tVec);
+        xVecIterations.add(stepHandler.xVec);
+        Tmax = stepHandler.tVec.getNumRows();
+        this.xvec_it = Matrix.extractRows(stepHandler.xVec, Tmax - 1, Tmax, null);
       }
-
-      // Retrieve Transient Data
-      tIterations.add(stepHandler.tVec);
-      xVecIterations.add(stepHandler.xVec);
-      int Tmax = stepHandler.tVec.getNumRows();
       totalSteps += Tmax;
-      this.xvec_it = JLineMatrix.extractRows(stepHandler.xVec, Tmax - 1, Tmax, null);
-
       T0 = T; // for next iteration
       if (T >= options.timespan[1]) {
         goOn = false;
@@ -131,11 +171,11 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
     // Note this is done manually for performance purposes - concatRows is not as efficient
     int nextRow = 0;
     int cols = xVecIterations.get(0).getNumCols();
-    this.xvec_t = new JLineMatrix(totalSteps, cols);
-    result.t = new JLineMatrix(totalSteps, 1);
+    this.xvec_t = new Matrix(totalSteps, cols);
+    result.t = new Matrix(totalSteps, 1);
     for (int i = 0; i < iter; i++) {
-      JLineMatrix tIter = tIterations.get(i);
-      JLineMatrix xVecIter = xVecIterations.get(i);
+      Matrix tIter = tIterations.get(i);
+      Matrix xVecIter = xVecIterations.get(i);
       int stepsPerIter = tIter.getNumRows();
       for (int j = nextRow; j < nextRow + stepsPerIter; j++) {
         result.t.set(j, 0, tIter.get(j - nextRow, 0));
@@ -150,18 +190,18 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
   private void solver_fluid(NetworkStruct sn, SolverOptions options, SolverResult result) {
 
     int M = sn.nstations; // Number of stations
-    int K = sn.nClasses; // Number of classes
-    JLineMatrix S = sn.nservers.clone();
+    int K = sn.nclasses; // Number of classes
+    Matrix S = sn.nservers.clone();
 
     // Making deep copies as going forwards, mu and phi are amended
-    Map<Station, Map<JobClass, JLineMatrix>> mu = new HashMap<>();
-    Map<Station, Map<JobClass, JLineMatrix>> phi = new HashMap<>();
+    Map<Station, Map<JobClass, Matrix>> mu = new HashMap<>();
+    Map<Station, Map<JobClass, Matrix>> phi = new HashMap<>();
     for (int i = 0; i < M; i++) {
       Station station = sn.stations.get(i);
-      Map<JobClass, JLineMatrix> muCopy = new HashMap<>();
-      Map<JobClass, JLineMatrix> phiCopy = new HashMap<>();
+      Map<JobClass, Matrix> muCopy = new HashMap<>();
+      Map<JobClass, Matrix> phiCopy = new HashMap<>();
       for (int k = 0; k < K; k++) {
-        JobClass jobClass = sn.jobClasses.get(k);
+        JobClass jobClass = sn.jobclasses.get(k);
         muCopy.put(jobClass, sn.mu.get(station).get(jobClass).clone());
         phiCopy.put(jobClass, sn.phi.get(station).get(jobClass).clone());
       }
@@ -169,13 +209,13 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
       phi.put(station, phiCopy);
     }
 
-    JLineMatrix match = new JLineMatrix(M, K); // Indicates whether a class is served at a station
-    JLineMatrix phases = new JLineMatrix(M, K);
-    JLineMatrix slowrate = new JLineMatrix(M, K);
+    Matrix match = new Matrix(M, K); // Indicates whether a class is served at a station
+    Matrix phases = new Matrix(M, K);
+    Matrix slowrate = new Matrix(M, K);
     for (int i = 0; i < M; i++) {
       Station station = sn.stations.get(i);
       for (int k = 0; k < K; k++) {
-        JobClass jobClass = sn.jobClasses.get(k);
+        JobClass jobClass = sn.jobclasses.get(k);
 
         if (mu.get(station).get(jobClass).hasNaN()) {
           mu.get(station).get(jobClass).reshape(0, 0);
@@ -202,8 +242,8 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
       }
     }
 
-    JLineMatrix y0 = new JLineMatrix(1, 0);
-    JLineMatrix assigned = new JLineMatrix(1, K); // number of jobs of each class already assigned
+    Matrix y0 = new Matrix(1, 0);
+    Matrix assigned = new Matrix(1, K); // number of jobs of each class already assigned
     double toAssign;
     for (int i = 0; i < M; i++) {
       for (int k = 0; k < K; k++) {
@@ -257,21 +297,21 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
     solver_fluid_iteration(sn, mu, phi, S, yDefault, slowrate, options, result);
 
     // This part assumes PS, DPS, GPS scheduling
-    result.QN = new JLineMatrix(M, K);
-    result.QNt = new JLineMatrix[M][K];
-    JLineMatrix[] Qt = new JLineMatrix[M];
-    result.UNt = new JLineMatrix[M][K];
+    result.QN = new Matrix(M, K);
+    result.QNt = new Matrix[M][K];
+    Matrix[] Qt = new Matrix[M];
+    result.UNt = new Matrix[M][K];
     int Tmax = xvec_t.getNumRows();
 
     for (int i = 0; i < M; i++) {
-      Qt[i] = new JLineMatrix(Tmax, 1);
+      Qt[i] = new Matrix(Tmax, 1);
       for (int k = 0; k < K; k++) {
         int shift =
             (int) phases.sumSubMatrix(0, i, 0, phases.getNumCols())
                 + (int) phases.sumSubMatrix(i, i + 1, 0, k);
         result.QN.set(i, k, xvec_it.sumSubMatrix(0, 1, shift, shift + (int) phases.get(i, k)));
 
-        result.QNt[i][k] = new JLineMatrix(Tmax, 1);
+        result.QNt[i][k] = new Matrix(Tmax, 1);
         for (int step = 0; step < Tmax; step++) {
           result.QNt[i][k].set(
               step, 0, xvec_t.sumSubMatrix(step, step + 1, shift, shift + (int) phases.get(i, k)));
@@ -286,7 +326,7 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
     for (int i = 0; i < M; i++) {
       if (sn.nservers.get(i, 0) > 0) { // Not INF
         for (int k = 0; k < K; k++) {
-          result.UNt[i][k] = new JLineMatrix(Tmax, 1);
+          result.UNt[i][k] = new Matrix(Tmax, 1);
           for (int step = 0; step < Tmax; step++) {
             // If not an infinite server then this is a number between 0 and 1
             result.UNt[i][k].set(
@@ -311,14 +351,14 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
   public void analyze(NetworkStruct sn, SolverOptions options, SolverResult result) {
 
     int M = sn.nstations; // Number of stations
-    int K = sn.nClasses; // Number of classes
-    Map<Station, Map<JobClass, JLineMatrix>> lambda = sn.mu;
+    int K = sn.nclasses; // Number of classes
+    Map<Station, Map<JobClass, Matrix>> lambda = sn.mu;
 
     // Inner iteration of fluid analysis
     solver_fluid(sn, options, result);
 
     // Assumes the existence of a delay node through which all classes pass
-    JLineMatrix delayNodes = new JLineMatrix(1, M);
+    Matrix delayNodes = new Matrix(1, M);
     for (int i = 0; i < M; i++) {
       if (sn.sched.get(sn.stations.get(i)) == INF) {
         delayNodes.set(0, i, 1);
@@ -326,16 +366,16 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
     }
 
     // THROUGHPUT - for all classes in each station
-    result.TN = new JLineMatrix(M, K);
-    result.TNt = new JLineMatrix[M][K];
+    result.TN = new Matrix(M, K);
+    result.TNt = new Matrix[M][K];
     int Tmax = result.t.getNumRows();
     for (int i = 0; i < M; i++) {
       for (int k = 0; k < K; k++) {
-        result.TNt[i][k] = new JLineMatrix(Tmax, 1);
+        result.TNt[i][k] = new Matrix(Tmax, 1);
       }
     }
 
-    JLineMatrix[][] Xservice = new JLineMatrix[M][K]; // Throughput per class, station and phase
+    Matrix[][] Xservice = new Matrix[M][K]; // Throughput per class, station and phase
 
     for (int i = 0; i < M; i++) {
       if (delayNodes.get(0, i) == 1) {
@@ -343,15 +383,15 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
           int idx =
               (int) sn.phases.sumSubMatrix(0, i, 0, K)
                   + (int) sn.phases.sumSubMatrix(i, i + 1, 0, k);
-          Xservice[i][k] = new JLineMatrix((int) sn.phases.get(i, k), 1);
+          Xservice[i][k] = new Matrix((int) sn.phases.get(i, k), 1);
           for (int f = 0; f < (int) sn.phases.get(i, k); f++) {
-            double lambdaIKF = lambda.get(sn.stations.get(i)).get(sn.jobClasses.get(k)).get(f, 0);
-            double phiIKF = sn.phi.get(sn.stations.get(i)).get(sn.jobClasses.get(k)).get(f, 0);
+            double lambdaIKF = lambda.get(sn.stations.get(i)).get(sn.jobclasses.get(k)).get(f, 0);
+            double phiIKF = sn.phi.get(sn.stations.get(i)).get(sn.jobclasses.get(k)).get(f, 0);
 
             result.TN.set(
                 i, k, result.TN.get(i, k) + (xvec_it.get(0, idx + f) * lambdaIKF * phiIKF));
 
-            JLineMatrix tmpTNt = result.QNt[i][k].clone();
+            Matrix tmpTNt = result.QNt[i][k].clone();
             tmpTNt.scale(lambdaIKF * phiIKF, tmpTNt);
             result.TNt[i][k] = result.TNt[i][k].add(1.0, tmpTNt);
 
@@ -360,28 +400,25 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
         }
       } else {
         double xi = result.QN.sumRows(i); // Number of jobs in the station
-        JLineMatrix xi_t = result.QNt[i][0].clone();
+        Matrix xi_t = result.QNt[i][0].clone();
         for (int r = 1; r < K; r++) {
           xi_t = xi_t.add(1.0, result.QNt[i][r]);
         }
 
-        double wni = 0.01;
-        JLineMatrix wi = new JLineMatrix(1, K);
-        if (xi > 0) {
+        double wni = GlobalConstants.CoarseTol;
+        Matrix wi = new Matrix(1, K);
+        if (xi > 0 || sn.sched.get(sn.stations.get(i)) == EXT) {
           if (sn.sched.get(sn.stations.get(i)) == FCFS) {
             for (int k = 0; k < K; k++) {
               int idx =
                   (int) sn.phases.sumSubMatrix(0, i, 0, K)
                       + (int) sn.phases.sumSubMatrix(i, i + 1, 0, k);
+              Matrix D0 = sn.proc.get(sn.stations.get(i)).get(sn.jobclasses.get(k)).get(0);
+              Matrix D1 = sn.proc.get(sn.stations.get(i)).get(sn.jobclasses.get(k)).get(1);
               wi.set(
                   0,
                   k,
-                  new MAP(
-                          new DMatrixRMaj(
-                              sn.proc.get(sn.stations.get(i)).get(sn.jobClasses.get(k)).get(0)),
-                          new DMatrixRMaj(
-                              sn.proc.get(sn.stations.get(i)).get(sn.jobClasses.get(k)).get(1)))
-                      .getMean());
+                  map_mean(D0,D1));
 
               wni +=
                   wi.get(0, k) * xvec_it.sumSubMatrix(0, 1, idx, idx + (int) sn.phases.get(i, k));
@@ -392,11 +429,11 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
             int idx =
                 (int) sn.phases.sumSubMatrix(0, i, 0, K)
                     + (int) sn.phases.sumSubMatrix(i, i + 1, 0, k);
-            Xservice[i][k] = new JLineMatrix((int) sn.phases.get(i, k), 1);
+            Xservice[i][k] = new Matrix((int) sn.phases.get(i, k), 1);
 
             for (int f = 0; f < (int) sn.phases.get(i, k); f++) {
-              double lambdaIKF = lambda.get(sn.stations.get(i)).get(sn.jobClasses.get(k)).get(f, 0);
-              double phiIKF = sn.phi.get(sn.stations.get(i)).get(sn.jobClasses.get(k)).get(f, 0);
+              double lambdaIKF = lambda.get(sn.stations.get(i)).get(sn.jobclasses.get(k)).get(f, 0);
+              double phiIKF = sn.phi.get(sn.stations.get(i)).get(sn.jobclasses.get(k)).get(f, 0);
 
               switch (sn.sched.get(sn.stations.get(i))) {
                 case EXT:
@@ -411,8 +448,8 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
                                     - xvec_it.sumSubMatrix(
                                         0, 1, idx + 1, idx + (int) sn.phases.get(i, k)))));
 
-                    JLineMatrix tmpTNt = xvec_t.sumRows(idx + 1, idx + (int) sn.phases.get(i, k));
-                    JLineMatrix ones = new JLineMatrix(tmpTNt.getNumRows(), tmpTNt.getNumCols());
+                    Matrix tmpTNt = xvec_t.sumRows(idx + 1, idx + (int) sn.phases.get(i, k));
+                    Matrix ones = new Matrix(tmpTNt.getNumRows(), tmpTNt.getNumCols());
                     ones.ones();
                     tmpTNt = ones.sub(1, tmpTNt);
                     tmpTNt.scale(lambdaIKF * phiIKF, tmpTNt);
@@ -428,7 +465,7 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
                   } else {
                     result.TN.set(
                         i, k, result.TN.get(i, k) + (lambdaIKF * phiIKF * xvec_it.get(0, idx + f)));
-                    JLineMatrix tmpTNt = xvec_t.sumRows(idx + f, idx + f + 1);
+                    Matrix tmpTNt = xvec_t.sumRows(idx + f, idx + f + 1);
                     tmpTNt.scale(lambdaIKF * phiIKF, tmpTNt);
                     result.TNt[i][k] = result.TNt[i][k].add(1, tmpTNt);
                     Xservice[i][k].set(f, 0, lambdaIKF * xvec_it.get(0, idx + f));
@@ -447,8 +484,8 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
                               * xvec_it.get(0, idx + f)
                               * min(xi, sn.nservers.get(i, 0))));
 
-                  JLineMatrix tmpTNT = new JLineMatrix(xvec_t.getNumRows(), 1);
-                  JLineMatrix.extractColumn(xvec_t, idx + f, tmpTNT);
+                  Matrix tmpTNT = new Matrix(xvec_t.getNumRows(), 1);
+                  Matrix.extractColumn(xvec_t, idx + f, tmpTNT);
                   tmpTNT.scale(lambdaIKF * phiIKF, tmpTNT);
                   int rows = tmpTNT.getNumRows();
                   for (int row = 0; row < rows; row++) {
@@ -468,21 +505,21 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
                   break;
 
                 case DPS:
-                  JLineMatrix w = new JLineMatrix(1, K);
+                  Matrix w = new Matrix(1, K);
                   for (int p = 0; p < K; p++) {
                     w.set(0, k, sn.schedparam.get(i, k));
                   }
 
-                  JLineMatrix tmpQ = new JLineMatrix(1, result.QN.getNumCols());
-                  JLineMatrix.extractRows(result.QN, i, i + 1, tmpQ);
+                  Matrix tmpQ = new Matrix(1, result.QN.getNumCols());
+                  Matrix.extractRows(result.QN, i, i + 1, tmpQ);
                   tmpQ = tmpQ.transpose();
-                  JLineMatrix wxi = new JLineMatrix(1, 1); // number of jobs in the station
+                  Matrix wxi = new Matrix(1, 1); // number of jobs in the station
                   wxi = w.mult(tmpQ, wxi);
 
-                  JLineMatrix wxi_t = result.QNt[i][0].clone();
+                  Matrix wxi_t = result.QNt[i][0].clone();
                   wxi_t.scale(w.get(0, 0), wxi_t);
                   for (int r = 1; r < result.QNt[i][0].getNumCols(); r++) {
-                    JLineMatrix tmpWxi_t = result.QNt[i][r].clone();
+                    Matrix tmpWxi_t = result.QNt[i][r].clone();
                     tmpWxi_t.scale(w.get(0, r), tmpWxi_t);
                     wxi_t = wxi_t.add(1, tmpWxi_t);
                   }
@@ -498,8 +535,8 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
                               * xvec_it.get(0, idx + f)
                               * min(xi, sn.nservers.get(i, 0))));
 
-                  tmpTNT = new JLineMatrix(xvec_t.getNumRows(), 1);
-                  JLineMatrix.extractColumn(xvec_t, idx + f, tmpTNT);
+                  tmpTNT = new Matrix(xvec_t.getNumRows(), 1);
+                  Matrix.extractColumn(xvec_t, idx + f, tmpTNT);
                   tmpTNT.scale(lambdaIKF * phiIKF * w.get(0, k), tmpTNT);
                   rows = tmpTNT.getNumRows();
                   for (int row = 0; row < rows; row++) {
@@ -524,8 +561,8 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
 
                 case FCFS:
                 case SIRO:
-                  tmpTNT = new JLineMatrix(xvec_t.getNumRows(), 1);
-                  JLineMatrix.extractColumn(xvec_t, idx + f, tmpTNT);
+                  tmpTNT = new Matrix(xvec_t.getNumRows(), 1);
+                  Matrix.extractColumn(xvec_t, idx + f, tmpTNT);
                   tmpTNT.scale(lambdaIKF * phiIKF, tmpTNT);
                   rows = tmpTNT.getNumRows();
                   for (int row = 0; row < rows; row++) {
@@ -586,7 +623,7 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
     }
 
     // Response Times - this is approximate, Little's law does not hold in transient
-    result.RN = new JLineMatrix(M, K);
+    result.RN = new Matrix(M, K);
     for (int i = 0; i < M; i++) {
       for (int k = 0; k < K; k++) {
         if (result.TN.get(i, k) > 0) {
@@ -596,7 +633,7 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
     }
 
     // Utilisation
-    result.UN = new JLineMatrix(M, K);
+    result.UN = new Matrix(M, K);
     for (int i = 0; i < M; i++) {
       for (int k = 0; k < K; k++) {
         double sumForUN = 0;
@@ -606,7 +643,7 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
           if (Xservice[i][k].get(row, 0) > 0) {
             sumForUN +=
                 Xservice[i][k].get(row, 0)
-                    / lambda.get(sn.stations.get(i)).get(sn.jobClasses.get(k)).get(row, 0);
+                    / lambda.get(sn.stations.get(i)).get(sn.jobclasses.get(k)).get(row, 0);
             sumForTN += Xservice[i][k].get(row, 0);
           }
         }
@@ -628,7 +665,7 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
   }
 
   @Override
-  public JLineMatrix getXVecIt() {
+  public Matrix getXVecIt() {
     return this.xvec_it;
   }
 }

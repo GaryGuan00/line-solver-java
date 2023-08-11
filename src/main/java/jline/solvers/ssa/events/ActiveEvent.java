@@ -10,7 +10,7 @@ import jline.lang.nodes.Node;
 import jline.lang.nodes.Source;
 import jline.lang.nodes.StatefulNode;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 import java.util.List;
 import java.util.Random;
@@ -21,19 +21,19 @@ public class ActiveEvent extends PhaseEvent {
 
         Eventually to replace both of them.
      */
-    private int sourceIdx;
-    private int destIdx;
-    private int classIndex;
-    private SchedStrategy schedStrategy;
-    private boolean isSource;
-    private List<List<Double>> phMatrix;
+    private final int sourceIdx;
+    private final int destIdx;
+    private final int classIndex;
+    private final SchedStrategy schedStrategy;
+    private final boolean isSource;
+    private final List<List<Double>> phMatrix;
     protected Node sourceNode;
     protected Node destNode;
     protected double routingProb;
 
-    private JobClass jobClass;
+    private final JobClass jobClass;
     protected boolean isProcessorSharing;
-    private int nPhases;
+    private final int nPhases;
 
 
     public ActiveEvent(Node sourceNode, Node destNode, JobClass jobClass, List<List<Double>> phMatrix) {
@@ -89,7 +89,7 @@ public class ActiveEvent extends PhaseEvent {
     }
 
     @Override
-    public double getRate(StateMatrix stateMatrix) {
+    public double getRate(SSAStateMatrix networkState) {
         double totalRate = 0;
         for (int i = 0; i < this.nPhases; i++) {
             totalRate += -(this.phMatrix.get(i).get(i));
@@ -99,15 +99,15 @@ public class ActiveEvent extends PhaseEvent {
     }
 
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
         int nInPhase = 1;
 
         if (this.isProcessorSharing) {
-            nInPhase = stateMatrix.getState(this.sourceIdx, this.classIndex);
+            nInPhase = networkState.getState(this.sourceIdx, this.classIndex);
         } else if (this.isSource) {
             nInPhase = 1;
         } else if (this.sourceNode instanceof StatefulNode) {
-            nInPhase = stateMatrix.inProcess(this.sourceIdx, this.classIndex);
+            nInPhase = networkState.inProcess(this.sourceIdx, this.classIndex);
             if (nInPhase == 0) {
                 return true;
             }
@@ -119,7 +119,7 @@ public class ActiveEvent extends PhaseEvent {
 
         while (acc < referenceJob) {
             startPhase += 1;
-            acc += stateMatrix.getInPhase(this.sourceIdx, this.classIndex, startPhase);
+            acc += networkState.getInPhase(this.sourceIdx, this.classIndex, startPhase);
         }
 
         // get next phase
@@ -137,22 +137,22 @@ public class ActiveEvent extends PhaseEvent {
         }
 
         // update matrix, and check if there's a departure
-        if (stateMatrix.updatePhase(this.sourceIdx, this.classIndex, startPhase, nextPhase)) {
-            if (!stateMatrix.stateDeparture(this.sourceIdx, this.classIndex)) {
+        if (networkState.updatePhase(this.sourceIdx, this.classIndex, startPhase, nextPhase)) {
+            if (!networkState.stateDeparture(this.sourceIdx, this.classIndex)) {
                 return false;
             }
 
-            this.destNode.getArrivalEvent(jobClass).stateUpdate(stateMatrix, random, timeline);
-            timeline.record(this,stateMatrix);
+            this.destNode.getArrivalEvent(jobClass).stateUpdate(networkState, random, timeline);
+            timeline.record(this, networkState);
             return true;
         }
 
-        timeline.record(this,stateMatrix);
+        timeline.record(this, networkState);
         return true;
     }
 
     @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         throw new RuntimeException("Not Implemented");
     }
 

@@ -1,16 +1,14 @@
 package jline.util;
 
-import jline.lang.JLineMatrix;
-
 import java.util.LinkedList;
 
 public class Permutations {
 
-  public static JLineMatrix uniquePerms(JLineMatrix vec) {
+  public static Matrix uniquePerms(Matrix vec) {
 
     // Vector is empty
     if (vec.isEmpty()) {
-      return new JLineMatrix(0, 0);
+      return new Matrix(0, 0);
     }
 
     // Vector is not a single row
@@ -50,13 +48,13 @@ public class Permutations {
       System.out.println("Warning: unimplemented code reached in Permutations.uniquePerms");
     }
 
-    JLineMatrix[] output = new JLineMatrix[nu];
+    Matrix[] output = new Matrix[nu];
     for (int i = 0; i < nu; i++) {
-      JLineMatrix v = vec.clone();
+      Matrix v = vec.clone();
       // TODO: implement the rest of this code
       System.out.println("Warning: unimplemented code reached in Permutations.uniquePerms");
     }
 
-    return new JLineMatrix(0, 0);
+    return new Matrix(0, 0);
   }
 }

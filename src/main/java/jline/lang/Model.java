@@ -4,7 +4,7 @@ import java.io.Serializable;
 
 public class Model implements Serializable {
     private String name;
-    private String lineVersion;
+    private final String lineVersion;
 
     public Model(String modelName) {
         this.name = modelName;

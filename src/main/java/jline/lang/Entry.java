@@ -1,14 +1,16 @@
 
 package jline.lang;
 
+import jline.util.Matrix;
+
 import java.util.HashMap;
 import java.util.Map;
-
+@SuppressWarnings("unchecked")
 public class Entry extends LayeredNetworkElement{
     protected Task parent;
     protected Map<Integer,String> replyActivity = new HashMap();//TODO:K/V type
-    private double openArrivalRate;
-    protected JLineMatrix scheduling = new JLineMatrix(0,0,0);
+    private final double openArrivalRate;
+    protected Matrix scheduling = new Matrix(0,0,0);
 
     public Entry(LayeredNetwork model, String name) {
         super(name);

@@ -6,20 +6,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.ejml.data.DMatrixSparseCSC;
-
 import jline.lang.nodes.Station;
+import jline.util.Matrix;
 
 public class Chain extends NetworkElement implements Serializable{
 
 	protected List<Station> stations;
 	protected List<JobClass> classes;
 	protected List<String> classnames;
-	protected JLineMatrix visits; //visist.get(i,r) means the number of visist that a job in chain c pays to station i in class r
+	protected Matrix visits; //visist.get(i,r) means the number of visist that a job in chain c pays to station i in class r
 	protected Map<JobClass, Integer> classIndexMap;
 	protected Map<Station, Integer> stationIndexMap;
-	protected JLineMatrix completes;
-	protected JLineMatrix njobs;
+	protected Matrix completes;
+	protected Matrix njobs;
 	
 	public Chain(String neName) {
 		super(neName);
@@ -27,11 +26,11 @@ public class Chain extends NetworkElement implements Serializable{
 		stations = new ArrayList<Station>();
 		classes = new ArrayList<JobClass>();
 		classnames = new ArrayList<String>();
-		visits = new JLineMatrix(0,0,0);
+		visits = new Matrix(0,0,0);
 		classIndexMap = new HashMap<JobClass, Integer>();
 		stationIndexMap = new HashMap<Station, Integer>();
-		completes = new JLineMatrix(0,0,0);
-		njobs = new JLineMatrix(0,0,0);
+		completes = new Matrix(0,0,0);
+		njobs = new Matrix(0,0,0);
 	}
 	
 	public Chain(String neName, List<JobClass> classes, List<Station> stations) {

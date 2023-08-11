@@ -6,16 +6,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
-import org.ejml.sparse.csc.CommonOps_DSCC;
+import jline.lang.constant.GlobalConstants;
+import jline.lang.distributions.*;
+import jline.util.JFunction;
+import jline.util.Matrix;
 
 import jline.lang.*;
 import jline.lang.constant.DropStrategy;
-import jline.lang.distributions.DisabledDistribution;
-import jline.lang.distributions.Distribution;
-import jline.lang.distributions.Immediate;
-import jline.lang.distributions.MarkovianDistribution;
 import jline.solvers.ssa.events.DepartureEvent;
 
 public class Station extends StatefulNode implements Serializable {
@@ -23,8 +21,8 @@ public class Station extends StatefulNode implements Serializable {
     protected double cap; // double to allow infinite values.
     protected Map<JobClass, Double> classCap;
     protected Map<JobClass, DropStrategy> dropRule;
-    protected JLineMatrix lldScaling;
-    protected Function<JLineMatrix, Double> lcdScaling;
+    protected Matrix lldScaling;
+    protected JFunction<Matrix, Double> lcdScaling;
 
     protected Map<JobClass, DepartureEvent> departureEvents;
 
@@ -37,7 +35,7 @@ public class Station extends StatefulNode implements Serializable {
         this.cap = Double.POSITIVE_INFINITY;
         this.dropRule = new HashMap<JobClass, DropStrategy>();
         
-        this.lldScaling = new JLineMatrix(0,0);
+        this.lldScaling = new Matrix(0,0);
         this.lcdScaling = null;
     }
 
@@ -55,7 +53,7 @@ public class Station extends StatefulNode implements Serializable {
     }
 
     public void setCap(int cap) {
-        this.cap = (double) cap;
+        this.cap = cap;
     }
 
     public void setClassCap(JobClass jobClass, double cap) {
@@ -99,34 +97,41 @@ public class Station extends StatefulNode implements Serializable {
         throw new RuntimeException("Not Implemented!");
     }
 
-    public List<Object> getMarkovianSourceRates()  {
+    public List<Object> getSourceRates()  {
     	int nClasses = this.model.getNumberOfClasses();
-    	Map<JobClass, Map<Integer, JLineMatrix>> map = new HashMap<JobClass, Map<Integer, JLineMatrix>>();
-    	Map<JobClass, JLineMatrix> mu = new HashMap<JobClass, JLineMatrix>();
-    	Map<JobClass, JLineMatrix> phi = new HashMap<JobClass, JLineMatrix>();
-    	for(int i = 0; i < nClasses; i++) {
-    		Source source = (Source)this;
-    		JobClass jobclass = this.model.getClassByIndex(i);
+    	Map<JobClass, Map<Integer, Matrix>> map = new HashMap<JobClass, Map<Integer, Matrix>>();
+    	Map<JobClass, Matrix> mu = new HashMap<JobClass, Matrix>();
+    	Map<JobClass, Matrix> phi = new HashMap<JobClass, Matrix>();
+    	for(int r = 0; r < nClasses; r++) {
+    		Source source = (Source) this;
+    		JobClass jobclass = this.model.getClassByIndex(r);
 			if (!source.containsJobClass(jobclass)) {
-				source.setArrival(jobclass, new DisabledDistribution());
-    			JLineMatrix nan_matrix = new JLineMatrix(1,1,1);
-    			CommonOps_DSCC.fill(nan_matrix, Double.NaN);
-    			Map<Integer, JLineMatrix> tmp = new HashMap<Integer, JLineMatrix>();
+				source.setArrival(jobclass, new Disabled());
+    			Matrix nan_matrix = new Matrix(1,1,1);
+    			nan_matrix.fill(Double.NaN);
+    			Map<Integer, Matrix> tmp = new HashMap<Integer, Matrix>();
     			tmp.put(0, nan_matrix);
     			tmp.put(1, nan_matrix.clone());
     			map.put(jobclass, tmp);
     			mu.put(jobclass, nan_matrix.clone());
     			phi.put(jobclass, nan_matrix.clone());
-			} else if (!(source.getArrivalDistribution(jobclass) instanceof DisabledDistribution)) { 
-    			//Current JLine only support Exp, Coxian, Erlang, HyperEXP and APH.
-    			Distribution distr = source.getArrivalDistribution(jobclass);
-				map.put(jobclass, ((MarkovianDistribution)distr).getRepres());
-				mu.put(jobclass, ((MarkovianDistribution)distr).getMu());
-				phi.put(jobclass, ((MarkovianDistribution)distr).getPhi());
+            } else if ((source.getArrivalDistribution(jobclass) instanceof Det)) {
+                Distribution distr = source.getArrivalDistribution(jobclass);
+                Map<Integer, Matrix> tmp = new HashMap<Integer, Matrix>();
+                tmp.put(0, new Matrix(-distr.getRate()));
+                tmp.put(1, new Matrix(distr.getRate()));
+                map.put(jobclass, tmp);
+                mu.put(jobclass, new Matrix(distr.getRate()));
+                phi.put(jobclass, new Matrix(1.0));
+            } else if (!(source.getArrivalDistribution(jobclass) instanceof Disabled)) {
+                Distribution distr = source.getArrivalDistribution(jobclass);
+                map.put(jobclass, ((MarkovianDistribution)distr).getRepres());
+                mu.put(jobclass, ((MarkovianDistribution)distr).getMu());
+                phi.put(jobclass, ((MarkovianDistribution)distr).getPhi());
     		} else {
-    			JLineMatrix nan_matrix = new JLineMatrix(1,1,1);
-    			CommonOps_DSCC.fill(nan_matrix, Double.NaN);
-    			Map<Integer, JLineMatrix> tmp = new HashMap<Integer, JLineMatrix>();
+    			Matrix nan_matrix = new Matrix(1,1,1);
+    			nan_matrix.fill(Double.NaN);
+    			Map<Integer, Matrix> tmp = new HashMap<Integer, Matrix>();
     			tmp.put(0, nan_matrix);
     			tmp.put(1, nan_matrix.clone());
     			map.put(jobclass, tmp);
@@ -138,20 +143,21 @@ public class Station extends StatefulNode implements Serializable {
     	return new ArrayList<Object>(Arrays.asList(map, mu, phi));
     }
 
-    public List<Object> getMarkovianServiceRates()  {
+    public List<Object> getServiceRates()  {
     	int nClasses = this.model.getNumberOfClasses();
-    	Map<JobClass, Map<Integer, JLineMatrix>> map = new HashMap<JobClass, Map<Integer, JLineMatrix>>();
-    	Map<JobClass, JLineMatrix> mu = new HashMap<JobClass, JLineMatrix>();
-    	Map<JobClass, JLineMatrix> phi = new HashMap<JobClass, JLineMatrix>();
+    	Map<JobClass, Map<Integer, Matrix>> map = new HashMap<JobClass, Map<Integer, Matrix>>();
+    	Map<JobClass, Matrix> mu = new HashMap<JobClass, Matrix>();
+    	Map<JobClass, Matrix> phi = new HashMap<JobClass, Matrix>();
     	for(int i = 0; i < nClasses; i++) {
     		JobClass jobclass = this.model.getClassByIndex(i);
     		Queue queue = (Queue) this;
-    		//Since Delay, Join are all sub-class of Queue, and only queue and source are the sub-class of station, we could cast this to queue to call setService method
+    		// Since Delay, Join are all sub-class of Queue, and only queue and source
+            // are the sub-class of station, we could cast this to queue to call setService method
     		if(!queue.containsJobClass(jobclass)) {
-    			queue.setService(jobclass, new DisabledDistribution());
-    			JLineMatrix nan_matrix = new JLineMatrix(1,1,1);
-    			CommonOps_DSCC.fill(nan_matrix, Double.NaN);
-    			Map<Integer, JLineMatrix> tmp = new HashMap<Integer, JLineMatrix>();
+    			queue.setService(jobclass, new Disabled());
+    			Matrix nan_matrix = new Matrix(1,1,1);
+    			nan_matrix.fill(Double.NaN);
+    			Map<Integer, Matrix> tmp = new HashMap<Integer, Matrix>();
     			tmp.put(0, nan_matrix);
     			tmp.put(1, nan_matrix.clone());
     			map.put(jobclass, tmp);
@@ -159,30 +165,38 @@ public class Station extends StatefulNode implements Serializable {
     			phi.put(jobclass, nan_matrix.clone());
     		} else if (queue.getServiceProcess(jobclass) instanceof Immediate) {
     			Distribution distr = this.server.getServiceDistribution(jobclass);
-    			JLineMatrix map_matrix_1 = new JLineMatrix(1,1,1);
-    			map_matrix_1.set(0, 0, -distr.infRateRep);
-    			JLineMatrix map_matrix_2 = new JLineMatrix(1,1,1);
-    			map_matrix_2.set(0, 0, distr.infRateRep);
-    			JLineMatrix mu_matrix = new JLineMatrix(1,1,1);
-    			mu_matrix.set(0, 0, distr.infRateRep);
-    			JLineMatrix phi_matrix = new JLineMatrix(1,1,1);
+    			Matrix map_matrix_1 = new Matrix(1,1,1);
+    			map_matrix_1.set(0, 0, -GlobalConstants.Immediate);
+    			Matrix map_matrix_2 = new Matrix(1,1,1);
+    			map_matrix_2.set(0, 0, GlobalConstants.Immediate);
+    			Matrix mu_matrix = new Matrix(1,1,1);
+    			mu_matrix.set(0, 0, GlobalConstants.Immediate);
+    			Matrix phi_matrix = new Matrix(1,1,1);
     			phi_matrix.set(0, 0, 1);
-    			Map<Integer, JLineMatrix> tmp = new HashMap<Integer, JLineMatrix>();
+    			Map<Integer, Matrix> tmp = new HashMap<Integer, Matrix>();
     			tmp.put(0, map_matrix_1);
     			tmp.put(1, map_matrix_2);
     			map.put(jobclass, tmp);
     			mu.put(jobclass, mu_matrix);
     			phi.put(jobclass, phi_matrix);
-    		} else if (!(queue.getServiceProcess(jobclass) instanceof DisabledDistribution)) {
+    		} else if (!(queue.getServiceProcess(jobclass) instanceof Disabled)) {
     			//Current JLine only support Exp, Coxian, Erlang, HyperEXP and APH.
     			Distribution distr = this.server.getServiceDistribution(jobclass);
 				map.put(jobclass, ((MarkovianDistribution)distr).getRepres());
 				mu.put(jobclass, ((MarkovianDistribution)distr).getMu());
 				phi.put(jobclass, ((MarkovianDistribution)distr).getPhi());
+            } else if ((queue.getServiceProcess(jobclass) instanceof Det)) {
+                Distribution distr = this.server.getServiceDistribution(jobclass);
+                Map<Integer, Matrix> tmp = new HashMap<Integer, Matrix>();
+                tmp.put(0, new Matrix(-distr.getRate()));
+                tmp.put(1, new Matrix(distr.getRate()));
+                map.put(jobclass, tmp);
+                mu.put(jobclass, new Matrix(distr.getRate()));
+                phi.put(jobclass, new Matrix(1.0));
     		} else {
-    			JLineMatrix nan_matrix = new JLineMatrix(1,1,1);
-    			CommonOps_DSCC.fill(nan_matrix, Double.NaN);
-    			Map<Integer, JLineMatrix> tmp = new HashMap<Integer, JLineMatrix>();
+    			Matrix nan_matrix = new Matrix(1,1,1);
+    			nan_matrix.fill(Double.NaN);
+    			Map<Integer, Matrix> tmp = new HashMap<Integer, Matrix>();
     			tmp.put(0, nan_matrix);
     			tmp.put(1, nan_matrix.clone());
     			map.put(jobclass, tmp);
@@ -221,19 +235,19 @@ public class Station extends StatefulNode implements Serializable {
     	this.dropRule.put(jobclass, drop);
     }
 
-    public void setLimitedLoadDependence(JLineMatrix alpha) {
+    public void setLimitedLoadDependence(Matrix alpha) {
     	this.lldScaling = alpha;
     }
     
-    public JLineMatrix getLimitedLoadDependence() {
+    public Matrix getLimitedLoadDependence() {
     	return this.lldScaling;
     }
     
-    public void setLimitedClassDependence(Function<JLineMatrix, Double> gamma) {
+    public void setLimitedClassDependence(JFunction<Matrix, Double> gamma) {
     	this.lcdScaling = gamma;
     }
     
-    public Function<JLineMatrix, Double> getLimitedClassDependence(){
+    public JFunction<Matrix, Double> getLimitedClassDependence(){
     	return this.lcdScaling;
     }
 }

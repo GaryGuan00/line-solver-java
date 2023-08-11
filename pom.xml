@@ -2,16 +2,16 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>groupId</groupId>
-  <artifactId>linesolver</artifactId>
+  <artifactId>jline</artifactId>
   <version>2.0</version>
   <build>
-    <finalName>linesolver</finalName>
+    <finalName>jline</finalName>
     <plugins>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.22.1</version>
         <configuration>
-          <skipTests>true</skipTests>
+          <skipTests>${skipTests}</skipTests>
         </configuration>
       </plugin>
       <plugin>
@@ -26,47 +26,62 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.1</version>
         <configuration>
           <source>8</source>
           <target>8</target>
+          <compilerArgs>
+            <arg>-Xlint:all</arg>
+          </compilerArgs>
         </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <configuration>
-          <archive>
-            <manifest>
-              <addClasspath>true</addClasspath>
-              <mainClass>jline.examples.JavaClient</mainClass>
-            </manifest>
-          </archive>
-          <descriptorRefs>
-            <descriptorRef>jar-with-dependencies</descriptorRef>
-          </descriptorRefs>
-        </configuration>
-        <executions>
-          <execution>
-            <id>make-my-jar-with-dependencies</id>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
+	</plugin>
+	<plugin>
+	  <groupId>org.apache.maven.plugins</groupId>
+	  <artifactId>maven-shade-plugin</artifactId>
+	  <version>2.3</version>
+	  <executions>
+	     <!-- Run shade goal on package phase -->
+	    <execution>
+		<phase>package</phase>
+		<goals>
+			<goal>shade</goal>
+		</goals>
+		<configuration>
+		  <transformers>
+		  </transformers>
+		</configuration>
+		      </execution>
+		  </executions>
+	  </plugin>
+	 <plugin> 
+		 <groupId>
+			 com.googlecode.addjars-maven-plugin
+	 </groupId> 
+	 <artifactId>addjars-maven-plugin</artifactId> 
+	 <version>1.0.5</version> 
+	 <executions> 
+		 <execution> 
+		<goals> 
+			<goal>add-jars</goal> 
+		</goals> 
+		<configuration> 
+			 <resources> 
+				 <resource> 
+					 <directory>${basedir}/lib</directory> 
+ 				</resource> 
+			</resources> 
+		</configuration> 
+		</execution> 
+	</executions> 
+	</plugin>	  
     </plugins>
   </build>
-  <repositories>
-    <repository>
-      <id>kpc-toolbox-java-mvn-repo</id>
-      <url>https://raw.githubusercontent.com/imperial-qore/kpc-toolbox-java/main/mvn-artifact/</url>
-      <snapshots>
-        <enabled>true</enabled>
-        <updatePolicy>always</updatePolicy>
-      </snapshots>
-    </repository>
-  </repositories>
   <dependencies>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-math3</artifactId>
+      <version>3.6.1</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.maven.plugins</groupId>
       <artifactId>maven-assembly-plugin</artifactId>
@@ -90,11 +105,6 @@
       <version>0.41</version>
     </dependency>
     <dependency>
-      <groupId>org.qore</groupId>
-      <artifactId>kpc-toolbox-java</artifactId>
-      <version>1.0.0</version>
-    </dependency>
-    <dependency>
       <groupId>org.javatuples</groupId>
       <artifactId>javatuples</artifactId>
       <version>1.2</version>
@@ -116,16 +126,16 @@
       <version>1.2.4</version>
     </dependency>
     <dependency>
-      <groupId>org.javatuples</groupId>
-      <artifactId>javatuples</artifactId>
-      <version>1.2</version>
+      <groupId>org.apfloat</groupId>
+      <artifactId>apfloat</artifactId>
+      <version>1.10.1</version>
     </dependency>
     <dependency>
-      <groupId>lineclient</groupId>
-      <artifactId>lienclient</artifactId>
+      <groupId>lsodaSolver</groupId>
+      <artifactId>lsoda</artifactId>
       <version>1.0</version>
       <scope>system</scope>
-      <systemPath>${basedir}/lib/lineclient.jar</systemPath>
+      <systemPath>${project.basedir}/lib/lsoda-1.0.jar</systemPath>
     </dependency>
   </dependencies>
   <properties>

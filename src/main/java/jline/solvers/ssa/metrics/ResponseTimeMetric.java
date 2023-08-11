@@ -4,7 +4,7 @@ import jline.lang.constant.SchedStrategy;
 import jline.solvers.ssa.events.ArrivalEvent;
 import jline.solvers.ssa.events.DepartureEvent;
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.util.Pair;
 
 import java.util.ArrayList;
@@ -39,9 +39,10 @@ public class ResponseTimeMetric extends Metric<Double, Double> {
         return this.metricValue;
     }
 
-    public void fromStateMatrix(double t, StateMatrix stateMatrix) {
+    public void fromStateMatrix(double t, SSAStateMatrix networkState) {
     }
 
+    @SuppressWarnings("unchecked")
     public void fromEvent(double t, Event e) {
         if (e instanceof DepartureEvent) {
             if (this.buffer.isEmpty()) {
@@ -103,7 +104,7 @@ public class ResponseTimeMetric extends Metric<Double, Double> {
         this.nDepartures = 0;
         this.cutoffTime = this.time;
     }
-
+    @SuppressWarnings("unchecked")
     public void fromEvent(double t, Event e, int n) {
         if (e instanceof DepartureEvent) {
             if (this.buffer.isEmpty()) {

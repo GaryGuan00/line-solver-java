@@ -1,6 +1,7 @@
 package jline.lang;
 
 import jline.lang.constant.ActivityPrecedenceType;
+import jline.util.Matrix;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,10 +13,10 @@ public class ActivityPrecedence {
     protected List<String> postActs;
     protected String preType;
     protected String postType;
-    protected JLineMatrix preParams;
-    protected JLineMatrix postParams;
+    protected Matrix preParams;
+    protected Matrix postParams;
 
-    public ActivityPrecedence(List<String> preActs, List<String> postActs, String preType, String postType, JLineMatrix preParams, JLineMatrix postParams) {
+    public ActivityPrecedence(List<String> preActs, List<String> postActs, String preType, String postType, Matrix preParams, Matrix postParams) {
         this.preActs = preActs;
         this.postActs = postActs;
         this.preType = preType;
@@ -24,7 +25,7 @@ public class ActivityPrecedence {
         this.postParams = postParams;
     }
 
-    public ActivityPrecedence(List<String> preActs, List<String> postActs, String preType, String postType, JLineMatrix preParams) {
+    public ActivityPrecedence(List<String> preActs, List<String> postActs, String preType, String postType, Matrix preParams) {
         this.preActs = preActs;
         this.postActs = postActs;
         this.preType = preType;
@@ -60,7 +61,7 @@ public class ActivityPrecedence {
         this.postParams = null;
     }
 
-    public ActivityPrecedence(boolean isActivity, List<Activity> preActs, List<Activity> postActs,String preType, String postType, JLineMatrix preParams, JLineMatrix postParams) {
+    public ActivityPrecedence(boolean isActivity, List<Activity> preActs, List<Activity> postActs, String preType, String postType, Matrix preParams, Matrix postParams) {
         List<String> preActsName = new ArrayList<>();
         List<String> postActsName = new ArrayList<>();
         for(Activity preAct:preActs){
@@ -77,7 +78,7 @@ public class ActivityPrecedence {
         this.postParams = postParams;
     }
 
-    public ActivityPrecedence(boolean isActivity, List<Activity> preActs, List<Activity> postActs,String preType, String postType, JLineMatrix preParams) {
+    public ActivityPrecedence(boolean isActivity, List<Activity> preActs, List<Activity> postActs,String preType, String postType, Matrix preParams) {
         List<String> preActsName = new ArrayList<>();
         List<String> postActsName = new ArrayList<>();
         for(Activity preAct:preActs){
@@ -201,7 +202,7 @@ public class ActivityPrecedence {
         return new ActivityPrecedence(preActs, postActs);
     }
 
-    public static ActivityPrecedence AndJoin(List<String> preActs, String postAct, JLineMatrix quorum) {
+    public static ActivityPrecedence AndJoin(List<String> preActs, String postAct, Matrix quorum) {
         List<String> postActs = new ArrayList<String>();
         postActs.add(postAct);
         return new ActivityPrecedence(preActs, postActs,ActivityPrecedenceType.PRE_AND,ActivityPrecedenceType.POST_SEQ,quorum,null);
@@ -218,18 +219,18 @@ public class ActivityPrecedence {
         preActs.add(preAct);
         return new ActivityPrecedence(preActs,postActs,ActivityPrecedenceType.PRE_SEQ,ActivityPrecedenceType.POST_AND);    }
 
-    public static ActivityPrecedence Xor(String preAct, List<String> postActs, JLineMatrix probs) {
+    public static ActivityPrecedence Xor(String preAct, List<String> postActs, Matrix probs) {
 
         return ActivityPrecedence.OrFork(preAct,postActs,probs);
     }
 
-    public static ActivityPrecedence OrFork(String preAct, List<String> postActs, JLineMatrix probs) {
+    public static ActivityPrecedence OrFork(String preAct, List<String> postActs, Matrix probs) {
         List<String> preActs = new ArrayList<>();
         preActs.add(preAct);
         return new ActivityPrecedence(preActs,postActs,ActivityPrecedenceType.PRE_SEQ,ActivityPrecedenceType.POST_OR,null,probs);
     }
 
-    public static ActivityPrecedence Loop(String preAct, List<String> postActs, JLineMatrix counts){
+    public static ActivityPrecedence Loop(String preAct, List<String> postActs, Matrix counts){
         List<String> preActs = new ArrayList<>();
         preActs.add(preAct);
         return new ActivityPrecedence(preActs,postActs,ActivityPrecedenceType.PRE_SEQ,ActivityPrecedenceType.POST_LOOP,null,counts);

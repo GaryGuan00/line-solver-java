@@ -3,16 +3,16 @@
 
 package jline.solvers.fluid;
 
-import jline.lang.JLineMatrix;
+import jline.util.Matrix;
 
 // Class to store results specific to SolverFluid
 public class SolverFluidResult {
 
   // Results from getAvg
-  public JLineMatrix odeStateVec;
+  public Matrix odeStateVec;
 
   // Results from getCdfRespT and getTranCdfPassT
-  public JLineMatrix[][] distribC;
+  public Matrix[][] distribC;
   public double distribRuntime;
 
   // Results from getProbAggr

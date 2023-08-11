@@ -6,6 +6,8 @@ package jline.solvers;
 import jline.lang.Model;
 import jline.lang.constant.SolverType;
 
+import java.util.Random;
+
 // Abstract class for model solution algorithms and tools
 public abstract class Solver {
 
@@ -13,12 +15,14 @@ public abstract class Solver {
   public SolverOptions options; // Data structure with solver options
   public SolverResult result; // Last result
   public boolean enableChecks;
+  public Random random;
 
   protected Solver(String name, SolverOptions options) {
     this.name = name;
     this.options = options;
     this.result = new SolverResult();
     this.enableChecks = true;
+    this.random = new Random(options.seed);
   }
 
   protected Solver(String name) {
@@ -60,9 +64,8 @@ public abstract class Solver {
   }
 
   // Assign a new seed to the random number generator
-  protected static void resetRandomGeneratorSeed(int seed) {
-    // TODO: implementation
-    throw new RuntimeException("This method has not yet been implemented in JLINE.");
+  public void resetRandomGeneratorSeed(int seed) {
+    this.random = new Random(seed);
   }
 
   // List valid fields for options data structure

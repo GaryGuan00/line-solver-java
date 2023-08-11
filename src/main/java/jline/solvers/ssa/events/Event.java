@@ -4,24 +4,23 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
 
 import jline.lang.nodes.Node;
+import jline.solvers.ctmc.EventData;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
-import jline.util.Pair;
-import org.javatuples.Quartet;
-import org.javatuples.Triplet;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 public class Event implements Serializable {
     public Node node;
     public Event() {
     }
 
-    public double getRate(StateMatrix stateMatrix) {
+    public double getRate(SSAStateMatrix networkState) {
         return Double.NaN;
     }
 
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
         /*
             stateUpdate -
                 Attempt to apply an event to the stateMatrix
@@ -31,18 +30,18 @@ public class Event implements Serializable {
         return true;
     }
 
-    public boolean updateStateSpace(StateMatrix stateMatrix, Random random, Timeline timeline, ArrayList<StateMatrix> stateSpace, Queue<StateMatrix> queue) {
+    public boolean updateStateSpace(SSAStateMatrix networkState, Random random, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
 
         return true;
     }
 
-    public boolean updateEventSpace(StateMatrix stateMatrix, Random random, Timeline timeline, ArrayList<Quartet<Event,Pair<OutputEvent,Double>,StateMatrix,StateMatrix>>  eventSpace,Event event, Queue<StateMatrix> queue,StateMatrix copy) {
+    public boolean updateEventSpace(SSAStateMatrix networkState, Random random, ArrayList<EventData> eventSpace, Event event, Queue<SSAStateMatrix> queue, SSAStateMatrix copy, Set<EventData> eventSet) {
 
         return true;
     }
 
 
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         /*
             stateUpdateN -
                 Attempt to apply N repetitions of an event to the stateMatrix
@@ -51,7 +50,7 @@ public class Event implements Serializable {
          */
         int rem = n;
         for (int i = 0; i < n; i++) {
-            if (this.stateUpdate(stateMatrix, random, timeline)) {
+            if (this.stateUpdate(networkState, random, timeline)) {
                 rem--;
             }
         }
@@ -63,31 +62,33 @@ public class Event implements Serializable {
         System.out.format("Generic event\n");
     }
 
-    public int getMaxRepetitions(StateMatrix stateMatrix) {
+    public int getMaxRepetitions(SSAStateMatrix networkState) {
         return Integer.MAX_VALUE;
     }
 
-    public StateMatrix getNextState(StateMatrix startingState, Timeline timeline, ArrayList<StateMatrix> stateSpace, Queue<StateMatrix> queue) {
+    public SSAStateMatrix getNextState(SSAStateMatrix startingState, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
+        //TO_DO why are there overrides if they don't change anything??? remove them
+        SSAStateMatrix endingState = new SSAStateMatrix(startingState);
 
-        StateMatrix endingState = new StateMatrix(startingState);
-
-        if(updateStateSpace(endingState, new Random(), timeline, stateSpace,queue)){
+        if(updateStateSpace(endingState, new Random(), stateSpace,queue, stateSet)){
             return endingState;
         }
-
         return null;
 
     }
 
-    public StateMatrix getNextEventState(StateMatrix startingState, Timeline timeline, ArrayList<Quartet<Event,Pair<OutputEvent,Double>,StateMatrix,StateMatrix>> eventSpace,Event event, Queue<StateMatrix> queue, StateMatrix copy) {
+    public SSAStateMatrix getNextEventState(SSAStateMatrix startingState, ArrayList<EventData> eventSpace, Event event, Queue<SSAStateMatrix> queue, SSAStateMatrix copy, Set<EventData> eventSet) {
 
-        StateMatrix endingState = new StateMatrix(startingState);
+        SSAStateMatrix endingState = new SSAStateMatrix(startingState);
 
-        if(updateEventSpace(endingState, new Random(), timeline, eventSpace,event,queue,copy)){
+        if(updateEventSpace(endingState, new Random(), eventSpace,event,queue,copy, eventSet)){
             return endingState;
         }
 
         return null;
     }
 
+    public Node getNode() {
+        return node;
+    }
 }

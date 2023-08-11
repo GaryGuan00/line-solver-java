@@ -1,11 +1,12 @@
 package jline.util;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
 import jline.lang.NetworkEvent;
 
-public class Sync {
+public class Sync implements Serializable {
 
 	//Index starts from 0
 	public Map<Integer, NetworkEvent> active;

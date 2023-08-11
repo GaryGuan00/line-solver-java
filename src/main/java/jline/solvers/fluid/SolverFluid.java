@@ -3,19 +3,15 @@
 
 package jline.solvers.fluid;
 
-import jline.lang.JLineMatrix;
+import jline.lang.constant.*;
+import jline.lang.state.State;
+import jline.util.Matrix;
 import jline.lang.JobClass;
 import jline.lang.Model;
 import jline.lang.Network;
-import jline.lang.constant.JobClassType;
-import jline.lang.constant.SolverType;
 import jline.lang.distributions.Coxian;
-import jline.lang.distributions.Distribution;
 import jline.solvers.NetworkSolver;
-import jline.lang.constant.NodeType;
-import jline.lang.constant.SchedStrategy;
 import jline.lang.nodes.Station;
-import jline.lang.state.NetworkState;
 import jline.solvers.SolverOptions;
 import jline.solvers.SolverResult;
 import jline.solvers.fluid.analyzers.ClosingAndStateDepMethodsAnalyzer;
@@ -50,21 +46,21 @@ public class SolverFluid extends NetworkSolver {
 
   public void initSol() {
 
-    JLineMatrix initSol = new JLineMatrix(1, 0);
-    for (int ind = 0; ind < sn.nNodes; ind++) {
+    Matrix initSol = new Matrix(1, 0);
+    for (int ind = 0; ind < sn.nnodes; ind++) {
       if (sn.isstateful.get(ind, 0) == 1) {
         int isf = (int) sn.nodeToStateful.get(0, ind);
         int ist = (int) sn.nodeToStation.get(0, ind);
-        JLineMatrix state_i = new JLineMatrix(1, 0);
+        Matrix state_i = new Matrix(1, 0);
         // Compared to state_i, initSol_i does not track disabled classes
         // and removes Inf entries in the Sources
-        JLineMatrix initSol_i = new JLineMatrix(1, 0);
+        Matrix initSol_i = new Matrix(1, 0);
 
-        NetworkState.StateMarginalStatistics stats =
-            NetworkState.toMarginal(
+        State.StateMarginalStatistics stats =
+            State.toMarginal(
                 sn, ind, sn.state.get(sn.stations.get(isf)), null, null, null, null, null);
-        JLineMatrix nir = stats.nir;
-        List<JLineMatrix> kir_i = stats.kir;
+        Matrix nir = stats.nir;
+        List<Matrix> kir_i = stats.kir;
 
         switch (sn.sched.get(sn.stations.get(ist))) {
           case EXT:
@@ -72,7 +68,7 @@ public class SolverFluid extends NetworkSolver {
             state_i.set(0, 0, POSITIVE_INFINITY); // Fluid does not model infinite buffer?
             int rMax = kir_i.get(0).getNumCols();
             for (int r = 0; r < rMax; r++) {
-              int kMax = sn.mu.get(sn.stations.get(ist)).get(sn.jobClasses.get(r)).length();
+              int kMax = sn.mu.get(sn.stations.get(ist)).get(sn.jobclasses.get(r)).length();
               for (int k = 0; k < kMax; k++) {
                 state_i.expandMatrix(1, state_i.getNumCols() + 1, state_i.getNumElements() + 1);
                 state_i.set(0, state_i.getNumCols() - 1, kir_i.get(k).get(0, r));
@@ -93,7 +89,7 @@ public class SolverFluid extends NetworkSolver {
           case HOL:
             rMax = kir_i.get(0).getNumCols();
             for (int r = 0; r < rMax; r++) {
-              int kMax = sn.mu.get(sn.stations.get(ist)).get(sn.jobClasses.get(r)).length();
+              int kMax = sn.mu.get(sn.stations.get(ist)).get(sn.jobclasses.get(r)).length();
               for (int k = 0; k < kMax; k++) {
                 state_i.expandMatrix(1, state_i.getNumCols() + 1, state_i.getNumElements() + 1);
                 if (!isNaN(sn.rates.get(ist, r))) {
@@ -124,7 +120,7 @@ public class SolverFluid extends NetworkSolver {
             return;
         }
 
-        initSol = JLineMatrix.concatColumns(initSol, initSol_i, null);
+        initSol = Matrix.concatColumns(initSol, initSol_i, null);
         sn.state.put(sn.stations.get(isf), state_i);
       }
     }
@@ -134,12 +130,12 @@ public class SolverFluid extends NetworkSolver {
   private void runMethodSpecificAnalyzer() {
 
     int M = sn.nstations;
-    int K = sn.nClasses;
-    JLineMatrix phases = sn.phases.clone();
-    JLineMatrix phasesLast = sn.phases.clone();
-    JLineMatrix rates0 = sn.rates.clone();
+    int K = sn.nclasses;
+    Matrix phases = sn.phases.clone();
+    Matrix phasesLast = sn.phases.clone();
+    Matrix rates0 = sn.rates.clone();
 
-    JLineMatrix V = new JLineMatrix(M, K);
+    Matrix V = new Matrix(M, K);
     for (int i = 0; i < sn.visits.size(); i++) {
       V = V.add(1, sn.visits.get(i));
     }
@@ -166,8 +162,8 @@ public class SolverFluid extends NetworkSolver {
     if ((Objects.equals(options.method, "matrix")) || (Objects.equals(options.method, "closing"))) {
       if (sn.sched.containsValue(SchedStrategy.FCFS)) {
         int iter = 0;
-        JLineMatrix eta_1 = new JLineMatrix(M, 1);
-        JLineMatrix eta = new JLineMatrix(M, 1);
+        Matrix eta_1 = new Matrix(M, 1);
+        Matrix eta = new Matrix(M, 1);
         for (int i = 0; i < M; i++) {
           eta.set(i, 0, POSITIVE_INFINITY);
         }
@@ -199,43 +195,43 @@ public class SolverFluid extends NetworkSolver {
             }
           }
 
-          JLineMatrix ST0 = new JLineMatrix(M, K);
+          Matrix ST0 = new Matrix(M, K);
           for (int i = 0; i < M; i++) {
             for (int j = 0; j < K; j++) {
               ST0.set(i, j, 1 / rates0.get(i, j));
               if (isInfinite(ST0.get(i, j))) {
-                ST0.set(i, j, Distribution.infRep);
+                ST0.set(i, j, 1/GlobalConstants.Zero);
               } else if (isNaN(ST0.get(i, j))) {
-                ST0.set(i, j, Distribution.zeroRn);
+                ST0.set(i, j, GlobalConstants.Zero);
               }
             }
           }
 
-          JLineMatrix XN = new JLineMatrix(1, K);
+          Matrix XN = new Matrix(1, K);
           for (int k = 0; k < K; k++) {
             if (sn.refstat.get(k, 0) >= 0) { // Ignore artificial classes
               XN.set(0, k, result.TN.get((int) sn.refstat.get(k, 0), k));
             }
           }
 
-          if (Objects.equals(options.config.highVar, "interp")) {
+          if (Objects.equals(options.config.highvar, "interp")) {
             // TODO: implement npfqn_nonexp_approx
             throw new RuntimeException("Warning: unimplemented code reached in SF.rMSA 1");
           }
           // DELETE THIS SECTION ONCE YOU'VE IMPLEMENTED NPFQN //
-          eta = new JLineMatrix(M, 1);
+          eta = new Matrix(M, 1);
           eta.ones();
-          JLineMatrix ST = ST0.clone();
+          Matrix ST = ST0.clone();
           // DELETE DOWN TO HERE
 
-          JLineMatrix rates = new JLineMatrix(M, K);
+          Matrix rates = new Matrix(M, K);
           for (int i = 0; i < M; i++) {
             for (int j = 0; j < K; j++) {
               rates.set(i, j, 1 / ST.get(i, j));
               if (isInfinite(rates.get(i, j))) {
-                rates.set(i, j, Distribution.infRep);
+                rates.set(i, j, 1/GlobalConstants.Zero);
               } else if (isNaN(rates.get(i, j))) {
-                rates.set(i, j, Distribution.zeroRn);
+                rates.set(i, j, GlobalConstants.Zero);
               }
             }
           }
@@ -245,18 +241,18 @@ public class SolverFluid extends NetworkSolver {
               for (int k = 0; k < K; k++) {
                 if (rates.get(i, k) > 0 && sn.scv.get(i, k) > 0) {
                   Coxian cx = Coxian.fitMeanAndSCV(1 / rates.get(i, k), sn.scv.get(i, k));
-                  JLineMatrix muik = cx.getMu();
-                  JLineMatrix phiik = cx.getPhi();
+                  Matrix muik = cx.getMu();
+                  Matrix phiik = cx.getPhi();
                   // we now handle the case that due to either numerical issues or different
                   // relationship between scv and mean if the size of the phase-type representation
                   // has changed
                   phases.set(i, k, muik.length());
-                  NetworkState.StateMarginalStatistics stats = null;
+                  State.StateMarginalStatistics stats = null;
                   if (phases.get(i, k) != phasesLast.get(i, k)) { // If number of phases changed
                     // Before we update sn we adjust the initial state
                     int isf = (int) sn.stationToStateful.get(0, i);
                     stats =
-                        NetworkState.toMarginal(
+                        State.toMarginal(
                             sn,
                             i,
                             sn.state.get(sn.stations.get(isf)),
@@ -266,9 +262,9 @@ public class SolverFluid extends NetworkSolver {
                             null,
                             null);
                   }
-                  sn.proc.get(sn.stations.get(i)).put(sn.jobClasses.get(k), cx.getRepres());
-                  sn.mu.get(sn.stations.get(i)).put(sn.jobClasses.get(k), muik);
-                  sn.phi.get(sn.stations.get(i)).put(sn.jobClasses.get(k), phiik);
+                  sn.proc.get(sn.stations.get(i)).put(sn.jobclasses.get(k), cx.getRepres());
+                  sn.mu.get(sn.stations.get(i)).put(sn.jobclasses.get(k), muik);
+                  sn.phi.get(sn.stations.get(i)).put(sn.jobclasses.get(k), phiik);
                   sn.phases = phases.clone();
 
                   sn.phasessz = sn.phases.clone();
@@ -280,9 +276,9 @@ public class SolverFluid extends NetworkSolver {
                     }
                   }
 
-                  sn.phaseshift = new JLineMatrix(sn.phases.getNumRows(), 1);
+                  sn.phaseshift = new Matrix(sn.phases.getNumRows(), 1);
                   sn.phaseshift =
-                      JLineMatrix.concatColumns(sn.phaseshift, sn.phasessz.cumsumViaRow(), null);
+                      Matrix.concatColumns(sn.phaseshift, sn.phasessz.cumsumViaRow(), null);
 
                   if (phases.get(i, k) != phasesLast.get(i, k)) {
                     int isf = (int) sn.stationToStateful.get(0, i);
@@ -290,11 +286,11 @@ public class SolverFluid extends NetworkSolver {
                     assert stats != null;
                     sn.state.put(
                         sn.stations.get(isf),
-                        NetworkState.fromMarginalAndStarted(sn, i, stats.nir, stats.sir));
+                        State.fromMarginalAndStarted(sn, i, stats.nir, stats.sir));
                     // Pick one as the marginals won't change
                     sn.state.put(
                         sn.stations.get(isf),
-                        JLineMatrix.extractRows(sn.state.get(sn.stations.get(isf)), 0, 1, null));
+                        Matrix.extractRows(sn.state.get(sn.stations.get(isf)), 0, 1, null));
                   }
                 }
               }
@@ -332,7 +328,7 @@ public class SolverFluid extends NetworkSolver {
       result.t.set(0, 0, 0.00000001);
     }
 
-    JLineMatrix Ufull0 = result.UN.clone();
+    Matrix Ufull0 = result.UN.clone();
     for (int i = 0; i < M; i++) {
       List<Integer> sdCols = new LinkedList<>();
       for (int k = 0; k < K; k++) {
@@ -385,8 +381,8 @@ public class SolverFluid extends NetworkSolver {
       }
     }
 
-    result.XN = new JLineMatrix(1, K);
-    result.CN = new JLineMatrix(1, K);
+    result.XN = new Matrix(1, K);
+    result.CN = new Matrix(1, K);
     for (int k = 0; k < K; k++) {
       if (sn.refstat.get(k, 0) >= 0) { // Ignore artificial classes
         result.XN.set(0, k, result.TN.get((int) sn.refstat.get(k, 0), k));
@@ -459,27 +455,27 @@ public class SolverFluid extends NetworkSolver {
     }*/
 
     int M = sn.nstations;
-    int K = sn.nClasses;
+    int K = sn.nclasses;
 
-    JLineMatrix Q = new JLineMatrix(M, K);
-    JLineMatrix U = Q.clone();
-    JLineMatrix R = Q.clone();
-    JLineMatrix T = Q.clone();
-    JLineMatrix C = new JLineMatrix(1, K);
-    JLineMatrix X = C.clone();
-    JLineMatrix[][] Qt = new JLineMatrix[M][K];
-    JLineMatrix[][] Ut = new JLineMatrix[M][K];
-    JLineMatrix[][] Tt = new JLineMatrix[M][K];
+    Matrix Q = new Matrix(M, K);
+    Matrix U = Q.clone();
+    Matrix R = Q.clone();
+    Matrix T = Q.clone();
+    Matrix C = new Matrix(1, K);
+    Matrix X = C.clone();
+    Matrix[][] Qt = new Matrix[M][K];
+    Matrix[][] Ut = new Matrix[M][K];
+    Matrix[][] Tt = new Matrix[M][K];
     for (int i = 0; i < M; i++) {
       for (int k = 0; k < K; k++) {
-        Qt[i][k] = new JLineMatrix(0, 0);
-        Ut[i][k] = new JLineMatrix(0, 0);
-        Tt[i][k] = new JLineMatrix(0, 0);
+        Qt[i][k] = new Matrix(0, 0);
+        Ut[i][k] = new Matrix(0, 0);
+        Tt[i][k] = new Matrix(0, 0);
       }
     }
 
-    JLineMatrix s0_sz = new JLineMatrix(1, sn.state.size());
-    JLineMatrix s0_id = s0_sz.clone();
+    Matrix s0_sz = new Matrix(1, sn.state.size());
+    Matrix s0_id = s0_sz.clone();
     int i = 0;
     for (Station station : sn.stations) {
       s0_sz.set(0, i, sn.state.get(station).getNumRows());
@@ -490,13 +486,13 @@ public class SolverFluid extends NetworkSolver {
 
     while (s0_id.elementMin() >= 0) { // For all possible initial states
       double s0prior_val = 1;
-      for (int ind = 0; ind < sn.nNodes; ind++) {
+      for (int ind = 0; ind < sn.nnodes; ind++) {
         if (sn.isstateful.get(ind, 0) == 1) {
           int isf = (int) sn.nodeToStateful.get(0, ind);
           // Update prior
-          s0prior_val *= sn.statePrior.get(sn.stations.get(isf)).get(0, (int) s0_id.get(0, isf));
-          JLineMatrix newState =
-              JLineMatrix.extractRows(
+          s0prior_val *= sn.stateprior.get(sn.stations.get(isf)).get(0, (int) s0_id.get(0, isf));
+          Matrix newState =
+              Matrix.extractRows(
                   sn.state.get(sn.stations.get(isf)),
                   (int) s0_id.get(0, isf),
                   (int) s0_id.get(0, isf) + 1,
@@ -526,7 +522,7 @@ public class SolverFluid extends NetworkSolver {
             X.set(1, k, NaN);
           }
 
-          JLineMatrix nanMatrix = new JLineMatrix(1, 1);
+          Matrix nanMatrix = new Matrix(1, 1);
           nanMatrix.set(0, 0, NaN);
           for (int ist = 0; ist < M; ist++) {
             for (int r = 0; r < K; r++) {
@@ -562,7 +558,7 @@ public class SolverFluid extends NetworkSolver {
       }
 
       // Update initial state
-      JLineMatrix pprodInput = s0_sz.clone();
+      Matrix pprodInput = s0_sz.clone();
       for (int j = 0; j < s0_sz.length(); j++) {
         pprodInput.set(0, j, pprodInput.get(0, j) - 1);
       }
@@ -596,10 +592,10 @@ public class SolverFluid extends NetworkSolver {
   public void getTranCdfPassT() {
     long startTime = System.nanoTime();
     this.sn = model.getStruct(true);
-    for (int ind = 0; ind < sn.nNodes; ind++) {
+    for (int ind = 0; ind < sn.nnodes; ind++) {
       if (sn.isstateful.get(ind, 0) == 1) {
         int isf = (int) sn.nodeToStateful.get(ind, 0);
-        JLineMatrix statePrior = sn.statePrior.get(sn.stations.get(isf));
+        Matrix statePrior = sn.stateprior.get(sn.stations.get(isf));
         if (statePrior.elementSum() != statePrior.elementMax()) {
           throw new RuntimeException(
               "getTranCdfPassT: multiple initial states have non-zero prior - unsupported.");
@@ -607,7 +603,7 @@ public class SolverFluid extends NetworkSolver {
         // Assign initial state to network
         sn.state.put(
             sn.stations.get(isf),
-            JLineMatrix.extractRows(sn.state.get(sn.stations.get(isf)), 0, 1, null));
+            Matrix.extractRows(sn.state.get(sn.stations.get(isf)), 0, 1, null));
       }
     }
 
@@ -636,8 +632,8 @@ public class SolverFluid extends NetworkSolver {
     }
 
     if (allAreFinite) {
-      NetworkState.StateMarginalStatistics stats =
-          NetworkState.toMarginal(
+      State.StateMarginalStatistics stats =
+          State.toMarginal(
               this.sn,
               ist,
               sn.state.get(sn.stations.get((int) sn.stationToStateful.get(0, ist))),
@@ -661,22 +657,22 @@ public class SolverFluid extends NetworkSolver {
     }
   }
 
-  private JLineMatrix[][] passageTime() {
+  private Matrix[][] passageTime() {
 
     int M = sn.nstations; // Number of Stations
-    int K = sn.nClasses; // Number of Classes
+    int K = sn.nclasses; // Number of Classes
     double N = sn.nclosedjobs; // Population
-    JLineMatrix S = sn.nservers.clone();
+    Matrix S = sn.nservers.clone();
     for (int i = 0; i < M; i++) {
       // Set number of servers in delay station = population
       if (Double.isInfinite(S.get(i, 0))) {
         S.set(i, 0, N);
       }
     }
-    JLineMatrix[][][] tmpRT = new JLineMatrix[M][K][2];
+    Matrix[][][] tmpRT = new Matrix[M][K][2];
 
     // Initialisation
-    JLineMatrix slowrate = new JLineMatrix(M, K);
+    Matrix slowrate = new Matrix(M, K);
     for (int i = 0; i < M; i++) {
       for (int k = 0; k < K; k++) {
         // Service completion (exit) rates in each phase
@@ -685,7 +681,7 @@ public class SolverFluid extends NetworkSolver {
             k,
             Math.min(
                 POSITIVE_INFINITY,
-                sn.mu.get(sn.stations.get(i)).get(sn.jobClasses.get(k)).elementMin()));
+                sn.mu.get(sn.stations.get(i)).get(sn.jobclasses.get(k)).elementMin()));
       }
     }
 
@@ -704,25 +700,25 @@ public class SolverFluid extends NetworkSolver {
             if (sn.phases.get(i, c) > 0) {
 
               // Generate ODEs Passage Time
-              JLineMatrix phases_c;
+              Matrix phases_c;
               int Kc = K + 1; // Add a single new class
               // Single new class is arbitrarily open
-              if (Kc > sn.jobClasses.size()) {
+              if (Kc > sn.jobclasses.size()) {
                 KcClass = new JobClass(JobClassType.Open, "singleNewClass");
-                sn.jobClasses.add(KcClass);
+                sn.jobclasses.add(KcClass);
               }
               // Indices of the transient class corresponding to each class in the original model
               // for
               // chain k
-              JLineMatrix idxTranCl = new JLineMatrix(1, K);
+              Matrix idxTranCl = new Matrix(1, K);
               for (Integer c2 : idxClassesInChain) {
                 idxTranCl.set(0, c2, K);
               }
 
-              JLineMatrix newRT = new JLineMatrix(M * Kc, M * Kc); // New routing table
-              Map<Station, Map<JobClass, Map<Integer, JLineMatrix>>> newProc = new HashMap<>();
-              Map<Station, Map<JobClass, JLineMatrix>> newMu = new HashMap<>();
-              Map<Station, Map<JobClass, JLineMatrix>> newPi = new HashMap<>();
+              Matrix newRT = new Matrix(M * Kc, M * Kc); // New routing table
+              Map<Station, Map<JobClass, Map<Integer, Matrix>>> newProc = new HashMap<>();
+              Map<Station, Map<JobClass, Matrix>> newMu = new HashMap<>();
+              Map<Station, Map<JobClass, Matrix>> newPi = new HashMap<>();
 
               for (int j = 0; j < M; j++) {
                 Station station = sn.stations.get(j);
@@ -730,7 +726,7 @@ public class SolverFluid extends NetworkSolver {
                 newPi.put(station, new HashMap<>());
                 newProc.put(station, new HashMap<>());
                 for (int r = 0; r < K; r++) {
-                  JobClass jobClass = sn.jobClasses.get(r);
+                  JobClass jobClass = sn.jobclasses.get(r);
                   newProc.get(station).put(jobClass, new HashMap<>());
                   int procSize = sn.proc.get(station).get(jobClass).size();
                   for (int q = 0; q < procSize; q++) {
@@ -746,14 +742,14 @@ public class SolverFluid extends NetworkSolver {
                 }
                 newMu
                     .get(station)
-                    .put(KcClass, sn.mu.get(station).get(sn.jobClasses.get(c)).clone());
+                    .put(KcClass, sn.mu.get(station).get(sn.jobclasses.get(c)).clone());
                 newPi
                     .get(station)
-                    .put(KcClass, sn.phi.get(station).get(sn.jobClasses.get(c)).clone());
+                    .put(KcClass, sn.phi.get(station).get(sn.jobclasses.get(c)).clone());
 
                 // PHD Distribution
                 for (int r = 0; r < sn.nchains; r++) {
-                  JobClass jobClass = sn.jobClasses.get(r);
+                  JobClass jobClass = sn.jobclasses.get(r);
                   int procSize = sn.proc.get(station).get(jobClass).size();
                   for (int q = 0; q < procSize; q++) {
                     newProc
@@ -763,12 +759,12 @@ public class SolverFluid extends NetworkSolver {
                   }
                 }
                 newProc.get(station).put(KcClass, new HashMap<>());
-                int procSize = sn.proc.get(station).get(sn.jobClasses.get(c)).size();
+                int procSize = sn.proc.get(station).get(sn.jobclasses.get(c)).size();
                 for (int q = 0; q < procSize; q++) {
                   newProc
                       .get(station)
                       .get(KcClass)
-                      .put(q, sn.proc.get(station).get(sn.jobClasses.get(c)).get(q).clone());
+                      .put(q, sn.proc.get(station).get(sn.jobclasses.get(c)).get(q).clone());
                 }
               }
 
@@ -871,7 +867,7 @@ public class SolverFluid extends NetworkSolver {
               for (int row = 0; row < M; row++) {
                 for (int col = 0; col < K; col++) {
                   double val = slowrate.get(row, col);
-                  if (val > Distribution.tolerance && val < minNonZeroRate) {
+                  if (val > GlobalConstants.CoarseTol && val < minNonZeroRate) {
                     minNonZeroRate = val;
                   }
                 }
@@ -895,8 +891,8 @@ public class SolverFluid extends NetworkSolver {
                       sn, newMu, newPi, newProc, newRT, S, options, initialState.length);
 
               // ODE analysis
-              JLineMatrix tFull = new JLineMatrix(0, 0);
-              JLineMatrix stateFull = new JLineMatrix(0, 0);
+              Matrix tFull = new Matrix(0, 0);
+              Matrix stateFull = new Matrix(0, 0);
               int iter = 1;
               boolean finished = false;
               int tref = 0;
@@ -904,30 +900,28 @@ public class SolverFluid extends NetworkSolver {
 
                 // Solve ODE - y_mean_iter is the transient solution in stage e
                 FirstOrderIntegrator odeSolver;
-                if (options.stiff && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
+                if (options.stiff) {
                   System.err.println(
                       "Stiff solvers are not yet available in JLINE. Using non-stiff solver instead.");
                 }
-                if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
+                if (options.tol > 0.001) {
                   System.err.println(
                       "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
                 }
-                odeSolver = options.odeSolvers.accurateODESolver;
+                odeSolver = options.odesolvers.accurateODESolver;
 
                 odeSolver.clearStepHandlers();
                 TransientDataHandler stepHandler = new TransientDataHandler(initialState.length);
                 odeSolver.addStepHandler(stepHandler);
 
                 try {
-		  System.out.print("Starting ODE integration cycle...");
                   odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
-		  System.out.println("done");
                 } catch (RuntimeException e) {
                   throw new RuntimeException("ODE Solver Failed.");
                 }
 
-                JLineMatrix tmpTIter = stepHandler.tVec;
-                JLineMatrix tmpStateIter = stepHandler.xVec;
+                Matrix tmpTIter = stepHandler.tVec;
+                Matrix tmpStateIter = stepHandler.xVec;
 
                 iter++;
 
@@ -944,7 +938,7 @@ public class SolverFluid extends NetworkSolver {
                   for (int row = startRow; row < endRow; row++) {
                     tFull.set(row, 0, tmpTIter.get(row - startRow, 0) + tref);
                   }
-                  stateFull = JLineMatrix.concatRows(stateFull, tmpStateIter, null);
+                  stateFull = Matrix.concatRows(stateFull, tmpStateIter, null);
                 }
 
                 tmpSum = 0;
@@ -990,13 +984,13 @@ public class SolverFluid extends NetworkSolver {
     }
 
     if (KcClass != null) {
-      sn.jobClasses.remove(KcClass);
+      sn.jobclasses.remove(KcClass);
     }
 
-    JLineMatrix[][] RTret = new JLineMatrix[M][K];
+    Matrix[][] RTret = new Matrix[M][K];
     for (int i = 0; i < M; i++) {
       for (int c = 0; c < K; c++) {
-        RTret[i][c] = JLineMatrix.concatColumns(tmpRT[i][c][1], tmpRT[i][c][0], null);
+        RTret[i][c] = Matrix.concatColumns(tmpRT[i][c][1], tmpRT[i][c][0], null);
       }
     }
     return RTret;

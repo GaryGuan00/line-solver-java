@@ -7,22 +7,25 @@ import jline.lang.distributions.Erlang;
 import jline.lang.nodes.Node;
 import jline.lang.nodes.Source;
 import jline.lang.nodes.StatefulNode;
+import jline.solvers.ctmc.EventData;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
+import jline.solvers.ssa.state.PhaseList;
+import jline.util.Pair;
 
-import java.util.Random;
+import java.util.*;
 
 public class ErlangPhaseEvent extends PhaseEvent implements NodeEvent {
-    private int statefulIndex;
-    private int classIndex;
-    private SchedStrategy schedStrategy;
-    private boolean isSource;
+    private final int statefulIndex;
+    private final int classIndex;
+    private final SchedStrategy schedStrategy;
+    private final boolean isSource;
     private final Erlang serviceProcess;
     protected Node node;
-    private JobClass jobClass;
+    private final JobClass jobClass;
     protected boolean isProcessorSharing;
 
-    private DepartureEvent departureEvent;
+    private final DepartureEvent departureEvent;
 
     public ErlangPhaseEvent(Node node, JobClass jobClass, DepartureEvent departureEvent) {
         super();
@@ -59,17 +62,16 @@ public class ErlangPhaseEvent extends PhaseEvent implements NodeEvent {
     }
 
     @Override
-    public double getRate(StateMatrix stateMatrix) {
+    public double getRate(SSAStateMatrix networkState) {
         int activeServers = 1;
 
         if (this.isProcessorSharing) {
-            double serviceRatio = (double)stateMatrix.getState(this.statefulIndex, this.classIndex)/(double)stateMatrix.totalStateAtNode(this.statefulIndex);
-            serviceRatio *= stateMatrix.psTotalCapacity(this.statefulIndex);
-            return this.serviceProcess.getRate()*serviceRatio;
-        }
+            double serviceRatio = (double) networkState.getState(this.statefulIndex, this.classIndex)/(double) networkState.totalStateAtNode(this.statefulIndex);
+            serviceRatio *= networkState.psTotalCapacity(this.statefulIndex);
+            return ((Double)this.serviceProcess.getParam(1).getValue())*serviceRatio;        }
 
         if (this.node instanceof StatefulNode) {
-            activeServers = stateMatrix.inProcess(this.statefulIndex, this.classIndex);
+            activeServers = networkState.inProcess(this.statefulIndex, this.classIndex);
             if (this.node instanceof Source) {
                 // NOTE: Pay active attention to this part
                 activeServers = 1;//stateMatrix.getPhaseListSize(this)+1;
@@ -78,50 +80,177 @@ public class ErlangPhaseEvent extends PhaseEvent implements NodeEvent {
             }
         }
 
-        return this.serviceProcess.getRate()*activeServers;
+        return ((Double)this.serviceProcess.getParam(1).getValue())*activeServers;
+    }
+
+    public double getDepartureRate(SSAStateMatrix networkState) {
+        int activeServers = 1;
+        if (this.isProcessorSharing) {
+            double serviceRatio = (double) networkState.getState(this.statefulIndex, this.classIndex)/(double) networkState.totalStateAtNode(this.statefulIndex);
+            serviceRatio *= networkState.psTotalCapacity(this.statefulIndex);
+            return ((Double)this.serviceProcess.getParam(1).getValue())*serviceRatio* networkState.getInPhase(this.statefulIndex, this.classIndex, (int) this.serviceProcess.getNumberOfPhases() - 1);
+        }
+
+        if (this.node instanceof StatefulNode) {
+            activeServers = networkState.inProcess(this.statefulIndex, this.classIndex);
+            if (this.node instanceof Source) {
+                // NOTE: Pay active attention to this part
+                activeServers = 1;//stateMatrix.getPhaseListSize(this)+1;
+            } else if (activeServers == 0) {
+                return Double.NaN;
+            }
+        }
+
+        return ((Double)this.serviceProcess.getParam(1).getValue())* networkState.getInPhase(this.statefulIndex, this.classIndex, (int) this.serviceProcess.getNumberOfPhases() - 1);
     }
 
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
         if (this.node instanceof StatefulNode) {
             if (this.node instanceof Source) {
-                if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
-                    this.departureEvent.stateUpdate(stateMatrix, random, timeline);
-                    timeline.record(this, stateMatrix);
+                if (networkState.incrementPhase(this.statefulIndex, this.classIndex)) {
+                    this.departureEvent.stateUpdate(networkState, random, timeline);
+                    timeline.record(this, networkState);
                 }
 
                 return true;
-            } else if (stateMatrix.getState(this.statefulIndex, this.classIndex) == 0) {
+            } else if (networkState.getState(this.statefulIndex, this.classIndex) == 0) {
                 return true;
             }
         }
 
-        if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
-            this.departureEvent.stateUpdate(stateMatrix, random, timeline);
-            timeline.record(this, stateMatrix);
+        if (networkState.incrementPhase(this.statefulIndex, this.classIndex)) {
+            this.departureEvent.stateUpdate(networkState, random, timeline);
+            timeline.record(this, networkState);
             return true;
         }
 
-        timeline.record(this, stateMatrix);
+        timeline.record(this, networkState);
         return true;
     }
 
     @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean updateStateSpace(SSAStateMatrix networkState, Random random, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
+        boolean ok = false;
+        PhaseList phaseList = networkState.getPhaseList(statefulIndex);
+        for(int i = 0; i < phaseList.getNPhases(classIndex); i++) {
+            SSAStateMatrix copy = new SSAStateMatrix(networkState);
+            int currPhase = phaseList.getNInPhase(classIndex, i);
+            if(currPhase > 0) {
+                ok = true;
+                if(i == phaseList.getNPhases(classIndex) - 1) {
+                    copy.updatePhase(statefulIndex, classIndex, i, -1);
+                    if(this.node instanceof Source) {
+                        copy.updatePhase(statefulIndex, classIndex, -1, 0);
+                    }
+                    this.departureEvent.getNextState(copy, stateSpace, queue, stateSet);
+                }
+                else {
+                    copy.updatePhase(statefulIndex, classIndex, i, i + 1);
+                    if (!copy.exceedsCutoff() && !stateSet.contains(copy)) {
+                        stateSet.add(copy);
+                        stateSpace.add(copy);
+                        queue.add(copy);
+                    }
+                }
+            }
+        }
+        if(!ok && this.node instanceof Source) {
+            SSAStateMatrix copy = new SSAStateMatrix(networkState);
+            copy.updatePhase(statefulIndex, classIndex, -1, 0);
+            stateSpace.remove(0);
+            stateSet.remove(networkState);
+            stateSet.add(copy);
+            stateSpace.add(copy);
+            queue.add(copy);
+        }
+        return true;
+    }
+
+    @Override
+    public boolean updateEventSpace(SSAStateMatrix networkState, Random random, ArrayList<EventData> eventSpace, Event event, Queue<SSAStateMatrix> queue, SSAStateMatrix copy, Set<EventData> eventSet) {
+        PhaseList phaseList = networkState.getPhaseList(statefulIndex);
+        boolean ok = false;
+        for(int i = 0; i < phaseList.getNPhases(classIndex); i++) {
+            SSAStateMatrix copy2 = new SSAStateMatrix(networkState);
+            int currPhase = phaseList.getNInPhase(classIndex, i);
+            if(currPhase > 0) {
+                ok = true;
+                if(i == phaseList.getNPhases(classIndex) - 1) {
+                    copy2.updatePhase(statefulIndex, classIndex, i, -1);
+                    if(this.node instanceof Source) {
+                        copy2.updatePhase(statefulIndex, classIndex, -1, 0);
+                    }
+                    this.departureEvent.getNextEventState(copy2, eventSpace,event, queue,copy, eventSet);
+                }
+                else {
+                    copy2.updatePhase(statefulIndex, classIndex, i, i + 1);
+                    int phase = copy.findPhaseChange(copy2, this.statefulIndex, this.classIndex);
+                    double rate =  copy.getInPhase(this.statefulIndex, classIndex, phase) * ((Double)this.serviceProcess.getParam(1).getValue());
+                    OutputEvent dummyEvent = new OutputEvent(classIndex);
+                    Pair<OutputEvent, Double> pair = new Pair<>(dummyEvent, rate);
+                    EventData eventData = new EventData(event, pair, copy, copy2);
+                    if (!copy2.exceedsCutoff() && !eventSet.contains(eventData)) {
+                        eventSet.add(eventData);
+                        eventSpace.add(eventData);
+                        queue.add(copy2);
+                    }
+                }
+            }
+        }
+        if(!ok && this.node instanceof Source) {
+            SSAStateMatrix copy2 = new SSAStateMatrix(networkState);
+            copy2.updatePhase(statefulIndex, classIndex, -1, 0);
+            EventData eventData = new EventData(null, null, copy2, null);
+            eventSet = new HashSet<>();
+            eventSpace.remove(0);
+            eventSet.add(eventData);
+            eventSpace.add(eventData);
+            queue.add(copy2);
+        }
+        return true;
+    }
+    @Override
+    public SSAStateMatrix getNextState(SSAStateMatrix startingState, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
+
+        SSAStateMatrix endingState = new SSAStateMatrix(startingState);
+
+        if(updateStateSpace(endingState, new Random(), stateSpace,queue, stateSet)){
+            return endingState;
+        }
+
+        return null;
+
+    }
+
+    @Override
+    public SSAStateMatrix getNextEventState(SSAStateMatrix startingState, ArrayList<EventData> eventSpace, Event event, Queue<SSAStateMatrix> queue, SSAStateMatrix copy, Set<EventData> eventSet) {
+
+        SSAStateMatrix endingState = new SSAStateMatrix(startingState);
+
+        if(updateEventSpace(endingState, new Random(), eventSpace,event,queue,copy, eventSet)){
+            return endingState;
+        }
+
+        return null;
+    }
+
+    @Override
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         if (this.node instanceof StatefulNode) {
             if (this.node instanceof Source) {
-                int nDepartures = stateMatrix.incrementPhaseN(n,this.statefulIndex, this.classIndex);
-                int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures,stateMatrix, random, timeline);
-                timeline.preRecord(this, stateMatrix, nDepartures-nRemDepartures);
+                int nDepartures = networkState.incrementPhaseN(n,this.statefulIndex, this.classIndex);
+                int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures, networkState, random, timeline);
+                timeline.preRecord(this, networkState, nDepartures-nRemDepartures);
                 return 0;
-            } else if (stateMatrix.getState(this.statefulIndex, this.classIndex) == 0) {
+            } else if (networkState.getState(this.statefulIndex, this.classIndex) == 0) {
                 return 0;
             }
         }
 
-        int nDepartures = stateMatrix.incrementPhaseN(n, this.statefulIndex, this.classIndex);
-        int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures, stateMatrix, random, timeline);
-        timeline.preRecord(this, stateMatrix, nDepartures-nRemDepartures);
+        int nDepartures = networkState.incrementPhaseN(n, this.statefulIndex, this.classIndex);
+        int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures, networkState, random, timeline);
+        timeline.preRecord(this, networkState, nDepartures-nRemDepartures);
         return nRemDepartures;
     }
 

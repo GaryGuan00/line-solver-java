@@ -1,0 +1,198 @@
+package jline.examples;
+
+import jline.lang.ClosedClass;
+import jline.lang.Network;
+import jline.lang.OpenClass;
+import jline.lang.RoutingMatrix;
+import jline.lang.constant.SchedStrategy;
+import jline.lang.constant.SolverType;
+import jline.lang.distributions.Exp;
+import jline.lang.nodes.*;
+import jline.solvers.NetworkSolver;
+import jline.solvers.SolverOptions;
+import jline.solvers.mva.SolverMVA;
+import jline.util.NetworkAvgTable;
+
+import java.util.Arrays;
+import java.util.Collections;
+
+public class ForkJoin {
+
+    public static Network ex1(){
+        Network model = new Network("model");
+
+        Source source = new Source(model,"Source");
+        Queue queue1 = new Queue(model, "Queue1", SchedStrategy.FCFS);
+        Queue queue2 = new Queue(model, "Queue2", SchedStrategy.FCFS);
+        Fork fork = new Fork(model, "Fork");
+        Join join = new Join(model, "Join", fork);
+        Sink sink = new Sink(model, "Sink");
+        OpenClass jobclass1 = new OpenClass(model, "class1");
+        source.setArrival(jobclass1, new Exp(0.05));
+        queue1.setService(jobclass1, new Exp(1.0));
+        queue2.setService(jobclass1, new Exp(2.0));
+
+        RoutingMatrix routingMatrix = new RoutingMatrix(model, Collections.singletonList(jobclass1),
+                Arrays.asList(source, queue1, queue2, fork, join, sink));
+
+        routingMatrix.set(jobclass1, jobclass1, source, fork, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue1, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue2, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue1, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue2, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, join, sink, 1);
+        model.link(routingMatrix);
+
+        return model;
+    }
+
+    public static Network ex5(){
+        Network model = new Network("model");
+        Delay delay = new Delay(model, "Delay");
+        Queue queue1 = new Queue(model, "Queue1", SchedStrategy.PS);
+        Queue queue2 = new Queue(model, "Queue2", SchedStrategy.PS);
+        Fork fork = new Fork(model, "Fork");
+        Join join = new Join(model, "Join", fork);
+
+        ClosedClass jobclass1 = new ClosedClass(model, "class1", 5 ,delay);
+
+        delay.setService(jobclass1, new Exp(1.0));
+        queue1.setService(jobclass1, new Exp(1.0));
+        queue2.setService(jobclass1, new Exp(1.0));
+
+        RoutingMatrix routingMatrix = new RoutingMatrix(model, Collections.singletonList(jobclass1),
+                Arrays.asList(delay, queue1, queue2, fork, join));
+
+        routingMatrix.set(jobclass1, jobclass1, delay, fork, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue1, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue2, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue1, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue2, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, join, delay, 1);
+        model.link(routingMatrix);
+
+        return model;
+    }
+
+    public static Network ex9(){
+        Network model = new Network("model");
+        Delay delay = new Delay(model, "Delay");
+        Queue queue1 = new Queue(model, "Queue1", SchedStrategy.FCFS);
+        Queue queue2 = new Queue(model, "Queue2", SchedStrategy.FCFS);
+        Fork fork = new Fork(model, "Fork");
+        Join join = new Join(model, "Join", fork);
+
+        ClosedClass jobclass1 = new ClosedClass(model, "class1", 10,delay, 0);
+        ClosedClass jobclass2 = new ClosedClass(model, "class2", 10,delay, 0);
+
+        queue1.setService(jobclass1, new Exp(1.0));
+        queue2.setService(jobclass1, new Exp(2.0));
+        delay.setService(jobclass1, new Exp(0.5));
+
+        queue1.setService(jobclass2, new Exp(1.0));
+        queue2.setService(jobclass2, new Exp(2.0));
+        delay.setService(jobclass2, new Exp(0.2));
+
+        RoutingMatrix routingMatrix = new RoutingMatrix(model, Arrays.asList(jobclass1, jobclass2),
+                Arrays.asList(delay, queue1, queue2, fork, join));
+
+        routingMatrix.set(jobclass1, jobclass1, delay, fork, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue1, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue2, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue1, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue2, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, join, delay, 1);
+
+        routingMatrix.set(jobclass2, jobclass2, delay, fork, 1);
+        routingMatrix.set(jobclass2, jobclass2, fork, queue1, 1);
+        routingMatrix.set(jobclass2, jobclass2, fork, queue2, 1);
+        routingMatrix.set(jobclass2, jobclass2, queue1, join, 1);
+        routingMatrix.set(jobclass2, jobclass2, queue2, join, 1);
+        routingMatrix.set(jobclass2, jobclass2, join, delay, 1);
+        model.link(routingMatrix);
+
+        return model;
+    }
+
+    public static Network ex10(){
+        Network model = new Network("model");
+        Delay delay = new Delay(model, "Delay");
+        Queue queue1 = new Queue(model, "Queue1", SchedStrategy.FCFS);
+        Queue queue2 = new Queue(model, "Queue2", SchedStrategy.FCFS);
+        Queue queue3 = new Queue(model, "Queue3", SchedStrategy.FCFS);
+        Fork fork = new Fork(model, "Fork");
+        Join join = new Join(model, "Join", fork);
+
+        ClosedClass jobclass1 = new ClosedClass(model, "class1", 10,delay, 0);
+
+        queue1.setService(jobclass1, new Exp(1.0));
+        queue2.setService(jobclass1, new Exp(2.0));
+        queue3.setService(jobclass1, new Exp(1.0));
+        delay.setService(jobclass1, new Exp(0.5));
+
+        RoutingMatrix routingMatrix = new RoutingMatrix(model, Collections.singletonList(jobclass1),
+                Arrays.asList(delay, queue1, queue2, queue3, fork, join));
+
+        routingMatrix.set(jobclass1, jobclass1, delay, fork, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue1, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue2, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue1, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue2, queue3, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue3, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, join, delay, 1);
+
+        model.link(routingMatrix);
+
+        return model;
+    }
+
+    public static Network ex_nested(){
+        Network model = new Network("model");
+        Delay delay = new Delay(model, "Delay1");
+        Queue queue1 = new Queue(model, "Queue1", SchedStrategy.FCFS);
+        Queue queue2 = new Queue(model, "Queue2", SchedStrategy.FCFS);
+        Fork fork = new Fork(model, "Fork");
+        Join join = new Join(model, "Join", fork);
+        Queue queue3 = new Queue(model, "Queue3", SchedStrategy.FCFS);
+        Queue queue4 = new Queue(model, "Queue4", SchedStrategy.FCFS);
+        Fork fork2 = new Fork(model, "Fork2");
+        Join join2 = new Join(model, "Join2", fork2);
+
+        ClosedClass jobclass1 = new ClosedClass(model, "class1", 1,delay, 0);
+
+        queue1.setService(jobclass1, new Exp(1.0));
+        queue2.setService(jobclass1, new Exp(1.0));
+        delay.setService(jobclass1, new Exp(0.5));
+        queue3.setService(jobclass1, new Exp(2.0));
+        queue4.setService(jobclass1, new Exp(2.0));
+
+        RoutingMatrix routingMatrix = new RoutingMatrix(model, Collections.singletonList(jobclass1),
+                Arrays.asList(delay, queue1, queue2, fork, join, queue3, queue4, fork2, join2));
+
+        routingMatrix.set(jobclass1, jobclass1, delay, fork, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue1, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork, queue2, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue1, fork2, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork2, queue3, 1);
+        routingMatrix.set(jobclass1, jobclass1, fork2, queue4, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue3, join2, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue4, join2, 1);
+        routingMatrix.set(jobclass1, jobclass1, join2, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, queue2, join, 1);
+        routingMatrix.set(jobclass1, jobclass1, join, delay, 1);
+
+        model.link(routingMatrix);
+
+        return model;
+    }
+
+    public static void main(String[] args) {
+        Network model = ex_nested();
+        SolverOptions options = new SolverOptions(SolverType.MVA);
+//        options.config.fork_join = "ht";
+        options.iter_max = 100;
+        NetworkSolver solver = new SolverMVA(model, options);
+        NetworkAvgTable t = solver.getAvgTable();
+        t.print(options);
+    }
+}

@@ -3,20 +3,20 @@
 
 package jline.solvers;
 
-import jline.lang.JLineMatrix;
+import jline.util.Matrix;
 
 // Class to store all (interim) results generic to all Solvers from e.g. runAnalyzer method
 // For Solver-specific results, create separate class(es) e.g. SolverFluidResult as an example
 public class SolverResult {
 
   public String method;
-
-  public JLineMatrix QN;
-  public JLineMatrix UN;
-  public JLineMatrix RN;
-  public JLineMatrix TN;
-  public JLineMatrix CN;
-  public JLineMatrix XN;
+  public Matrix QN;
+  public Matrix UN;
+  public Matrix RN;
+  public Matrix TN;
+  public Matrix CN;
+  public Matrix XN;
+  public Matrix AN;
 
   // Note: for transient metrics, the time steps are stored separately in 't' - this differs from
   // LINE where they are stored in adjacent columns to the performance metrics QNt, UNt and TNt.
@@ -25,10 +25,10 @@ public class SolverResult {
   // time step data just once in a separate object is significantly more efficient than storing
   // multiple times. The row indices can be used to reference between the relevant performance
   // metric and 't' i.e. the value in row 150 in QNt was measured at the time step in row 150 in 't'
-  public JLineMatrix[][] QNt;
-  public JLineMatrix[][] UNt;
-  public JLineMatrix[][] TNt;
-  public JLineMatrix t;
+  public Matrix[][] QNt;
+  public Matrix[][] UNt;
+  public Matrix[][] TNt;
+  public Matrix t;
 
   public double runtime;
 
@@ -45,9 +45,9 @@ public class SolverResult {
     clone.CN = this.CN.clone();
     clone.XN = this.XN.clone();
 
-    clone.QNt = new JLineMatrix[this.QNt.length][this.QNt[0].length];
-    clone.UNt = new JLineMatrix[this.UNt.length][this.UNt[0].length];
-    clone.TNt = new JLineMatrix[this.TNt.length][this.TNt[0].length];
+    clone.QNt = new Matrix[this.QNt.length][this.QNt[0].length];
+    clone.UNt = new Matrix[this.UNt.length][this.UNt[0].length];
+    clone.TNt = new Matrix[this.TNt.length][this.TNt[0].length];
     for (int i = 0; i < this.QNt.length; i++) {
       for (int j = 0; j < this.QNt[0].length; j++) {
         clone.QNt[i][j] = this.QNt[i][j].clone();

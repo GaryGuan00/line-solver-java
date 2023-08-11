@@ -5,19 +5,19 @@ import java.util.Random;
 import jline.lang.JobClass;
 import jline.lang.nodes.Node;
 import jline.lang.nodes.StatefulNode;
-import jline.lang.processes.MAPProcess;
+import jline.lang.processes.MAP;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 public class MAPPhaseEvent extends PhaseEvent {
-    MAPProcess mapProcess;
+    MAP MAP;
 
-    private int statefulIndex;
-    private int classIndex;
+    private final int statefulIndex;
+    private final int classIndex;
 
-    public MAPPhaseEvent(Node node, JobClass jobClass, MAPProcess mapProcess) {
+    public MAPPhaseEvent(Node node, JobClass jobClass, MAP MAP) {
         super();
-        this.mapProcess = mapProcess;
+        this.MAP = MAP;
 
         if (node instanceof StatefulNode) {
             this.statefulIndex = ((StatefulNode)node).getStatefulIndex();
@@ -29,34 +29,34 @@ public class MAPPhaseEvent extends PhaseEvent {
 
     @Override
     public long getNPhases() {
-        return mapProcess.getNumberOfPhases();
+        return MAP.getNumberOfPhases();
     }
 
     @Override
-    public double getRate(StateMatrix stateMatrix) {
-        return (long)mapProcess.getTotalPhaseRate(stateMatrix.getGlobalPhase(this.statefulIndex, this.classIndex));
+    public double getRate(SSAStateMatrix networkState) {
+        return (long)MAP.getTotalPhaseRate(networkState.getGlobalPhase(this.statefulIndex, this.classIndex));
     }
 
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
-        timeline.record(this, stateMatrix);
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
+        timeline.record(this, networkState);
 
-        int nextPhase =  this.mapProcess.getNextPhase(stateMatrix.getGlobalPhase(this.statefulIndex, this.classIndex), random);
-        return stateMatrix.updateGlobalPhase(this.statefulIndex, this.classIndex,nextPhase);
+        int nextPhase =  this.MAP.getNextPhase(networkState.getGlobalPhase(this.statefulIndex, this.classIndex), random);
+        return networkState.updateGlobalPhase(this.statefulIndex, this.classIndex,nextPhase);
     }
 
     @Override
-    public int stateUpdateN(int n,StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         int res = n;
         for (int i = 0; i < n; i++) {
 
-            int nextPhase =  this.mapProcess.getNextPhase(stateMatrix.getGlobalPhase(this.statefulIndex, this.classIndex), random);
-            if (stateMatrix.updateGlobalPhase(this.statefulIndex, this.classIndex,nextPhase)) {
+            int nextPhase =  this.MAP.getNextPhase(networkState.getGlobalPhase(this.statefulIndex, this.classIndex), random);
+            if (networkState.updateGlobalPhase(this.statefulIndex, this.classIndex,nextPhase)) {
                 res--;
             }
         }
 
-        timeline.preRecord(this, stateMatrix, n-res);
+        timeline.preRecord(this, networkState, n-res);
 
         return res;
     }

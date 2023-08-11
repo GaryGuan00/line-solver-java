@@ -3,7 +3,9 @@ package jline.lang.distributions;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
+import jline.lang.constant.GlobalConstants;
 import jline.util.Interval;
 
 public class Immediate extends Distribution implements Serializable {
@@ -16,7 +18,18 @@ public class Immediate extends Distribution implements Serializable {
         return false;
     }
 
-    public List<Double> sample(int n) {
+    /**
+     * Gets n samples from the distribution
+     * @param n - the number of samples
+     * @return - n samples from the distribution
+     */
+    @Override
+    public List<Double> sample(long n) {
+        return this.sample(n,null);
+    }
+
+    @Override
+    public List<Double> sample(long n, Random random) {
         List<Double> ret_list = new ArrayList<Double>();
         for (int i = 0; i < n; i++) {
             ret_list.add(0.0);
@@ -26,11 +39,11 @@ public class Immediate extends Distribution implements Serializable {
     }
 
     public double getRate() {
-        return infRateRep;
+        return GlobalConstants.Immediate;
     }
 
     public double getMean() {
-        return 0;
+        return 1 / GlobalConstants.Immediate;
     }
 
     public double getSCV() {
@@ -38,7 +51,7 @@ public class Immediate extends Distribution implements Serializable {
     }
 
     public double getMu() {
-        return infRateRep;
+        return GlobalConstants.Immediate;
     }
 
     public double getPhi() {
@@ -54,7 +67,7 @@ public class Immediate extends Distribution implements Serializable {
     }
 
     public Interval getPH() {
-        return new Interval(-infRateRep, infRateRep);
+        return new Interval(-GlobalConstants.Immediate, GlobalConstants.Immediate);
     }
 
     public boolean isImmediate() {

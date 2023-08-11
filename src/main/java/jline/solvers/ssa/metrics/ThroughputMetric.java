@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import jline.solvers.ssa.events.ArrivalEvent;
 import jline.solvers.ssa.events.DepartureEvent;
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.util.Pair;
 
 public class ThroughputMetric extends Metric<Double, Double> {
@@ -31,7 +31,7 @@ public class ThroughputMetric extends Metric<Double, Double> {
         return this.metricValue;
     }
 
-    public void fromStateMatrix(double t, StateMatrix stateMatrix) {
+    public void fromStateMatrix(double t, SSAStateMatrix networkState) {
         /*double stateValue = stateMatrix.getState(i,j);
         double throughput = Math.max(stateMatrix.getState(i,j) - this.prevState, 0);
         this.addSample(t, throughput);
@@ -45,6 +45,7 @@ public class ThroughputMetric extends Metric<Double, Double> {
         this.cutoffTime = this.time;
     }
 
+    @SuppressWarnings("unchecked")
     public void fromEvent (double t, Event e) {
         if (e instanceof DepartureEvent) {
             DepartureEvent de = (DepartureEvent) e;
@@ -83,7 +84,7 @@ public class ThroughputMetric extends Metric<Double, Double> {
             }
         }
     }
-
+    @SuppressWarnings("unchecked")
     public void fromEvent(double t, Event e, int n) {
         if (e instanceof DepartureEvent) {
             DepartureEvent de = (DepartureEvent) e;
@@ -123,6 +124,7 @@ public class ThroughputMetric extends Metric<Double, Double> {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void taper(double t) {
         double totalThroughput = this.metricValue * this.time;
         this.metricValue = totalThroughput/this.time;

@@ -1,12 +1,13 @@
 package jline.solvers.mva;
 
+import jline.lang.FeatureSet;
 import jline.lang.Network;
 import jline.lang.NetworkStruct;
 import jline.lang.constant.SolverType;
 import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
 
-public class SolverMVA extends NetworkSolver{
+public class SolverMVA extends NetworkSolver {
 	
 	public SolverMVA(Network model, SolverOptions options) {
 		super(model, "MVA", options);
@@ -39,7 +40,42 @@ public class SolverMVA extends NetworkSolver{
 		if (this.options == null)
 			this.options = new SolverOptions(SolverType.MVA);
 		
-		AMVARunner runner = new AMVARunner(this.sn, this.options);
+		MVARunner runner = new MVARunner(this);
 		this.result = runner.run();
+	}
+
+	/**
+	 * Returns the feature set supported by the MVA solver
+	 * @return - the feature set supported by the MVA solver
+	 */
+	public static FeatureSet getFeatureSet(){
+		FeatureSet s = new FeatureSet();
+		// TODO: update with the features supported by JLINE. These are the features supported by LINE.
+		String[] features = {"Sink","Source",
+		"ClassSwitch","Delay","Queue",
+		"APH","Coxian","Erlang","Exp","HyperExp",
+		"Pareto","Weibull","Lognormal","Uniform","Det",
+		"StatelessClassSwitcher","InfiniteServer","SharedServer","Buffer","Dispatcher",
+		"CacheClassSwitcher","Cache",
+		"Server","RandomSource","ServiceTunnel",
+		"SchedStrategy_INF","SchedStrategy_PS",
+		"SchedStrategy_DPS","SchedStrategy_FCFS","SchedStrategy_SIRO","SchedStrategy_HOL",
+		"SchedStrategy_LCFSPR",
+		"Fork","Forker","Join","Joiner",
+		"RoutingStrategy_PROB","RoutingStrategy_RAND",
+		"ClosedClass","OpenClass","Replayer"};
+		s.setTrue(features);
+		return s;
+	}
+
+	/**
+	 * Checks whether the given model is supported by the MVA solver
+	 * @param model - the network model
+	 * @return - true if the model is supported, false otherwise
+	 */
+	public static boolean supports(Network model){
+		FeatureSet featUsed = model.getUsedLangFeatures();
+		FeatureSet featSupported = SolverMVA.getFeatureSet();
+		return FeatureSet.supports(featSupported, featUsed);
 	}
 }

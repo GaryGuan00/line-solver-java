@@ -4,7 +4,7 @@ import jline.lang.constant.SchedStrategy;
 import jline.solvers.ssa.events.ArrivalEvent;
 import jline.solvers.ssa.events.DepartureEvent;
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.util.Pair;
 
 import java.util.ArrayList;
@@ -48,10 +48,10 @@ public class ResidenceTimeMetric extends Metric<Double, Double> {
         } else if (this.useR5) {
             return this.cutoffR5().getRight();
         }
-        return this.metricValue * (((double)this.nDepartures)/this.totalClassMetric.getMetric());
+        return this.metricValue * (this.nDepartures /this.totalClassMetric.getMetric());
     }
 
-    public void fromStateMatrix(double t, StateMatrix stateMatrix) {
+    public void fromStateMatrix(double t, SSAStateMatrix networkState) {
     }
 
     public void resetHistory() {
@@ -61,7 +61,7 @@ public class ResidenceTimeMetric extends Metric<Double, Double> {
         this.nDepartures = 0;
         this.cutoffTime = this.time;
     }
-
+    @SuppressWarnings("unchecked")
     public void fromEvent(double t, Event e) {
         if (this.disabled) {return;}
         if (e instanceof DepartureEvent) {
@@ -116,7 +116,7 @@ public class ResidenceTimeMetric extends Metric<Double, Double> {
             }
         }
     }
-
+    @SuppressWarnings("unchecked")
     public void fromEvent(double t, Event e, int n) {
         if (e instanceof DepartureEvent) {
             if (this.buffer.isEmpty()) {

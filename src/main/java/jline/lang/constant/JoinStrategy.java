@@ -4,5 +4,7 @@ import java.io.Serializable;
 
 public enum JoinStrategy implements Serializable {
 	STD,
-	PARTIAL
+	PARTIAL,
+	Quorum,
+	Guard
 }

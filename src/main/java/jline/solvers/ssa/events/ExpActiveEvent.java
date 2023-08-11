@@ -4,33 +4,31 @@ import jline.lang.HasSchedStrategy;
 import jline.lang.JobClass;
 import jline.lang.constant.SchedStrategy;
 import jline.lang.distributions.Distribution;
-import jline.lang.distributions.Erlang;
 import jline.lang.distributions.Exp;
 import jline.lang.nodes.Node;
 import jline.lang.nodes.Source;
 import jline.lang.nodes.StatefulNode;
+import jline.solvers.ctmc.EventData;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
-import jline.util.Pair;
-import org.javatuples.Quartet;
-import org.javatuples.Triplet;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 import java.util.ArrayList;
 import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
 
 public class ExpActiveEvent  extends PhaseEvent implements NodeEvent {
-    private int statefulIndex;
-    private int classIndex;
-    private SchedStrategy schedStrategy;
-    private boolean isSource;
+    private final int statefulIndex;
+    private final int classIndex;
+    private final SchedStrategy schedStrategy;
+    private final boolean isSource;
     protected Node node;
-    private JobClass jobClass;
+    private final JobClass jobClass;
     protected boolean isProcessorSharing;
 
     protected final Distribution serviceProcess;
 
-    private DepartureEvent departureEvent;
+    private final DepartureEvent departureEvent;
 
     public ExpActiveEvent(Node node, JobClass jobClass, DepartureEvent departureEvent) {
         super();
@@ -67,17 +65,17 @@ public class ExpActiveEvent  extends PhaseEvent implements NodeEvent {
     }
 
     @Override
-    public double getRate(StateMatrix stateMatrix) {
+    public double getRate(SSAStateMatrix networkState) {
         int activeServers = 1;
 
         if (this.isProcessorSharing) {
-            double serviceRatio = (double)stateMatrix.getState(this.statefulIndex, this.classIndex)/(double)stateMatrix.totalStateAtNode(this.statefulIndex);
-            serviceRatio *= stateMatrix.psTotalCapacity(this.statefulIndex);
+            double serviceRatio = (double) networkState.getState(this.statefulIndex, this.classIndex)/(double) networkState.totalStateAtNode(this.statefulIndex);
+            serviceRatio *= networkState.psTotalCapacity(this.statefulIndex);
             return this.serviceProcess.getRate()*serviceRatio;
         }
 
         if (this.node instanceof StatefulNode) {
-            activeServers = stateMatrix.inProcess(this.statefulIndex, this.classIndex);
+            activeServers = networkState.inProcess(this.statefulIndex, this.classIndex);
             if (this.node instanceof Source) {
                 // NOTE: Pay active attention to this part
                 activeServers = 1;//stateMatrix.getPhaseListSize(this)+1;
@@ -90,99 +88,89 @@ public class ExpActiveEvent  extends PhaseEvent implements NodeEvent {
     }
 
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
         if (this.node instanceof StatefulNode) {
             if (this.node instanceof Source) {
-                if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
-                    this.departureEvent.stateUpdate(stateMatrix, random, timeline);
-                    timeline.record(this, stateMatrix);
+                if (networkState.incrementPhase(this.statefulIndex, this.classIndex)) {
+                    this.departureEvent.stateUpdate(networkState, random, timeline);
+                    timeline.record(this, networkState);
                 }
 
                 return true;
-            } else if (stateMatrix.getState(this.statefulIndex, this.classIndex) == 0) {
+            } else if (networkState.getState(this.statefulIndex, this.classIndex) == 0) {
                 return true;
             }
         }
 
-        if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
-            this.departureEvent.stateUpdate(stateMatrix, random, timeline);
-            timeline.record(this, stateMatrix);
+        if (networkState.incrementPhase(this.statefulIndex, this.classIndex)) {
+            this.departureEvent.stateUpdate(networkState, random, timeline);
+            timeline.record(this, networkState);
             return true;
         }
 
-        timeline.record(this, stateMatrix);
+        timeline.record(this, networkState);
 //        System.out.println("hello");
         return true;
     }
 
     @Override
-    public boolean updateStateSpace(StateMatrix stateMatrix, Random random, Timeline timeline, ArrayList<StateMatrix> stateSpace, Queue<StateMatrix> queue) {
+    public boolean updateStateSpace(SSAStateMatrix networkState, Random random, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
         if (this.node instanceof StatefulNode) {
             if (this.node instanceof Source) {
-                if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
-                    this.departureEvent.getNextState(stateMatrix,timeline, stateSpace, queue);
-                    timeline.record(this, stateMatrix);
+                if (networkState.incrementPhase(this.statefulIndex, this.classIndex)) {
+                    this.departureEvent.getNextState(networkState, stateSpace, queue, stateSet);
                 }
 
                 return true;
-            } else if (stateMatrix.getState(this.statefulIndex, this.classIndex) == 0) {
+            } else if (networkState.getState(this.statefulIndex, this.classIndex) == 0) {
                 return true;
             }
         }
 
-        if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
-            this.departureEvent.getNextState(stateMatrix,timeline, stateSpace, queue);
-            timeline.record(this, stateMatrix);
+        if (networkState.incrementPhase(this.statefulIndex, this.classIndex)) {
+            this.departureEvent.getNextState(networkState, stateSpace, queue, stateSet);
             return true;
         }
-
-        timeline.record(this, stateMatrix);
-//        System.out.println("hello");
         return true;
     }
 
     @Override
-    public boolean updateEventSpace(StateMatrix stateMatrix, Random random, Timeline timeline, ArrayList<Quartet<Event, Pair<OutputEvent,Double>,StateMatrix,StateMatrix>> eventSpace, Event event, Queue<StateMatrix> queue, StateMatrix copy) {
+    public boolean updateEventSpace(SSAStateMatrix networkState, Random random, ArrayList<EventData> eventSpace, Event event, Queue<SSAStateMatrix> queue, SSAStateMatrix copy, Set<EventData> eventSet) {
         if (this.node instanceof StatefulNode) {
             if (this.node instanceof Source) {
-                if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
-                    this.departureEvent.getNextEventState(stateMatrix,timeline, eventSpace,event, queue,copy);
-                    timeline.record(this, stateMatrix);
+                if (networkState.incrementPhase(this.statefulIndex, this.classIndex)) {
+                    this.departureEvent.getNextEventState(networkState, eventSpace,event, queue,copy, eventSet);
                 }
 
                 return true;
-            } else if (stateMatrix.getState(this.statefulIndex, this.classIndex) == 0) {
+            } else if (networkState.getState(this.statefulIndex, this.classIndex) == 0) {
                 return true;
             }
         }
 
-        if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
-            this.departureEvent.getNextEventState(stateMatrix,timeline, eventSpace,event, queue,copy);
-            timeline.record(this, stateMatrix);
+        if (networkState.incrementPhase(this.statefulIndex, this.classIndex)) {
+            this.departureEvent.getNextEventState(networkState, eventSpace,event, queue,copy, eventSet);
             return true;
         }
-
-        timeline.record(this, stateMatrix);
-//        System.out.println("hello");
         return true;
     }
 
         @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         if (this.node instanceof StatefulNode) {
             if (this.node instanceof Source) {
-                int nDepartures = stateMatrix.incrementPhaseN(n,this.statefulIndex, this.classIndex);
-                int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures,stateMatrix, random, timeline);
-                timeline.preRecord(this, stateMatrix, nDepartures-nRemDepartures);
+                int nDepartures = networkState.incrementPhaseN(n,this.statefulIndex, this.classIndex);
+                int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures, networkState, random, timeline);
+                timeline.preRecord(this, networkState, nDepartures-nRemDepartures);
                 return 0;
-            } else if (stateMatrix.getState(this.statefulIndex, this.classIndex) == 0) {
+            } else if (networkState.getState(this.statefulIndex, this.classIndex) == 0) {
                 return 0;
             }
         }
 
-        int nDepartures = stateMatrix.incrementPhaseN(n, this.statefulIndex, this.classIndex);
-        int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures, stateMatrix, random, timeline);
-        timeline.preRecord(this, stateMatrix, nDepartures-nRemDepartures);
+        int nDepartures = networkState.incrementPhaseN(n, this.statefulIndex, this.classIndex);
+        int nRemDepartures = this.departureEvent.stateUpdateN(nDepartures, networkState, random, timeline);
+        timeline.preRecord(this, networkState, nDepartures-nRemDepartures);
         return nRemDepartures;
     }
 
@@ -202,11 +190,11 @@ public class ExpActiveEvent  extends PhaseEvent implements NodeEvent {
     }
 
     @Override
-    public StateMatrix getNextState(StateMatrix startingState, Timeline timeline, ArrayList<StateMatrix> stateSpace, Queue<StateMatrix> queue) {
+    public SSAStateMatrix getNextState(SSAStateMatrix startingState, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
 
-        StateMatrix endingState = new StateMatrix(startingState);
+        SSAStateMatrix endingState = new SSAStateMatrix(startingState);
 
-        if(updateStateSpace(endingState, new Random(), timeline, stateSpace,queue)){
+        if(updateStateSpace(endingState, new Random(), stateSpace,queue, stateSet)){
             return endingState;
         }
 
@@ -214,11 +202,12 @@ public class ExpActiveEvent  extends PhaseEvent implements NodeEvent {
 
     }
 
-    public StateMatrix getNextEventState(StateMatrix startingState, Timeline timeline, ArrayList<Quartet<Event,Pair<OutputEvent,Double>,StateMatrix,StateMatrix>> eventSpace,Event event, Queue<StateMatrix> queue,StateMatrix copy) {
+    @Override
+    public SSAStateMatrix getNextEventState(SSAStateMatrix startingState, ArrayList<EventData> eventSpace, Event event, Queue<SSAStateMatrix> queue, SSAStateMatrix copy, Set<EventData> eventSet) {
 
-        StateMatrix endingState = new StateMatrix(startingState);
+        SSAStateMatrix endingState = new SSAStateMatrix(startingState);
 
-        if(updateEventSpace(endingState, new Random(), timeline, eventSpace,event,queue,copy)){
+        if(updateEventSpace(endingState, new Random(), eventSpace,event,queue,copy, eventSet)){
             return endingState;
         }
 

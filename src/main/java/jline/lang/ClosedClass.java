@@ -14,12 +14,13 @@ public class ClosedClass extends JobClass implements Serializable {
     protected Network model;
     public ClosedClass(Network model, String name, long njobs, Station refstat, int priority) {
         super(JobClassType.Closed, name);
+        this.index = model.getNumberOfClasses()+1;
         model.addJobClass(this);
         this.population = njobs;
         this.model = model;
         this.refstat = refstat;
         this.classIndex = -1;
-        this.priority = priority;
+        this.setPriority(priority);
     }
     public ClosedClass(Network model, String name, long njobs, Station refstat) {
         this(model, name,njobs, refstat,0);
@@ -49,5 +50,9 @@ public class ClosedClass extends JobClass implements Serializable {
             this.classIndex = this.model.getJobClassIndex(this);
         }
         return this.classIndex;
+    }
+
+    public void setPopulation(long pop){
+        this.population = pop;
     }
 }

@@ -93,6 +93,41 @@ public enum SchedStrategy {
         }
     }
 
+    public static String toFeature(SchedStrategy scheduling) {
+        switch (scheduling){
+            case INF:
+                return "SchedStrategy_INF";
+            case FCFS:
+                return "SchedStrategy_FCFS";
+            case LCFS:
+                return "SchedStrategy_LCFS";
+            case LCFSPR:
+                return "SchedStrategy_LCFSPR";
+            case SIRO:
+                return "SchedStrategy_SIRO";
+            case SJF:
+                return "SchedStrategy_SJF";
+            case LJF:
+                return "SchedStrategy_LJF";
+            case PS:
+                return "SchedStrategy_PS";
+            case DPS:
+                return "SchedStrategy_DPS";
+            case GPS:
+                return "SchedStrategy_GPS";
+            case SEPT:
+                return "SchedStrategy_SEPT";
+            case LEPT:
+                return "SchedStrategy_LEPT";
+            case HOL:
+                return "SchedStrategy_HOL";
+            case EXT:
+                return "SchedStrategy_EXT";
+            default:
+                return "";
+        }
+    }
+
     public static int toID(SchedStrategy scheduling) {
         switch (scheduling){
             case INF:
@@ -101,28 +136,32 @@ public enum SchedStrategy {
                 return 1;
             case LCFS:
                 return 2;
-            case LCFSPR:
-                return 3;
             case SIRO:
+                return 3;
+            case SJF:
                 return 4;
-            case PS:
+            case LJF:
                 return 5;
-            case DPS:
+            case PS:
                 return 6;
-            case GPS:
+            case DPS:
                 return 7;
-            case SEPT:
+            case GPS:
                 return 8;
-            case LEPT:
+            case SEPT:
                 return 9;
-            case HOL:
+            case LEPT:
                 return 10;
-            case FORK:
+            case HOL:
                 return 11;
-            case EXT:
+            case FORK:
                 return 12;
-            case REF:
+            case EXT:
                 return 13;
+            case REF:
+                return 14;
+            case LCFSPR:
+                return 15;
             default:
                 return -1;
         }

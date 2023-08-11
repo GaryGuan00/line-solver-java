@@ -3,12 +3,12 @@ package jline.lang.distributions;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-import jline.lang.*;
-import jline.lang.distributions.*;
-import jline.lang.nodes.*;
-import jline.lang.sections.*;
+import java.util.Random;
+
+import jline.lang.constant.GlobalConstants;
 import jline.util.Interval;
 import jline.util.Param;
+import org.apache.commons.lang3.NotImplementedException;
 
 abstract public class Distribution  implements Serializable  {
     protected double mean;
@@ -19,13 +19,9 @@ abstract public class Distribution  implements Serializable  {
     protected Interval support;
     protected List<Param> params;
 
-    public final static double zeroRn = 1e-8; // right neighborhood of zero
-    public final static double tolerance = 1e-3; // tolerance for distribution fitting
-    public final static double infRep = 1e8; // generic representation of infinity
-    public final static double infTimeRep = 1e8; // generic representation of infinite time
-    public final static double infRateRep = 1e8; // generic representation of an infinite rate
+    public abstract List<Double> sample(long n);
+    public abstract List<Double> sample(long n, Random random);
 
-    public abstract List<Double> sample(int n);
     public abstract double getMean();
     public abstract double getRate();
     public abstract double getSCV();
@@ -33,6 +29,10 @@ abstract public class Distribution  implements Serializable  {
     public abstract double getSkew();
     public abstract double evalCDF(double t);
     public abstract double evalLST(double s);
+
+    public List<Double> evalPMF(List<Double> t){
+        throw new NotImplementedException("evalPMF not implemented");
+    }
 
     public Distribution(String name, int numParam, Interval support) {
         this.params = new ArrayList<Param>();
@@ -60,7 +60,7 @@ abstract public class Distribution  implements Serializable  {
     }
 
     public boolean isImmediate() {
-        return getMean() < zeroRn;
+        return getMean() < GlobalConstants.Zero;
     }
 
     public boolean isContinuous() {
@@ -69,5 +69,15 @@ abstract public class Distribution  implements Serializable  {
 
     public boolean isDiscrete() {
         return this instanceof DiscreteDistribution;
+    }
+
+    public boolean isDisabled() {return this instanceof Disabled; }
+
+    public String getName() {
+        return name;
+    }
+
+    public Interval getSupport() {
+        return support;
     }
 }

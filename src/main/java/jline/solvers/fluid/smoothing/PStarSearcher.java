@@ -3,14 +3,15 @@
 
 package jline.solvers.fluid.smoothing;
 
-import jline.lang.JLineMatrix;
+import jline.lang.constant.GlobalConstants;
+import jline.lang.constant.SolverType;
+import jline.solvers.ssa.Timeline;
+import jline.util.Matrix;
 import jline.lang.Network;
 import jline.lang.NetworkStruct;
-import jline.lang.distributions.Distribution;
 import jline.solvers.SolverOptions;
 import jline.solvers.fluid.SolverFluid;
 import jline.solvers.ssa.SolverSSA;
-import jline.solvers.ssa.Timeline;
 import org.apache.commons.math3.optim.*;
 import org.apache.commons.math3.optim.nonlinear.scalar.GoalType;
 import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction;
@@ -25,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static java.lang.Double.POSITIVE_INFINITY;
 import static java.lang.Double.isInfinite;
 
 // NOTE TO USER: this class has been developed for research and experimentation purposes only.
@@ -43,7 +43,7 @@ public class PStarSearcher {
   public long runTime;
 
   // Generates the target (accurate) queue lengths used within the CMA-ES objective function
-  public JLineMatrix generateTargetQueueLengths(Network model) {
+  public Matrix generateTargetQueueLengths(Network model) {
 
     //// USER INPUT ////: Manually set options for SolverSSA
     int numSamplesSSA = 100000;
@@ -51,10 +51,11 @@ public class PStarSearcher {
     int R5kSSA = 19;
 
     // Model solved using SolverSSA
-    SolverSSA solverSSA = new SolverSSA();
-    solverSSA.compile(model);
-    solverSSA.setOptions().samples(numSamplesSSA).seed(seedSSA);
-    solverSSA.setOptions().R5(R5kSSA);
+    SolverOptions options = new SolverOptions(SolverType.SSA);
+    options.samples = numSamplesSSA;
+    options.seed = seedSSA;
+    SolverSSA solverSSA = new SolverSSA(model, options);
+    solverSSA.enableR5(R5kSSA);
     Timeline resultsSSA = solverSSA.solve();
     List<Double> QueueLengths = resultsSSA.allQueueLengths();
 
@@ -65,7 +66,7 @@ public class PStarSearcher {
     // QueueLengths.add(1, 17.083);
 
     // Mean Queue Length transferred to a JLineMatrix
-    JLineMatrix QNSSA = new JLineMatrix(model.getNumberOfNodes(), model.getNumberOfClasses());
+    Matrix QNSSA = new Matrix(model.getNumberOfNodes(), model.getNumberOfClasses());
     int numRows = QNSSA.getNumRows();
     for (int row = 0; row < numRows; row++) {
       int numCols = QNSSA.getNumCols();
@@ -78,7 +79,7 @@ public class PStarSearcher {
   }
 
   // Runs the CMA-ES algorithm to find pStar
-  public PointValuePair findPStarValues(Network model, JLineMatrix targetQueueLengths) {
+  public PointValuePair findPStarValues(Network model, Matrix targetQueueLengths) {
 
     // Construct parameters for CMA-ES Optimisation
     int numNodes = model.getNumberOfNodes();
@@ -88,7 +89,7 @@ public class PStarSearcher {
     double[] pStarUpperValue = new double[numNodes];
     // pStar is bounded between Distribution.zeroRN and +INF
     for (int i = 0; i < numNodes; i++) {
-      pStarLowerBound[i] = Distribution.zeroRn;
+      pStarLowerBound[i] = GlobalConstants.Zero;
       pStarUpperValue[i] = Double.POSITIVE_INFINITY;
     }
 
@@ -194,7 +195,7 @@ public class PStarSearcher {
   // Returns the variables needed to compute the smoothed processor-share constraint approximation
   // for a given model. This is subsequently used to derive sensible values for
   // pStarInitialSolution[], as per Section 6.2 in the report that accompanies this repository
-  private Map<String, SimpleMatrix> getGHatInputs(Network model, JLineMatrix targetQueueLengths) {
+  private Map<String, SimpleMatrix> getGHatInputs(Network model, Matrix targetQueueLengths) {
 
     SolverFluid solver = new SolverFluid(model);
     NetworkStruct sn = solver.sn;
@@ -209,10 +210,10 @@ public class PStarSearcher {
     // N.B. Method assumes no prior probabilities - it will break if it encounters this
 
     int M = sn.nstations;
-    int K = sn.nClasses;
+    int K = sn.nclasses;
     int totalNumPhases = (int) sn.phases.elementSum();
 
-    JLineMatrix S = sn.nservers.clone();
+    Matrix S = sn.nservers.clone();
     double initialPopulation = sn.njobs.elementSum();
     int SRows = S.getNumRows();
     for (int i = 0; i < SRows; i++) {
@@ -268,7 +269,7 @@ public class PStarSearcher {
     }
 
     Equation calculateSumXQa = new Equation();
-    calculateSumXQa.alias(x, "x", SQ, "SQ", Distribution.zeroRn, "distribZero");
+    calculateSumXQa.alias(x, "x", SQ, "SQ", GlobalConstants.Zero, "distribZero");
     calculateSumXQa.process("sumXQa = distribZero + SQ * x");
     SimpleMatrix sumXQa = calculateSumXQa.lookupSimple("sumXQa");
 
@@ -288,8 +289,8 @@ public class PStarSearcher {
     SolverFluid solver = new SolverFluid(model);
     NetworkStruct sn = solver.sn;
     int M = sn.nstations;
-    int K = sn.nClasses;
-    JLineMatrix nPhases = sn.phases;
+    int K = sn.nclasses;
+    Matrix nPhases = sn.phases;
 
     int idx = 0;
     for (int i = 0; i < M; i++) {
@@ -297,12 +298,14 @@ public class PStarSearcher {
       double cVal = SQa.get(idx, 0);
       // 100.0 used as an arbitrarily large number - any larger risks errors due to use as an exponent
       double maximumGHatValue = 1 / Math.pow(1 + Math.pow(xVal / cVal, 100.0), 1 / 100.0);
-      for (double j = 0.1; j < POSITIVE_INFINITY; j += 0.1) {
+      double j = 0.1;
+      while(true) {
         double gHatValue = 1 / Math.pow(1 + Math.pow(xVal / cVal, j), 1 / j);
         if (gHatValue >= threshold * maximumGHatValue) {
           pStarInitialSolution[i] = j / 2;
           break;
         }
+        j += 0.1;
       }
       idx += K * nPhases.get(i, 0);
     }

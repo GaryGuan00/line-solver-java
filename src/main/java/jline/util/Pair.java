@@ -11,6 +11,12 @@ public class Pair<T, U> implements Comparable<Pair<T,U>>, Serializable {
         this.right = right;
     }
 
+    // Copy constructor
+    public Pair(Pair<T, U> other) {
+        this.left = other.left;
+        this.right = other.right;
+    }
+
     public T getLeft() {
         return this.left;
     }
@@ -26,7 +32,7 @@ public class Pair<T, U> implements Comparable<Pair<T,U>>, Serializable {
     public void setRight(U right) {
         this.right = right;
     }
-
+    @SuppressWarnings("unchecked")
     @Override
     public int compareTo(Pair<T,U> other) {
         if (this.left instanceof Comparable) {

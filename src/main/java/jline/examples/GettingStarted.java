@@ -5,59 +5,18 @@ import jline.solvers.ctmc.SolverCTMC;
 import jline.lang.nodes.Delay;
 import jline.lang.*;
 import jline.lang.constant.SchedStrategy;
-import jline.lang.distributions.Erlang;
-import jline.lang.distributions.Exp;
-import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.events.OutputEvent;
-import jline.solvers.ssa.state.StateMatrix;
-import jline.util.Pair;
-import org.javatuples.Quartet;
+import jline.lang.distributions.*;
+import jline.util.Matrix;
 
-import java.util.ArrayList;
 import jline.lang.nodes.Queue;
 import jline.lang.nodes.Sink;
 import jline.lang.nodes.Source;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 public class GettingStarted {
-    public static void main(String[] args) {
-        long startTime = System.nanoTime();
-        Network model = GettingStarted.matlabExample3();
-        SolverCTMC solverSSA = new SolverCTMC();
-        solverSSA.compile(model);
-        solverSSA.setOptions().samples(20000).seed(9);
-        //solverSSA.setOptions().R5(17);
-        // Uncomment below to test Tau Leaping
-        /*solverSSA.setOptions().configureTauLeap(new TauLeapingType(
-                TauLeapingVarType.Poisson,
-                TauLeapingOrderStrategy.DirectedCycle,
-                TauLeapingStateStrategy.TimeWarp,
-                0.1
-        ));*/
-
-//        Timeline solve_soln = solverSSA.solve();
-//        System.out.println("Your simulation has finished.");
-//        solve_soln.printSummary(model);
-
-//        ArrayList<StateMatrix> stateSpace = solverSSA.getStateSpace();
-//        System.out.println(stateSpace.size());
-
-        ArrayList<Quartet<Event, Pair<OutputEvent, Double>, StateMatrix, StateMatrix>> eventSpace = solverSSA.getAllEvents();
-        System.out.println(eventSpace.size());
-
-        long endTime = System.nanoTime();
-
-        long duration = (endTime - startTime);
-//
-//        for(Quartet<Event,Pair<OutputEvent,Double>,StateMatrix,StateMatrix> quartet : eventSpace){
-//            System.out.println(quartet.getValue0() +" "+ quartet.getValue1());
-//            quartet.getValue2().stateChangePrint(quartet.getValue3());
-//        }
-
-        System.out.format("%d samples collected in %d ms\n", 100000, duration/1000000);
-        //solve_soln.printTransientState(0, 100);
-    }
 
     public static Network ex1() {
         /*  M/M/1 queue
@@ -131,14 +90,14 @@ public class GettingStarted {
         Sink sink = new Sink(model, "Sink");
         
         
-        RoutingMatrix routingMatrix = new RoutingMatrix(model, Arrays.asList(openClass),
+        RoutingMatrix routingMatrix = new RoutingMatrix(model, Collections.singletonList(openClass),
                 Arrays.asList(source, queue1, queue2, queue3, sink));
-        routingMatrix.addConnection(source, queue1);
-        routingMatrix.addConnection(queue1, sink);
-        routingMatrix.addConnection(source, queue2);
-        routingMatrix.addConnection(queue2, sink);
-        routingMatrix.addConnection(source, queue3);
-        routingMatrix.addConnection(queue3, sink);
+        routingMatrix.set(source, queue1);
+        routingMatrix.set(queue1, sink);
+        routingMatrix.set(source, queue2);
+        routingMatrix.set(queue2, sink);
+        routingMatrix.set(source, queue3);
+        routingMatrix.set(queue3, sink);
         model.link(routingMatrix);
 
 
@@ -183,13 +142,65 @@ public class GettingStarted {
     public static Network matlabExample3(){
         Network model = new Network("MRP");
         Delay delay = new Delay(model, "Working State");
-        Queue queue = new Queue(model, "RepairQueue", SchedStrategy.PS);
-        queue.setNumberOfServers(1);
+        Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
+        queue.setNumberOfServers(2);
 
-        ClosedClass closedClass = new ClosedClass(model, "ClosedClass", 3, delay);
+        ClosedClass closedClass = new ClosedClass(model, "Machines", 3, delay);
         delay.setService(closedClass, new Exp(0.5));
         queue.setService(closedClass, new Exp(4.0));
         model.link(model.serialRouting(delay, queue));
+        return model;
+    }
+
+    public static Network erlangExample1(){
+        Network model = new Network("MRP");
+        Delay delay = new Delay(model, "Working State");
+        Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
+        queue.setNumberOfServers(2);
+
+        ClosedClass closedClass = new ClosedClass(model, "Machines", 3, delay);
+        delay.setService(closedClass, new Exp(0.5));
+        queue.setService(closedClass, new Erlang(1, 2));
+        model.link(model.serialRouting(delay, queue));
+        return model;
+    }
+    public static Network erlangExample2(){
+        Network model = new Network("MRP");
+        Delay delay = new Delay(model, "Working State");
+        Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
+        queue.setNumberOfServers(2);
+
+        ClosedClass closedClass = new ClosedClass(model, "Machines", 3, delay);
+        delay.setService(closedClass, new Exp(0.5));
+        queue.setService(closedClass, new Erlang(5, 2));
+        model.link(model.serialRouting(delay, queue));
+        return model;
+    }
+
+    public static Network erlangExample3(){
+        Network model = new Network("MRP");
+        Delay delay = new Delay(model, "Working State");
+        Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
+        queue.setNumberOfServers(2);
+
+        ClosedClass closedClass = new ClosedClass(model, "Machines", 4, delay);
+        delay.setService(closedClass, new Erlang(1, 5));
+        queue.setService(closedClass, new Erlang(2, 3));
+        model.link(model.serialRouting(delay, queue));
+        return model;
+    }
+
+    public static Network ctmcExample1() {
+        Network model = new Network("M/M/1");
+        Source source = new Source(model, "mySource");
+        Queue queue = new Queue(model, "myQueue", SchedStrategy.FCFS);
+        Sink sink = new Sink(model, "mySink");
+        OpenClass oclass = new OpenClass(model, "myClass");
+
+        source.setArrival(oclass, new Exp(1));
+        queue.setService(oclass,  new Exp(1));
+        queue.setNumberOfServers(1);
+        model.link(model.serialRouting(source,queue,sink));
         return model;
     }
 
@@ -223,12 +234,12 @@ public class GettingStarted {
         Node1.setService(closedClass1, new Exp(1));
         Node2.setService(closedClass1, new Exp(0.6666667));
 
-        RoutingMatrix routingMatrix = new RoutingMatrix(model, Arrays.asList(closedClass1),
+        RoutingMatrix routingMatrix = new RoutingMatrix(model, Collections.singletonList(closedClass1),
                 Arrays.asList(Node1, Node2));
-        routingMatrix.addConnection(Node1, Node1, closedClass1,0.7);
-        routingMatrix.addConnection(Node1, Node2, closedClass1,0.3);
-        routingMatrix.addConnection(Node2, Node1, closedClass1,1.0);
-        routingMatrix.addConnection(Node2, Node2, closedClass1,0.0);
+        routingMatrix.set(Node1, Node1, 0.7);
+        routingMatrix.set(closedClass1, Node1, Node2, 0.3);
+        routingMatrix.set(closedClass1, Node2, Node1, 1.0);
+        routingMatrix.set(closedClass1, Node2, Node2, 0.0);
         model.link(routingMatrix);
         return model;
     }
@@ -251,15 +262,15 @@ public class GettingStarted {
         lower.setService(openClass, new Exp(8));
         post.setService(openClass, new Exp(15));
 
-        RoutingMatrix routingMatrix = new RoutingMatrix(model, Arrays.asList(openClass),
+        RoutingMatrix routingMatrix = new RoutingMatrix(model, Collections.singletonList(openClass),
                 Arrays.asList(source, fork, upper, lower, join, post, sink));
-        routingMatrix.addConnection(source, fork, openClass,1);
-        routingMatrix.addConnection(fork, upper, openClass,0.5);
-        routingMatrix.addConnection(fork, lower, openClass,0.5);
-        routingMatrix.addConnection(upper, join, openClass,1);
-        routingMatrix.addConnection(lower, join, openClass,1);
-        routingMatrix.addConnection(join, post, openClass,1);
-        routingMatrix.addConnection(post, sink, openClass,1);
+        routingMatrix.set(openClass, source, fork, 1);
+        routingMatrix.set(openClass, fork, upper, 0.5);
+        routingMatrix.set(openClass, fork, lower, 0.5);
+        routingMatrix.set(openClass, upper, join, 1);
+        routingMatrix.set(openClass, lower, join, 1);
+        routingMatrix.set(openClass, join, post, 1);
+        routingMatrix.set(openClass, post, sink, 1);
         model.link(routingMatrix);
         return model;
     }
@@ -303,14 +314,280 @@ public class GettingStarted {
 
         RoutingMatrix routingMatrix = new RoutingMatrix(model, Arrays.asList(openClass, oClass2),
                 Arrays.asList(source, queue1, queue2, queue3, sink));
-        routingMatrix.addConnection(source, queue1);
-        routingMatrix.addConnection(queue1, sink);
-        routingMatrix.addConnection(source, queue2);
-        routingMatrix.addConnection(queue2, sink);
-        routingMatrix.addConnection(source, queue3);
-        routingMatrix.addConnection(queue3, sink);
+        routingMatrix.set(source, queue1);
+        routingMatrix.set(queue1, sink);
+        routingMatrix.set(source, queue2);
+        routingMatrix.set(queue2, sink);
+        routingMatrix.set(source, queue3);
+        routingMatrix.set(queue3, sink);
         model.link(routingMatrix);
 
         return model;
+    }
+
+    public static Network   aphExample1() {
+        Network model = new Network("MRP");
+        Delay delay = new Delay(model, "Working State");
+        Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
+        queue.setNumberOfServers(2);
+
+        ClosedClass closedClass = new ClosedClass(model, "Machines", 3, delay);
+        delay.setService(closedClass, new Exp(0.5));
+        queue.setService(closedClass, APH.fitMeanAndSCV(4.0, 0.5));
+        model.link(model.serialRouting(delay, queue));
+        return model;
+    }
+
+    public static Network   aphExample2() {
+        Network model = new Network("M/APH/1");
+        Delay delay = new Delay(model, "Working State");
+        Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
+        queue.setNumberOfServers(2);
+        ClosedClass closedClass1 = new ClosedClass(model, "Machines", 1, delay);
+        ClosedClass closedClass2 = new ClosedClass(model, "Machines2", 1, delay);
+
+        delay.setService(closedClass1, APH.fitMeanAndSCV(16.0000,16.0000));
+        delay.setService(closedClass2, APH.fitMeanAndSCV(8.0000,16.0000));
+        queue.setService(closedClass1,  new Exp(0.1));
+        queue.setService(closedClass2,  new Exp(0.1));
+        // Block 3: topology
+        RoutingMatrix routingMatrix = new RoutingMatrix(model,
+                Arrays.asList(closedClass1, closedClass2),
+                Arrays.asList(delay, queue));
+
+        routingMatrix.set(closedClass1, closedClass1, delay, queue, 1.000000); // (Delay,Class1) -> (Queue1,Class1)
+        routingMatrix.set(closedClass1, closedClass1, queue, delay, 1.000000); // (Queue1,Class1) -> (Delay,Class1)
+        routingMatrix.set(closedClass2, closedClass2, delay, queue, 1.000000); // (Delay,Class2) -> (Queue1,Class2)
+        routingMatrix.set(closedClass2, closedClass2, queue, delay, 1.000000); // (Queue1,Class2) -> (Delay,Class2)
+
+        model.link(routingMatrix);
+//        model.link(model.serialRouting(delay, queue));
+
+        return model;
+    }
+
+
+    public static Network aphExample3() {
+        Network model = new Network("myModel");
+
+        // Block 1: nodes
+        Queue node1 = new Queue(model, "queue1", SchedStrategy.FCFS);
+        node1.setNumberOfServers(12);
+        Queue node2 = new Queue(model, "queue2", SchedStrategy.FCFS);
+        node2.setNumberOfServers(40);
+        Delay node3 = new Delay(model, "delay1");
+        Delay node4 = new Delay(model, "delay2");
+        Delay node5 = new Delay(model, "delay3");
+        Delay node6 = new Delay(model, "delay4");
+        Delay node7 = new Delay(model, "delay5");
+        Delay node8 = new Delay(model, "delay6");
+        Delay node9 = new Delay(model, "delay7");
+        Delay node10 = new Delay(model, "delay8");
+        Delay node11 = new Delay(model, "delay9");
+        Delay node12 = new Delay(model, "delay10");
+        List<ClassSwitch> switchNodes = Arrays.asList(
+                new ClassSwitch(model, "cs_queue2_delay9"),
+                new ClassSwitch(model, "cs_delay1_queue1"),
+                new ClassSwitch(model, "cs_delay2_delay5"),
+                new ClassSwitch(model, "cs_delay3_delay2"),
+                new ClassSwitch(model, "cs_delay5_delay8"),
+                new ClassSwitch(model, "cs_delay6_delay5"),
+                new ClassSwitch(model, "cs_delay7_delay8"),
+                new ClassSwitch(model, "cs_delay9_queue1"),
+                new ClassSwitch(model, "cs_delay9_delay4"),
+                new ClassSwitch(model, "cs_delay10_delay3")
+        );
+        //Block 2: classes
+        ClosedClass jobclass1 = new ClosedClass(model, "CClass1", 20, node8, 0);
+
+        node1.setService(jobclass1, Exp.fitMean(64.000000)); // (queue1,CClass1)
+        node2.setService(jobclass1, Exp.fitMean(0.015625)); // (queue2,CClass1)
+        node3.setService(jobclass1, APH.fitMeanAndSCV(1.000000,16.000000)); // (delay1,CClass1)
+        node4.setService(jobclass1, APH.fitMeanAndSCV(2.000000,32.000000)); // (delay2,CClass1)
+        node5.setService(jobclass1, APH.fitMeanAndSCV(0.015625,2.000000)); // (delay3,CClass1)
+        node6.setService(jobclass1, APH.fitMeanAndSCV(1.000000,0.500000)); // (delay4,CClass1)
+        node7.setService(jobclass1, new Erlang(128.000000,64)); // (delay5,CClass1)
+        node8.setService(jobclass1, APH.fitMeanAndSCV(0.125000,4.000000)); // (delay6,CClass1)
+        node9.setService(jobclass1, Exp.fitMean(0.031250)); // (delay7,CClass1)
+        node10.setService(jobclass1, Exp.fitMean(0.250000)); // (delay8,CClass1)
+        node11.setService(jobclass1, APH.fitMeanAndSCV(0.031250,4.000000)); // (delay9,CClass1)
+        node12.setService(jobclass1, APH.fitMeanAndSCV(16.000000,16.000000)); // (delay10,CClass1)
+        // Initialise class switch matrix
+        for (ClassSwitch switchNode : switchNodes) {
+            Matrix csMatrix = switchNode.initClassSwitchMatrix();
+            csMatrix.set(jobclass1.getIndex() - 1, jobclass1.getIndex() - 1, 1);
+            switchNode.setClassSwitchingMatrix(csMatrix);
+        }
+
+
+        // Block 3: topology
+        RoutingMatrix P = new RoutingMatrix(model,
+                Collections.singletonList(jobclass1),
+                Arrays.asList(node1, node2, node3, node4, node5, node6, node7, node8, node9, node10, node11, node12,
+                        switchNodes.get(0), switchNodes.get(1), switchNodes.get(2), switchNodes.get(3), switchNodes.get(4), switchNodes.get(5), switchNodes.get(6), switchNodes.get(7), switchNodes.get(8), switchNodes.get(9)));
+        P.set(jobclass1, jobclass1, node1, node7, 1);
+        P.set(jobclass1, jobclass1, node2, node9, 5.000000e-01);
+        P.set(jobclass1, jobclass1, node2, switchNodes.get(0), 5.000000e-01);
+        P.set(jobclass1, jobclass1, node3, switchNodes.get(1), 1);
+        P.set(jobclass1, jobclass1, node4, switchNodes.get(2), 1);
+        P.set(jobclass1, jobclass1, node5, node3, 5.000000e-01);
+        P.set(jobclass1, jobclass1, node5, switchNodes.get(3), 5.000000e-01);
+        P.set(jobclass1, jobclass1, node6, node1, 1);
+        P.set(jobclass1, jobclass1, node7, node8, 5.000000e-01);
+        P.set(jobclass1, jobclass1, node7, switchNodes.get(4), 5.000000e-01);
+        P.set(jobclass1, jobclass1, node8, switchNodes.get(5), 1);
+        P.set(jobclass1, jobclass1, node9, switchNodes.get(6), 1);
+        P.set(jobclass1, jobclass1, node10, node2, 8.480000e-01);
+        P.set(jobclass1, jobclass1, node10, node12, 1.520000e-01);
+        P.set(jobclass1, jobclass1, node11, switchNodes.get(7), 5.000000e-01);
+        P.set(jobclass1, jobclass1, node11, switchNodes.get(8), 5.000000e-01);
+        P.set(jobclass1, jobclass1, node12, switchNodes.get(9), 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(0), node11, 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(1), node1, 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(2), node7, 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(3), node4, 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(4), node10, 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(5), node7, 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(6), node10, 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(7), node1, 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(8), node6, 1);
+        P.set(jobclass1, jobclass1, switchNodes.get(9), node5, 1);
+        model.link(P);
+        return model;
+    }
+
+
+    public static Network closed2() {
+        Network model = new Network("MRP");
+        Delay delay = new Delay(model, "Delay");
+        Queue queue = new Queue(model, "Queue1", SchedStrategy.FCFS);
+        ClosedClass closedClass = new ClosedClass(model, "Machines", 1, delay,0);
+        ClosedClass closedClass2 = new ClosedClass(model, "Machines2", 1, delay,0);
+        delay.setService(closedClass, new Exp(1));
+        delay.setService(closedClass2, new Exp(1));
+
+        queue.setService(closedClass, new Exp(1));
+        queue.setService(closedClass2, new Exp(1));
+        RoutingMatrix routingMatrix = new RoutingMatrix(model,
+                Arrays.asList(closedClass, closedClass2),
+                Arrays.asList(delay, queue));
+        routingMatrix.set(closedClass,closedClass,delay,delay,0.3);
+        routingMatrix.set(closedClass,closedClass,delay,queue,0.1);
+        routingMatrix.set(closedClass,closedClass,queue,delay,0.2);
+        routingMatrix.set(closedClass,closedClass,queue,queue,0);
+        routingMatrix.set(closedClass,closedClass2,delay,delay,0.6);
+        routingMatrix.set(closedClass,closedClass2,delay,queue,0.0);
+        routingMatrix.set(closedClass,closedClass2,queue,delay,0.8);
+        routingMatrix.set(closedClass,closedClass2,queue,queue,0.0);
+        routingMatrix.set(closedClass2,closedClass2,delay,delay,0.0);
+        routingMatrix.set(closedClass2,closedClass2,delay,queue,1.0);
+        routingMatrix.set(closedClass2,closedClass2,queue,delay,0.0);
+        routingMatrix.set(closedClass2,closedClass2,queue,queue,0.0);
+        routingMatrix.set(closedClass2,closedClass,delay,delay,0.0);
+        routingMatrix.set(closedClass2,closedClass,delay,queue,0.0);
+        routingMatrix.set(closedClass2,closedClass,queue,delay,1.0);
+        routingMatrix.set(closedClass2,closedClass,queue,queue,0.0);
+        model.link(routingMatrix);
+        return model;
+    }
+    public static Network mixed1() {
+        Network model = new Network("MRP");
+        Delay node1 = new Delay(model, "Delay");
+        Queue node2 = new Queue(model, "Queue1", SchedStrategy.PS);
+        Source node3 = new Source(model, "Source");
+        Sink node4 = new Sink(model, "Sink");
+        ClosedClass jobclass1 = new ClosedClass(model, "ClosedClass", 2, node1, 0);
+        OpenClass jobclass2 = new OpenClass(model, "myClass", 0);
+        node1.setService(jobclass1, new Exp(1));
+        node1.setService(jobclass2, new Exp(1));
+        node2.setService(jobclass1, new Erlang(3,2));
+        node2.setService(jobclass2, new Exp(1));
+
+        node3.setArrival(jobclass2, new Exp(0.1));
+        RoutingMatrix routingMatrix = new RoutingMatrix(model,
+                Arrays.asList(jobclass1, jobclass2),
+                Arrays.asList(node1, node2, node3, node4));
+        routingMatrix.set(jobclass1, jobclass1, node1, node1, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node1, node2, 1.0);
+        routingMatrix.set(jobclass1, jobclass1, node1, node3, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node1, node4, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node2, node1, 1.0);
+        routingMatrix.set(jobclass1, jobclass1, node2, node2, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node2, node3, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node2, node4, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node3, node1, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node3, node2, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node3, node3, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node3, node4, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node4, node1, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node4, node2, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node4, node3, 0.0);
+        routingMatrix.set(jobclass1, jobclass1, node4, node4, 0.0);
+
+        routingMatrix.set(jobclass1, jobclass2, node1, node1, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node1, node2, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node1, node3, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node1, node4, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node2, node1, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node2, node2, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node2, node3, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node2, node4, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node3, node1, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node3, node2, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node3, node3, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node3, node4, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node4, node1, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node4, node2, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node4, node3, 0.0);
+        routingMatrix.set(jobclass1, jobclass2, node4, node4, 0.0);
+
+        routingMatrix.set(jobclass2, jobclass1, node1, node1, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node1, node2, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node1, node3, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node1, node4, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node2, node1, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node2, node2, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node2, node3, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node2, node4, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node3, node1, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node3, node2, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node3, node3, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node3, node4, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node4, node1, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node4, node2, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node4, node3, 0.0);
+        routingMatrix.set(jobclass2, jobclass1, node4, node4, 0.0);
+
+        routingMatrix.set(jobclass2, jobclass2, node1, node1, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node1, node2, 1.0);
+        routingMatrix.set(jobclass2, jobclass2, node1, node3, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node1, node4, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node2, node1, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node2, node2, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node2, node3, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node2, node4, 1.0);
+        routingMatrix.set(jobclass2, jobclass2, node3, node1, 1.0);
+        routingMatrix.set(jobclass2, jobclass2, node3, node2, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node3, node3, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node3, node4, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node4, node1, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node4, node2, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node4, node3, 0.0);
+        routingMatrix.set(jobclass2, jobclass2, node4, node4, 0.0);
+        model.link(routingMatrix);
+        return model;
+    }
+
+
+
+    public static void main(String[] args) throws IllegalAccessException {
+        Network model = ex1();
+        SolverCTMC solver = new SolverCTMC(model);
+
+        solver.applyCutoff(3);
+        solver.getAvgTable();
+//        solver.getGenerator();
+//        solver.getStateSpace();
+//        solver.getProbabilityVector();
     }
 }

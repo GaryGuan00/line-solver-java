@@ -3,12 +3,12 @@
 
 package jline.solvers.fluid.analyzers;
 
-import jline.lang.JLineMatrix;
+import jline.lang.constant.GlobalConstants;
+import jline.util.Matrix;
 import jline.lang.JobClass;
 import jline.lang.NetworkStruct;
 import jline.lang.constant.JobClassType;
 import jline.lang.constant.NodeType;
-import jline.lang.distributions.Distribution;
 import jline.lang.nodes.Station;
 import jline.solvers.SolverOptions;
 import jline.solvers.SolverResult;
@@ -25,18 +25,20 @@ import static java.lang.Double.*;
 import static java.lang.Math.abs;
 import static java.lang.Math.min;
 
+import odesolver.LSODA;
+
 public class MatrixMethodAnalyzer implements MethodAnalyzer {
 
-  public JLineMatrix xvec_t;
-  public JLineMatrix xvec_it;
+  public Matrix xvec_t;
+  public Matrix xvec_it;
 
   @Override
   public void analyze(NetworkStruct sn, SolverOptions options, SolverResult result) {
 
     int M = sn.nstations; // Number of stations
-    int K = sn.nClasses; // Number of classes
+    int K = sn.nclasses; // Number of classes
 
-    JLineMatrix S = sn.nservers.clone();
+    Matrix S = sn.nservers.clone();
     double initialPopulation = sn.njobs.elementSum();
     int SRows = S.getNumRows();
     for (int i = 0; i < SRows; i++) {
@@ -46,15 +48,15 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
     }
 
     // W (complete graph of transition rates) as per Ruuskanen et al., PEVA 151 (2021)
-    JLineMatrix psi = new JLineMatrix(0, 0);
-    JLineMatrix A = new JLineMatrix(0, 0);
-    JLineMatrix B = new JLineMatrix(0, 0);
-    JLineMatrix lambda = new JLineMatrix(M * K, 1);
+    Matrix psi = new Matrix(0, 0);
+    Matrix A = new Matrix(0, 0);
+    Matrix B = new Matrix(0, 0);
+    Matrix lambda = new Matrix(M * K, 1);
 
     for (int i = 0; i < M; i++) {
       if (sn.nodetypes.get((int) sn.stationToNode.get(i)) == NodeType.Source) {
         for (int k = 0; k < K; k++) {
-          if (sn.jobClasses.get(k).getJobClassType() == JobClassType.Open) {
+          if (sn.jobclasses.get(k).getJobClassType() == JobClassType.Open) {
             lambda.set(i * K + k, 0, sn.rates.get(i, k));
           }
         }
@@ -64,10 +66,10 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
     for (int i = 0; i < M; i++) {
       Station station = sn.stations.get(i);
       for (int r = 0; r < K; r++) {
-        JobClass jobClass = sn.jobClasses.get(r);
+        JobClass jobClass = sn.jobclasses.get(r);
         if (sn.phases.get(i, r) == 0) {
-          JLineMatrix zeroMatrix = new JLineMatrix(1, 1, 1);
-          JLineMatrix nanMatrix = new JLineMatrix(1, 1, 1);
+          Matrix zeroMatrix = new Matrix(1, 1, 1);
+          Matrix nanMatrix = new Matrix(1, 1, 1);
           nanMatrix.set(0, 0, Double.NaN);
           psi = psi.createBlockDiagonal(zeroMatrix);
           A = A.createBlockDiagonal(nanMatrix);
@@ -81,25 +83,25 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
     }
 
     // W (complete graph of transition rates) as per Ruuskanen et al., PEVA 151 (2021)
-    JLineMatrix W = calculateW(sn, psi, A, B);
+    Matrix W = calculateW(sn, psi, A, B);
 
-    JLineMatrix ALambda = A.mult(lambda, null);
+    Matrix ALambda = A.mult(lambda, null);
 
     int totalNumPhases = (int) sn.phases.elementSum();
     // State mapping to queues (called Q(a) in Ruuskanen et al.)
-    JLineMatrix Qa = new JLineMatrix(1, totalNumPhases);
+    Matrix Qa = new Matrix(1, totalNumPhases);
     // To compute per-class queue length, utilisation and throughput at the end
-    JLineMatrix SQC = new JLineMatrix(M * K, totalNumPhases);
-    JLineMatrix SUC = new JLineMatrix(M * K, totalNumPhases);
-    JLineMatrix STC = new JLineMatrix(M * K, totalNumPhases);
+    Matrix SQC = new Matrix(M * K, totalNumPhases);
+    Matrix SUC = new Matrix(M * K, totalNumPhases);
+    Matrix STC = new Matrix(M * K, totalNumPhases);
     // To compute total queue length in ODEs
-    JLineMatrix SQ = new JLineMatrix(totalNumPhases, totalNumPhases);
+    Matrix SQ = new Matrix(totalNumPhases, totalNumPhases);
 
     int state = 0;
     for (int i = 0; i < M; i++) {
       Station station = sn.stations.get(i);
       for (int r = 0; r < K; r++) {
-        JobClass jobClass = sn.jobClasses.get(r);
+        JobClass jobClass = sn.jobclasses.get(r);
         int nPhases = (int) sn.phases.get(i, r);
         for (int k = 0; k < nPhases; k++) {
           Qa.set(0, state, i);
@@ -126,7 +128,7 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
       }
     }
 
-    JLineMatrix Sa = new JLineMatrix(totalNumPhases, 1);
+    Matrix Sa = new Matrix(totalNumPhases, 1);
     for (int i = 0; i < totalNumPhases; i++) {
       Sa.set(i, 0, S.get((int) Qa.get(0, i), 0));
     }
@@ -154,69 +156,89 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
       nextState[i] = 0;
     }
 
-    FirstOrderIntegrator odeSolver;
-    if (options.stiff && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
-      System.err.println(
-              "Stiff solvers are not yet available in JLINE. Using non-stiff solver instead.");
-    }
-    if (options.tol > 0.001 && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
-      System.err.println(
-              "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
-    }
-    odeSolver = options.odeSolvers.accurateODESolver;
-
-    odeSolver.clearStepHandlers();
-    TransientDataHandler stepHandler = new TransientDataHandler(initSolLength);
-    odeSolver.addStepHandler(stepHandler);
-
     // Choose between original compact matrix form representation, and p-norm smoothed
     // representation as per Ruuskanen et al., PEVA 151 (2021).
     FirstOrderDifferentialEquations ode;
-    if (options.config.pStar.size() == 0) { // If pStar values do not exist
+
+    if (options.config.pstar.size() == 0) { // If pStar values do not exist
       ode = new MatrixMethodODE(W, SQ, S, Qa, ALambda, initSolLength);
     } else {
-      ode = new MatrixMethodODE(W, SQ, S, Qa, ALambda, initSolLength, sn, options.config.pStar);
+      ode = new MatrixMethodODE(W, SQ, S, Qa, ALambda, initSolLength, sn, options.config.pstar);
     }
 
-    System.out.print("Starting ODE integration cycle...");
-    odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
-    System.out.println("done.");
+    int Tmax;
+    if (options.stiff) {
+      LSODA odeSolver;
+      if (options.tol > GlobalConstants.CoarseTol){
+        odeSolver = options.odesolvers.fastStiffODESolver;
+      } else {
+        odeSolver = options.odesolvers.accurateStiffODESolver;
+      }
+      //System.out.print("Starting ODE integration cycle...");
+      odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
+      //System.out.println("done.");
+      Tmax = odeSolver.getStepsTaken()+1;
+      Matrix tVec = new Matrix(Tmax, 1);
+      Matrix xVec = new Matrix(Tmax,ode.getDimension());
+      ArrayList<Double> tHistory = odeSolver.getTvec();
+      ArrayList<Double[]> yHistory = odeSolver.getYvec();
+      for (int i = 0; i < Tmax; i++) {
+        tVec.set(i,0,tHistory.get(i));
+        for (int j = 0; j < ode.getDimension(); j++)
+          xVec.set(i,j,Math.max(0,yHistory.get(i)[j]));
+      }
+      result.t = tVec;
+      this.xvec_t = xVec;
+    }
+    else {
+      if (options.tol > GlobalConstants.CoarseTol && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
+        System.err.println(
+                "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
+      }
+      FirstOrderIntegrator odeSolver = options.odesolvers.accurateODESolver;
+      odeSolver.clearStepHandlers();
+      TransientDataHandler stepHandler = new TransientDataHandler(initSolLength);
+      odeSolver.addStepHandler(stepHandler);
+      //System.out.print("Starting ODE integration cycle...");
+      odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
+      //System.out.println("done.");
 
-    // Retrieve Transient Data
-    result.t = stepHandler.tVec;
-    int Tmax = result.t.getNumRows();
-    this.xvec_t = stepHandler.xVec;
-    this.xvec_it = JLineMatrix.extractRows(xvec_t, Tmax - 1, Tmax, null);
+      // Retrieve Transient Data
+      result.t = stepHandler.tVec;
+      Tmax = result.t.getNumRows();
+      this.xvec_t = stepHandler.xVec;
+    }
+    this.xvec_it = Matrix.extractRows(xvec_t, Tmax - 1, Tmax, null);
 
     // Use Transient Data to Store Results
-    result.QNt = new JLineMatrix[M][K];
-    result.UNt = new JLineMatrix[M][K];
-    result.TNt = new JLineMatrix[M][K];
+    result.QNt = new Matrix[M][K];
+    result.UNt = new Matrix[M][K];
+    result.TNt = new Matrix[M][K];
     for (int i = 0; i < M; i++) {
       for (int k = 0; k < K; k++) {
-        result.QNt[i][k] = new JLineMatrix(Tmax, 1);
-        result.UNt[i][k] = new JLineMatrix(Tmax, 1);
-        result.TNt[i][k] = new JLineMatrix(Tmax, 1);
+        result.QNt[i][k] = new Matrix(Tmax, 1);
+        result.UNt[i][k] = new Matrix(Tmax, 1);
+        result.TNt[i][k] = new Matrix(Tmax, 1);
       }
     }
 
     for (int step = 0; step < Tmax; step++) {
 
-      JLineMatrix x = JLineMatrix.extractRows(xvec_t, step, step + 1, null);
+      Matrix x = Matrix.extractRows(xvec_t, step, step + 1, null);
       x = x.transpose();
-      JLineMatrix theta = x.clone(); // Theta per Ruuskanen et al., PEVA 151 (2021).
-      JLineMatrix SQx = SQ.mult(x, null);
+      Matrix theta = x.clone(); // Theta per Ruuskanen et al., PEVA 151 (2021).
+      Matrix SQx = SQ.mult(x, null);
       for (int phase = 0; phase < totalNumPhases; phase++) {
-        double valSQx = SQx.get(phase, 0) + Distribution.zeroRn;
+        double valSQx = SQx.get(phase, 0) + GlobalConstants.Zero;
         double valSa = Sa.get(phase, 0);
         if (valSQx > valSa) {
           theta.set(phase, 0, x.get(phase, 0) / valSQx * valSa);
         }
       }
 
-      JLineMatrix QNtmp = SQC.mult(x, null);
-      JLineMatrix UNtmp = SUC.mult(theta, null);
-      JLineMatrix TNtmp = STC.mult(theta, null);
+      Matrix QNtmp = SQC.mult(x, null);
+      Matrix UNtmp = SUC.mult(theta, null);
+      Matrix TNtmp = STC.mult(theta, null);
 
       for (int i = 0; i < M; i++) {
         for (int k = 0; k < K; k++) {
@@ -227,10 +249,10 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
       }
     }
 
-    result.QN = new JLineMatrix(M, K);
-    result.UN = new JLineMatrix(M, K);
-    result.RN = new JLineMatrix(M, K);
-    result.TN = new JLineMatrix(M, K);
+    result.QN = new Matrix(M, K);
+    result.UN = new Matrix(M, K);
+    result.RN = new Matrix(M, K);
+    result.TN = new Matrix(M, K);
     for (int i = 0; i < M; i++) {
       for (int j = 0; j < K; j++) {
         result.QN.set(i, j, result.QNt[i][j].get(Tmax - 1, 0));
@@ -242,37 +264,37 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
   }
 
   @Override
-  public JLineMatrix getXVecIt() {
+  public Matrix getXVecIt() {
     return this.xvec_it;
   }
 
-  private JLineMatrix calculateW(NetworkStruct sn, JLineMatrix psi, JLineMatrix A, JLineMatrix B) {
+  private Matrix calculateW(NetworkStruct sn, Matrix psi, Matrix A, Matrix B) {
 
     // ODE building as per Ruuskanen et al., PEVA 151 (2021).
-    DMatrixSparseCSC psiDMatrix = psi.JLineMatrix2DMatrixSparseCSC();
-    DMatrixSparseCSC ADMatrix = A.JLineMatrix2DMatrixSparseCSC();
-    DMatrixSparseCSC BDMatrix = B.JLineMatrix2DMatrixSparseCSC();
-    DMatrixSparseCSC P = sn.rt.JLineMatrix2DMatrixSparseCSC();
+    DMatrixSparseCSC psiDMatrix = psi.toDMatrixSparseCSC();
+    DMatrixSparseCSC ADMatrix = A.toDMatrixSparseCSC();
+    DMatrixSparseCSC BDMatrix = B.toDMatrixSparseCSC();
+    DMatrixSparseCSC P = sn.rt.toDMatrixSparseCSC();
 
     Equation calculateW = new Equation();
     calculateW.alias(psiDMatrix, "psi", ADMatrix, "A", P, "P", BDMatrix, "B");
     calculateW.process("W = psi + B*P*A'");
-    JLineMatrix W = new JLineMatrix(calculateW.lookupSimple("W"));
+    Matrix W = new Matrix(calculateW.lookupSimple("W"));
 
     // Remove disabled transitions
     if (W.hasNaN()) {
       int WRows = W.getNumRows();
       int WCols = W.getNumCols();
       List<Integer> colsWithNans = new LinkedList<>();
-      JLineMatrix sumWCols = W.sumCols();
+      Matrix sumWCols = W.sumCols();
       for (int i = 0; i < WCols; i++) {
         if (isNaN(sumWCols.get(0, i))) {
           colsWithNans.add(i);
         }
       }
 
-      JLineMatrix tmpW =
-          new JLineMatrix(
+      Matrix tmpW =
+          new Matrix(
               W.getNumRows() - colsWithNans.size(), W.getNumCols() - colsWithNans.size());
       int tmpWRow = 0;
       for (int i = 0; i < WRows; i++) {

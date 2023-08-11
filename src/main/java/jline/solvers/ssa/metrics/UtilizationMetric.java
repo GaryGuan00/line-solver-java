@@ -1,7 +1,7 @@
 package jline.solvers.ssa.metrics;
 
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.util.Pair;
 
 public class UtilizationMetric extends Metric<Double, Double> {
@@ -58,8 +58,9 @@ public class UtilizationMetric extends Metric<Double, Double> {
         }
     }
 
-    public void fromStateMatrix(double t, StateMatrix stateMatrix) {
-        double inProcess = stateMatrix.inProcess(this.nodeIdx, this.classIdx);
+    @SuppressWarnings("unchecked")
+    public void fromStateMatrix(double t, SSAStateMatrix networkState) {
+        double inProcess = networkState.inProcess(this.nodeIdx, this.classIdx);
         double utilization;
 
         if (this.isDelay) {

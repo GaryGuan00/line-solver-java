@@ -5,7 +5,7 @@ import jline.lang.OutputStrategy;
 import jline.lang.nodes.Node;
 import jline.lang.sections.OutputSection;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 import java.util.List;
 import java.util.Random;
@@ -18,21 +18,21 @@ public class ForkOutputEvent extends OutputEvent {
     }
 
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
         for (OutputStrategy outputStrategy : this.outputStrategies) {
-            outputStrategy.getDestination().getArrivalEvent(this.jobClass).stateUpdate(stateMatrix, random, timeline);
+            outputStrategy.getDestination().getArrivalEvent(this.jobClass).stateUpdate(networkState, random, timeline);
         }
-        timeline.record(this, stateMatrix);
+        timeline.record(this, networkState);
         return true;
     }
 
     @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         int res = 0;
         for (OutputStrategy outputStrategy : this.outputStrategies) {
-            res += outputStrategy.getDestination().getArrivalEvent(this.jobClass).stateUpdateN(n, stateMatrix, random, timeline);
+            res += outputStrategy.getDestination().getArrivalEvent(this.jobClass).stateUpdateN(n, networkState, random, timeline);
         }
-        timeline.record(this, stateMatrix);
+        timeline.record(this, networkState);
         return res;
     }
 }

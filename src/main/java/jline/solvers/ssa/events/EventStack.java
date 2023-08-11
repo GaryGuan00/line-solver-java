@@ -1,23 +1,20 @@
 package jline.solvers.ssa.events;
 
-import jline.lang.JLineMatrix;
-import jline.lang.distributions.BinomialDistribution;
-import jline.lang.distributions.Exp;
-import jline.lang.distributions.PoissonDistribution;
+import jline.lang.distributions.Binomial;
+import jline.lang.distributions.Poisson;
 import jline.lang.nodes.Node;
 import jline.lang.nodes.Source;
-import jline.solvers.ssa.TauLeapingType;
-import jline.solvers.ssa.TauLeapingVarType;
+import jline.solvers.ctmc.EventData;
 import jline.solvers.ssa.Timeline;
+import jline.solvers.ssa.state.SSAStateMatrix;
+import jline.solvers.ssa.strategies.TauLeapingType;
+import jline.solvers.ssa.strategies.TauLeapingVarType;
 import jline.solvers.ssa.metrics.IllegalTauLeapPercentageMetric;
-import jline.solvers.ssa.state.StateMatrix;
 import jline.solvers.ssa.strategies.TauLeapingOrderStrategy;
 import jline.solvers.ssa.strategies.TauLeapingStateStrategy;
-import jline.util.Cdf;
+import jline.util.CumulativeDistribution;
 import jline.util.Pair;
 import jline.lang.OutputStrategy;
-import org.javatuples.Quartet;
-import org.javatuples.Triplet;
 
 import java.util.*;
 
@@ -62,29 +59,29 @@ public class EventStack {
         this.eventList.add(event);
     }
 
-    private void handleImmediate(StateMatrix stateMatrix, Timeline timeline, double t, Random random) {
+    private void handleImmediate(SSAStateMatrix networkState, Timeline timeline, double t, Random random) {
         /*
             Once an immediate event has been found, try to find any others. Build a cdf, and fire.
          */
-        Cdf<Event> immediateCdf = new Cdf<Event>(random);
+        CumulativeDistribution<Event> immediateCumulativeDistribution = new CumulativeDistribution<Event>(random);
         double totalImmediate = 0;
 
         for (Event event : this.eventList) {
-            if (event.getRate(stateMatrix) == Double.POSITIVE_INFINITY) {
+            if (event.getRate(networkState) == Double.POSITIVE_INFINITY) {
                 totalImmediate += 1.0;
-                immediateCdf.addElement(event, 1.0);
+                immediateCumulativeDistribution.addElement(event, 1.0);
             }
         }
 
-        immediateCdf.normalize(totalImmediate);
+        immediateCumulativeDistribution.normalize(totalImmediate);
 
-        Event e = immediateCdf.generate();
-        e.stateUpdate(stateMatrix, random, timeline);
+        Event e = immediateCumulativeDistribution.generate();
+        e.stateUpdate(networkState, random, timeline);
         if (timeline != null) {
             //timeline.record(t, e, stateMatrix);
         }
     }
-
+    @SuppressWarnings("unchecked")
     private void orderEventList(Random random) {
         /*
                 For DirectedGraph and DirectedCycle ordering methods, re-order the event list according to a topological
@@ -156,7 +153,7 @@ public class EventStack {
         this.eventList = outEvents;
     }
 
-    public double tauLeapUpdateMultistep(StateMatrix stateMatrix, Timeline timeline, double t, Random random) {
+    public double tauLeapUpdateMultistep(SSAStateMatrix networkState, Timeline timeline, double t, Random random) {
         /*
                 This is part of an optimization, but I've seperated TauLeapUpdate into two functions, one for TwoTimes
                 and one for all other ordering strategies. 99% of this is a simple copy+paste from an earlier iteration.
@@ -199,9 +196,9 @@ public class EventStack {
 
         // Build a list of all events, as well as firing counts
         for (Event event : this.eventList) {
-            double eventRate = event.getRate(stateMatrix);
+            double eventRate = event.getRate(networkState);
             if (eventRate == Double.POSITIVE_INFINITY) {
-                this.handleImmediate(stateMatrix, timeline, t, random);
+                this.handleImmediate(networkState, timeline, t, random);
                 return t;
             } else if (Double.isNaN(eventRate)) {
                 continue;
@@ -216,22 +213,22 @@ public class EventStack {
             TauLeapingVarType effectiveVarType = varType;
 
             if (effectiveVarType == TauLeapingVarType.Binomial) {
-                int maxReps = event.getMaxRepetitions(stateMatrix);
+                int maxReps = event.getMaxRepetitions(networkState);
                 if (maxReps > MAX_BINOMIAL_REPS) {
                     effectiveVarType = TauLeapingVarType.Poisson;
                 }
             }
 
             if (effectiveVarType == TauLeapingVarType.Poisson) {
-                PoissonDistribution pDist = new PoissonDistribution(eventRate*tau);
+                Poisson pDist = new Poisson(eventRate*tau);
                 eCount = pDist.getRealization(random);
             } else if (effectiveVarType == TauLeapingVarType.Binomial) {
-                int maxJump = event.getMaxRepetitions(stateMatrix);
+                int maxJump = event.getMaxRepetitions(networkState);
                 double prob = (eventRate*tau)/((double)maxJump);
 
                 prob = Math.min(prob, 1.0);
                 if (prob != 0) {
-                    BinomialDistribution bDist = new BinomialDistribution(prob, maxJump);
+                    Binomial bDist = new Binomial(prob, maxJump);
                     eCount = bDist.getRealization(random);
                 }
             }
@@ -269,7 +266,7 @@ public class EventStack {
                 int eCount = eventPair.getRight();
 
 
-                int rem = event.stateUpdateN(eCount, stateMatrix, random, timeline);
+                int rem = event.stateUpdateN(eCount, networkState, random, timeline);
 
                 if ((stateStrategy == TauLeapingStateStrategy.TwoTimes) && (timeIter==0)) {
                     // build another list here - it's a bit faster to build two lists rather than keeping track of
@@ -297,7 +294,7 @@ public class EventStack {
         return t;
     }
 
-    public double tauLeapUpdateOnestep(StateMatrix stateMatrix, Timeline timeline, double t, Random random) {
+    public double tauLeapUpdateOnestep(SSAStateMatrix networkState, Timeline timeline, double t, Random random) {
         double tau = this.tauLeapingType.getTau();
         boolean foundEvent = false;
         final int MAX_BINOMIAL_REPS = 1000;
@@ -332,7 +329,7 @@ public class EventStack {
         /*if (stateStrategy == TauLeapingStateStrategy.CycleCutoff) {
             stateMatrix.allowIllegalStates();
         } else*/ if ((stateStrategy == TauLeapingStateStrategy.TimeWarp) || (stateStrategy == TauLeapingStateStrategy.TauTimeWarp)) {
-            stateMatrix.cacheState();
+            networkState.cacheState();
         }
 
         t += tau;
@@ -341,9 +338,9 @@ public class EventStack {
 
         // loop through each event, calculate number of reps, and fire accordingly
         for (Event event : this.eventList) {
-            double eventRate = event.getRate(stateMatrix);
+            double eventRate = event.getRate(networkState);
             if (eventRate == Double.POSITIVE_INFINITY) {
-                this.handleImmediate(stateMatrix,timeline, t, random);
+                this.handleImmediate(networkState, timeline, t, random);
                 return t;
             } else if (Double.isNaN(eventRate)) {
                 continue;
@@ -352,19 +349,19 @@ public class EventStack {
             int eCount = 0;
 
             if (varType == TauLeapingVarType.Poisson) {
-                PoissonDistribution pDist = new PoissonDistribution(eventRate*tau);
+                Poisson pDist = new Poisson(eventRate*tau);
                 eCount = pDist.getRealization(random);
             } else if (varType == TauLeapingVarType.Binomial) {
-                int maxJump = event.getMaxRepetitions(stateMatrix);
+                int maxJump = event.getMaxRepetitions(networkState);
                 if (maxJump > MAX_BINOMIAL_REPS) {
-                    PoissonDistribution pDist = new PoissonDistribution(eventRate*tau);
+                    Poisson pDist = new Poisson(eventRate*tau);
                     eCount = pDist.getRealization(random);
                 } else {
                     double prob = (eventRate * tau) / ((double) maxJump);
 
                     prob = Math.min(prob, 1.0);
                     if (prob != 0) {
-                        BinomialDistribution bDist = new BinomialDistribution(prob, maxJump);
+                        Binomial bDist = new Binomial(prob, maxJump);
                         eCount = bDist.getRealization(random);
                     }
                 }
@@ -376,7 +373,7 @@ public class EventStack {
 
             // Find the number of unapplied reps. Note the max - this is necessary because on some occasions
             //    you'll receive a negative number when CycleCutoff is applied
-            int rem = Math.max(event.stateUpdateN(eCount, stateMatrix, random, timeline),0);
+            int rem = Math.max(event.stateUpdateN(eCount, networkState, random, timeline),0);
 
             if (stateStrategy == TauLeapingStateStrategy.TimeWarp) {
                 if (rem != 0) {
@@ -385,7 +382,7 @@ public class EventStack {
                         this.tauFailures = 0;
                     } else {
                         this.tauFailures++;
-                        stateMatrix.revertToCache();
+                        networkState.revertToCache();
                         timeline.clearCache();
                         return t - tau;
                     }
@@ -400,7 +397,7 @@ public class EventStack {
                         this.tauFailures = 0;
                         tauLeapingType.resetTau();
                     } else {
-                        stateMatrix.revertToCache();
+                        networkState.revertToCache();
                         timeline.clearCache();
                         tauLeapingType.setTau(Math.max(tau / 2, 0.0001));
                         this.tauFailures++;
@@ -431,28 +428,28 @@ public class EventStack {
     }
 
 
-    public double tauLeapUpdate(StateMatrix stateMatrix, Timeline timeline, double t, Random random) {
+    public double tauLeapUpdate(SSAStateMatrix networkState, Timeline timeline, double t, Random random) {
         // Wrapper function for a cleaner API
         if (tauLeapingType.getStateStrategy() == TauLeapingStateStrategy.TwoTimes) {
-            return tauLeapUpdateMultistep(stateMatrix, timeline, t, random);
+            return tauLeapUpdateMultistep(networkState, timeline, t, random);
         } else {
-            return tauLeapUpdateOnestep(stateMatrix, timeline, t, random);
+            return tauLeapUpdateOnestep(networkState, timeline, t, random);
         }
     }
 
-    public double updateState(StateMatrix stateMatrix, Timeline timeline, double t, Random random) {
+    public double updateState(SSAStateMatrix networkState, Timeline timeline, double t, Random random) {
         /*
             This uses the generic Gillespie algorithm to determine and fire the next event
          */
-        Cdf<Event> eventCdf = new Cdf<Event>(random);
+        CumulativeDistribution<Event> eventCumulativeDistribution = new CumulativeDistribution<Event>(random);
         double totalRate = 0;
 
         boolean foundEvent = false;
 
         for (Event event : this.eventList) {
-            double eventRate = event.getRate(stateMatrix);
+            double eventRate = event.getRate(networkState);
             if (eventRate == Double.POSITIVE_INFINITY) {
-                this.handleImmediate(stateMatrix,timeline, t, random);
+                this.handleImmediate(networkState, timeline, t, random);
                 return t;
             } else if (Double.isNaN(eventRate)) {
                 continue;
@@ -461,10 +458,10 @@ public class EventStack {
             foundEvent = true;
 
             totalRate += eventRate;
-            eventCdf.addElement(event, eventRate);
+            eventCumulativeDistribution.addElement(event, eventRate);
         }
 
-        eventCdf.normalize(totalRate);
+        eventCumulativeDistribution.normalize(totalRate);
 
         if (!foundEvent) {
             System.out.println("No event found!");
@@ -476,127 +473,57 @@ public class EventStack {
         this.curT = t;
         timeline.setTime(this.curT);
 
-        Event chosenEvent = eventCdf.generate();
-        chosenEvent.stateUpdate(stateMatrix, random, timeline);
+        Event chosenEvent = eventCumulativeDistribution.generate();
+        chosenEvent.stateUpdate(networkState, random, timeline);
 
         return t;
     }
 
-    public double updateStateSpace(Timeline timeline, double t, Random random, ArrayList<StateMatrix> stateSpace, Queue<StateMatrix> queue) {
+    public void updateStateSpace(ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
         while (!queue.isEmpty()){
 
-            StateMatrix stateMatrix1 = new StateMatrix(queue.remove());
-
-            Cdf<Event> eventCdf = new Cdf<Event>(random);
-            double totalRate = 0;
-
-            boolean foundEvent = false;
-
+            SSAStateMatrix networkState1 = new SSAStateMatrix(queue.remove());
+            ArrayList<Event> eventArrayList = new ArrayList<>();
             for (Event event : this.eventList) {
-                double eventRate = event.getRate(stateMatrix1);
-                if (eventRate == Double.POSITIVE_INFINITY) {
-                    this.handleImmediate(stateMatrix1, timeline, t, random);
-                    return t;
-                } else if (Double.isNaN(eventRate)) {
+                double eventRate = event.getRate(networkState1);
+                //TODO handleImmediate
+//                if (eventRate == Double.POSITIVE_INFINITY) {
+//                    this.handleImmediate(stateMatrix1, timeline, t, random);
+//                    return t;
+//                }
+                if (Double.isNaN(eventRate)) {
                     continue;
                 }
-
-                foundEvent = true;
-
-                totalRate += eventRate;
-
-                eventCdf.addElement(event, eventRate);
+                eventArrayList.add(event);
             }
-
-            eventCdf.normalize(totalRate);
-
-            if (!foundEvent) {
-//            System.out.println("No event found!");
-                return t;
-            }
-
-            double timeDelta = Math.log(1 - random.nextDouble()) / (-totalRate);
-            t += timeDelta;
-            this.curT = t;
-            timeline.setTime(this.curT);
-
-
-            ArrayList<Event> eventArrayList = eventCdf.getPossibleEvents();
-//            System.out.println(eventArrayList.size());
             for (Event event : eventArrayList) {
-//                System.out.println(event);
-                StateMatrix newMatrix = event.getNextState(stateMatrix1, timeline, stateSpace,queue);
-//                JLineMatrix jLineMatrix1 = new JLineMatrix(stateMatrix1.state.length, stateMatrix1.state[0].length);
-//                jLineMatrix1.array2DtoJLineMatrix(newMatrix.state).print();
-//                if (newMatrix != null && !newMatrix.checkIfVisited(stateSpace)) {
-//                    JLineMatrix jLineMatrix = new JLineMatrix(stateMatrix1.state.length, stateMatrix1.state[0].length);
-//                    stateSpace.add(newMatrix);
-//                    queue.add(newMatrix);
-//                    jLineMatrix.array2DtoJLineMatrix(newMatrix.state).print();
-//                    stateMatrix1.printStateVector();
-//                    newMatrix.printStateVector();
-//                }
+                event.getNextState(networkState1, stateSpace, queue, stateSet);
             }
         }
-
-        return t;
-
     }
 
-    public double updateEventSpace(Timeline timeline, double t, Random random, ArrayList<Quartet<Event,Pair<OutputEvent,Double>,StateMatrix,StateMatrix>> eventSpace, Queue<StateMatrix> queue) {
+    public void updateEventSpace(ArrayList<EventData> eventSpace, Queue<SSAStateMatrix> queue, Set<EventData> eventSet) {
         while (!queue.isEmpty()){
 
-            StateMatrix stateMatrix1 = new StateMatrix(queue.remove());
+            SSAStateMatrix networkState1 = new SSAStateMatrix(queue.remove());
 
-            Cdf<Event> eventCdf = new Cdf<Event>(random);
-            double totalRate = 0;
-
-            boolean foundEvent = false;
+            ArrayList<Event> eventArrayList = new ArrayList<>();
 
             for (Event event : this.eventList) {
-                double eventRate = event.getRate(stateMatrix1);
-                if (eventRate == Double.POSITIVE_INFINITY) {
-                    this.handleImmediate(stateMatrix1, timeline, t, random);
-                    return t;
-                } else if (Double.isNaN(eventRate) || eventRate==0) {
+                double eventRate = event.getRate(networkState1);
+
+                if (Double.isNaN(eventRate) || eventRate==0) {
                     continue;
                 }
 
-                foundEvent = true;
 
-                totalRate += eventRate;
-
-                eventCdf.addElement(event, eventRate);
+                eventArrayList.add(event);
             }
 
-            eventCdf.normalize(totalRate);
-
-            if (!foundEvent) {
-//            System.out.println("No event found!");
-                return t;
-            }
-
-            double timeDelta = Math.log(1 - random.nextDouble()) / (-totalRate);
-            t += timeDelta;
-            this.curT = t;
-            timeline.setTime(this.curT);
-
-
-            ArrayList<Event> eventArrayList = eventCdf.getPossibleEvents();
             for (Event event : eventArrayList) {
-                StateMatrix copyOfOld = new StateMatrix(stateMatrix1);
-                StateMatrix newMatrix = event.getNextEventState(stateMatrix1, timeline, eventSpace,event,queue,stateMatrix1);
-//                if (newMatrix != null && !newMatrix.checkIfVisited(eventSpace,stateMatrix1,event)) {
-//                    JLineMatrix jLineMatrix = new JLineMatrix(stateMatrix1.state.length, stateMatrix1.state[0].length);
-//                    eventSpace.add(Triplet.with(event,stateMatrix1,newMatrix));
-//                    queue.add(newMatrix);
-//                    jLineMatrix.array2DtoJLineMatrix(newMatrix.state).print();
-//                }
+               event.getNextEventState(networkState1, eventSpace,event,queue, networkState1, eventSet);
             }
         }
-
-        return t;
-
     }
 
 }

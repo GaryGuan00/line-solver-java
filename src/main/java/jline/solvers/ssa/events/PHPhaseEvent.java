@@ -9,28 +9,28 @@ import jline.lang.nodes.Node;
 import jline.lang.nodes.Source;
 import jline.lang.nodes.StatefulNode;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
-import jline.util.Cdf;
+import jline.solvers.ssa.state.SSAStateMatrix;
+import jline.util.CumulativeDistribution;
 
 import java.util.List;
 import java.util.Random;
 
 public class PHPhaseEvent extends PhaseEvent implements NodeEvent {
-    private int statefulIndex;
-    private int classIndex;
-    private SchedStrategy schedStrategy;
-    private boolean isSource;
+    private final int statefulIndex;
+    private final int classIndex;
+    private final SchedStrategy schedStrategy;
+    private final boolean isSource;
 
     protected Node node;
-    private JobClass jobClass;
+    private final JobClass jobClass;
     protected boolean isProcessorSharing;
     protected List<List<Double>> phMatrix;
 
-    private DepartureEvent departureEvent;
+    private final DepartureEvent departureEvent;
 
 
     private final PH serviceProcess;
-
+    @SuppressWarnings("unchecked")
     public PHPhaseEvent(Node node, JobClass jobClass, DepartureEvent departureEvent) {
         super();
         this.node = node;
@@ -69,23 +69,23 @@ public class PHPhaseEvent extends PhaseEvent implements NodeEvent {
     }
 
     @Override
-    public double getRate(StateMatrix stateMatrix) {
+    public double getRate(SSAStateMatrix networkState) {
         if (this.isProcessorSharing) {
             double totalRate = 0;
             for (int i = 0; i < this.phMatrix.size(); i++) {
-                int inPhase = stateMatrix.getInPhase(this.statefulIndex, this.classIndex, i);
+                int inPhase = networkState.getInPhase(this.statefulIndex, this.classIndex, i);
                 totalRate += inPhase * this.serviceProcess.getTotalPhaseRate(i);
             }
 
-            double serviceRatio = (double)stateMatrix.getState(this.statefulIndex, this.classIndex)/(double)stateMatrix.totalStateAtNode(this.statefulIndex);
-            serviceRatio *= stateMatrix.psTotalCapacity(this.statefulIndex);
+            double serviceRatio = (double) networkState.getState(this.statefulIndex, this.classIndex)/(double) networkState.totalStateAtNode(this.statefulIndex);
+            serviceRatio *= networkState.psTotalCapacity(this.statefulIndex);
             return totalRate*serviceRatio;
         }
 
         int activeServers = 1;
 
         if (this.node instanceof StatefulNode) {
-            activeServers = stateMatrix.inProcess(this.statefulIndex, this.classIndex);
+            activeServers = networkState.inProcess(this.statefulIndex, this.classIndex);
             if (this.node instanceof Source) {
                 // NOTE: Pay active attention to this part
                 activeServers = 1;//stateMatrix.getPhaseListSize(this)+1;
@@ -97,7 +97,7 @@ public class PHPhaseEvent extends PhaseEvent implements NodeEvent {
         double totalRate = 0;
 
         for (int i = 0; i < this.phMatrix.size(); i++) {
-            int inPhase = stateMatrix.getInPhase(this.statefulIndex, this.classIndex, i);
+            int inPhase = networkState.getInPhase(this.statefulIndex, this.classIndex, i);
             totalRate += inPhase * this.serviceProcess.getTotalPhaseRate(i);
         }
 
@@ -106,15 +106,15 @@ public class PHPhaseEvent extends PhaseEvent implements NodeEvent {
     }
 
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
         int nInPhase = 1;
 
         if (this.node instanceof StatefulNode) {
-            nInPhase = stateMatrix.inProcess(this.statefulIndex, this.classIndex);
+            nInPhase = networkState.inProcess(this.statefulIndex, this.classIndex);
             if (this.node instanceof Source) {
-                if (stateMatrix.incrementPhase(this.statefulIndex, this.classIndex)) {
-                    this.departureEvent.stateUpdate(stateMatrix, random, timeline);
-                    timeline.record(this, stateMatrix);
+                if (networkState.incrementPhase(this.statefulIndex, this.classIndex)) {
+                    this.departureEvent.stateUpdate(networkState, random, timeline);
+                    timeline.record(this, networkState);
                 }
 
                 return true;
@@ -123,19 +123,19 @@ public class PHPhaseEvent extends PhaseEvent implements NodeEvent {
             }
         }
 
-        Cdf<Integer> startingPhaseCdf = new Cdf<Integer>(random);
+        CumulativeDistribution<Integer> startingPhaseCumulativeDistribution = new CumulativeDistribution<Integer>(random);
         int totalInPhase = 0;
 
         for (int i = 0; i < this.phMatrix.size(); i++) {
-            int inPhase = stateMatrix.getInPhase(this.statefulIndex, this.classIndex, i);
-            startingPhaseCdf.addElement(i, inPhase);
+            int inPhase = networkState.getInPhase(this.statefulIndex, this.classIndex, i);
+            startingPhaseCumulativeDistribution.addElement(i, inPhase);
             totalInPhase += inPhase;
         }
-        startingPhaseCdf.normalize(totalInPhase);
+        startingPhaseCumulativeDistribution.normalize(totalInPhase);
 
-        int startingPhase = startingPhaseCdf.generate();
+        int startingPhase = startingPhaseCumulativeDistribution.generate();
 
-        Cdf<Integer> endingPhaseCdf = new Cdf<Integer>(random);
+        CumulativeDistribution<Integer> endingPhaseCumulativeDistribution = new CumulativeDistribution<Integer>(random);
         double departureRate = -this.phMatrix.get(startingPhase).get(startingPhase);
         double totalRate = -this.phMatrix.get(startingPhase).get(startingPhase);
 
@@ -145,31 +145,31 @@ public class PHPhaseEvent extends PhaseEvent implements NodeEvent {
             }
 
             departureRate -= this.phMatrix.get(startingPhase).get(i);
-            endingPhaseCdf.addElement(i, this.phMatrix.get(startingPhase).get(i));
+            endingPhaseCumulativeDistribution.addElement(i, this.phMatrix.get(startingPhase).get(i));
         }
-        endingPhaseCdf.addElement(-1, departureRate);
-        endingPhaseCdf.normalize(totalRate);
+        endingPhaseCumulativeDistribution.addElement(-1, departureRate);
+        endingPhaseCumulativeDistribution.normalize(totalRate);
 
-        int endingPhase = endingPhaseCdf.generate();
+        int endingPhase = endingPhaseCumulativeDistribution.generate();
 
         if (endingPhase == -1) {
-            stateMatrix.updatePhase(this.statefulIndex, this.classIndex,startingPhase, -1);
-            this.departureEvent.stateUpdate(stateMatrix, random, timeline);
-            timeline.record(this, stateMatrix);
+            networkState.updatePhase(this.statefulIndex, this.classIndex,startingPhase, -1);
+            this.departureEvent.stateUpdate(networkState, random, timeline);
+            timeline.record(this, networkState);
             return true;
         }
 
-        stateMatrix.updatePhase(this.statefulIndex, this.classIndex,startingPhase, endingPhase);
+        networkState.updatePhase(this.statefulIndex, this.classIndex,startingPhase, endingPhase);
 
-        timeline.record(this, stateMatrix);
+        timeline.record(this, networkState);
         return true;
     }
 
     @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         int res = n;
         for (int i = 0; i < n; i++) {
-            if (this.stateUpdate(stateMatrix, random, timeline)) {
+            if (this.stateUpdate(networkState, random, timeline)) {
                 res -= 1;
             } else {
                 return res;

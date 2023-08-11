@@ -3,22 +3,22 @@
 
 package jline.solvers.fluid.odes;
 
-import jline.lang.JLineMatrix;
+import jline.util.Matrix;
 import org.apache.commons.math3.ode.sampling.StepHandler;
 import org.apache.commons.math3.ode.sampling.StepInterpolator;
 
 public class MethodStepHandler implements StepHandler {
 
-  public JLineMatrix tVec;
-  public JLineMatrix xVec;
+  public Matrix tVec;
+  public Matrix xVec;
   private int maxSteps;
   private int stepCount;
 
   public MethodStepHandler(int numDimensions) {
 
     maxSteps = 2; // Can be increased but must be 2 or more
-    tVec = new JLineMatrix(maxSteps, 1);
-    xVec = new JLineMatrix(maxSteps, numDimensions);
+    tVec = new Matrix(maxSteps, 1);
+    xVec = new Matrix(maxSteps, numDimensions);
     stepCount = 0;
   }
 

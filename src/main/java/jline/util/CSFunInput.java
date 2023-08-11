@@ -1,7 +1,5 @@
 package jline.util;
 
-import jline.lang.JLineMatrix;
-
 public class CSFunInput {
 	/* Currently this class is designed for the usage of statelessclassswitcher
 	 * state and statedep are not used
@@ -16,10 +14,10 @@ public class CSFunInput {
 	 */
 	public int r;
 	public int s;
-	public JLineMatrix state;
-	public JLineMatrix statedep;
+	public Matrix state;
+	public Matrix statedep;
 	
-	public CSFunInput(int r, int s, JLineMatrix state, JLineMatrix statedep) {
+	public CSFunInput(int r, int s, Matrix state, Matrix statedep) {
 		this.r = r;
 		this.s = s;
 		this.state = state;

@@ -1,7 +1,7 @@
 package jline.solvers.ssa.metrics;
 
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.util.Pair;
 
 public class QueueLengthMetric extends Metric<Double, Double> {
@@ -14,6 +14,7 @@ public class QueueLengthMetric extends Metric<Double, Double> {
         this(nodeIdx, classIdx, nServers, false);
     }
 
+    @SuppressWarnings("unchecked")
     protected void addSample(double currentTime, Double metric) {
         double timeDelta = currentTime-this.time;
         this.metricValue = ((this.metricValue * this.time) +
@@ -53,17 +54,17 @@ public class QueueLengthMetric extends Metric<Double, Double> {
             return this.metricValue;
         }
     }
-
-    public void fromStateMatrix(double t, StateMatrix stateMatrix) {
-        double Q = (double)Math.min(stateMatrix.getState(this.nodeIdx,this.classIdx),
-                stateMatrix.getCapacity(this.nodeIdx,this.classIdx));
+    @SuppressWarnings("unchecked")
+    public void fromStateMatrix(double t, SSAStateMatrix networkState) {
+        double Q = Math.min(networkState.getState(this.nodeIdx,this.classIdx),
+                networkState.getCapacity(this.nodeIdx,this.classIdx));
 
         if (Q == this.metricValue) {
             return;
         }
         if (this.record) {
             this.metricValue = Q;
-            this.metricHistory.add(new Pair(new Double(t), Q));
+            this.metricHistory.add(new Pair(t, Q));
         } else {
             if (this.useR5 && (this.crossCount < this.r5Value)) {
                 if (this.belowAverage && (Q >= this.metricValue)) {

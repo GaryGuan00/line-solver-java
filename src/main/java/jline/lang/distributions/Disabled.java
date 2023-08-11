@@ -3,20 +3,34 @@ package jline.lang.distributions;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import jline.util.Interval;
 
 public class Disabled extends Distribution implements Serializable {
-	
+
+    static Disabled disabledInstance = null;
+
     public Disabled() {
-        super("jline.lang.Disabled", 0, new Interval(Double.NaN,Double.NaN));
+        super("Disabled", 0, new Interval(Double.NaN,Double.NaN));
     }
 
+    public static Disabled getInstance() {
+        if (disabledInstance == null) {
+            disabledInstance = new Disabled();
+        }
+        return disabledInstance;
+    }
     public boolean isDisabled() {
         return true;
     }
 
-    public List<Double> sample(int n) {
+    @Override
+    public List<Double> sample(long n) {
+        return this.sample(n,null);
+    }
+    @Override
+    public List<Double> sample(long n, Random random) {
         List<Double> ret_list = new ArrayList<Double>();
         for (int i = 0; i < n; i++) {
             ret_list.add(Double.NaN);
@@ -51,10 +65,6 @@ public class Disabled extends Distribution implements Serializable {
 
     public double evalLST(double s) {
         return Double.NaN;
-    }
-
-    public Interval getPH() {
-        return new Interval(Double.NaN, Double.NaN);
     }
 
     public boolean isImmediate() {

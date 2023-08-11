@@ -7,8 +7,8 @@ import jline.lang.*;
 import jline.lang.constant.ServiceStrategy;
 
 public class ServiceBinding implements Serializable {
-    private JobClass jobClass;
-    private ServiceStrategy serviceStrategy;
+    private final JobClass jobClass;
+    private final ServiceStrategy serviceStrategy;
     private Distribution distribution;
     
     public ServiceBinding(JobClass jobClass, ServiceStrategy serviceStrategy) {

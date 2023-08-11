@@ -3,26 +3,26 @@
 
 package jline.solvers.fluid.smoothing;
 
-import jline.lang.JLineMatrix;
+import jline.util.Matrix;
 import jline.lang.Network;
 import jline.solvers.fluid.SolverFluid;
 import org.apache.commons.math3.analysis.MultivariateFunction;
 
 public class CMAESObjectiveFunction implements MultivariateFunction {
 
-  private final JLineMatrix targetQueueLengths;
+  private final Matrix targetQueueLengths;
   private final Network model;
   private final boolean stiff;
   private int evaluation;
 
-  public CMAESObjectiveFunction(JLineMatrix targetQueueLengths, Network model, boolean stiff) {
+  public CMAESObjectiveFunction(Matrix targetQueueLengths, Network model, boolean stiff) {
     this.targetQueueLengths = targetQueueLengths;
     this.model = model;
     this.stiff = stiff;
     this.evaluation = 0;
   }
 
-  private double computeErrorValue(JLineMatrix QNFluid) {
+  private double computeErrorValue(Matrix QNFluid) {
     // Compute Error (L2 Norm - (Squared) Euclidean)
     double errorValue = 0;
     int M = targetQueueLengths.getNumRows();
@@ -46,10 +46,10 @@ public class CMAESObjectiveFunction implements MultivariateFunction {
     SolverFluid solverFluid = new SolverFluid(this.model);
     solverFluid.options.stiff = this.stiff;
     for (int i = 0; i < doubles.length; i++) {
-      solverFluid.options.config.pStar.add(i, doubles[i]);
+      solverFluid.options.config.pstar.add(i, doubles[i]);
     }
     solverFluid.runAnalyzer();
-    JLineMatrix QNFluid = solverFluid.result.QN;
+    Matrix QNFluid = solverFluid.result.QN;
     double errorValue = computeErrorValue(QNFluid);
 
     // System.out.format("Error Value: %f\n\n", errorValue);

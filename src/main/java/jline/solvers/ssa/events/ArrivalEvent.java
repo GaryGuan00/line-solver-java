@@ -4,17 +4,21 @@ import jline.lang.JobClass;
 import jline.lang.nodes.Node;
 import jline.lang.nodes.Sink;
 import jline.lang.nodes.StatefulNode;
+import jline.solvers.ctmc.EventData;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
+import jline.solvers.ssa.state.PhaseList;
+import jline.util.CumulativeDistribution;
+import jline.util.Pair;
 
 import java.io.Serializable;
-import java.util.Random;
+import java.util.*;
 
 public class ArrivalEvent extends Event implements NodeEvent, Serializable {
-    private int statefulIndex;
-    private int classIndex;
-    private boolean useBuffer;
-    private boolean isStateful;
+    private final int statefulIndex;
+    private final int classIndex;
+    private final boolean useBuffer;
+    private final boolean isStateful;
     protected JobClass jobClass;
     protected Node node;
 
@@ -37,31 +41,97 @@ public class ArrivalEvent extends Event implements NodeEvent, Serializable {
     }
 
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
         if (this.isStateful) {
-            if (!stateMatrix.stateArrival(this.statefulIndex, this.classIndex)) {
+            if (!networkState.stateArrival(this.statefulIndex, this.classIndex)) {
                 return false;
             }
         } else if (!(this.node instanceof Sink)){
             throw new RuntimeException(String.format("ArrivalEvent at %s not supported!", this.node.getName()));
         }
 
-        timeline.record(this, stateMatrix);
+        if(timeline != null) {
+            timeline.record(this, networkState);
+        }
+        return true;
+    }
+
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random) {
+        return stateUpdate(networkState, random, null);
+    }
+
+    public boolean updateStateSpace(SSAStateMatrix networkState, Random random, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
+        if (this.isStateful) {
+            if(networkState.getState(this.statefulIndex, this.classIndex) >= networkState.getCapacity(this.statefulIndex, this.classIndex)) {
+                return false;
+            }
+            PhaseList phaseList = networkState.getPhaseList(this.statefulIndex);
+            CumulativeDistribution<Integer> startingPhaseProbabilities =  phaseList.getStartingPhaseProbabilities(this.classIndex);
+            ArrayList<Pair<Double, Integer>> possibleStarts = startingPhaseProbabilities.getPossibleEventProbability();
+            for(Pair<Double, Integer> start : possibleStarts) {
+                if(start.getLeft() > 0) {
+                    SSAStateMatrix copy = new SSAStateMatrix(networkState);
+                    copy.stateArrivalAtPosition(this.statefulIndex, this.classIndex, start.getRight());
+                    if (!copy.exceedsCutoff() && !stateSet.contains(copy)) {
+                        stateSet.add(copy);
+                        stateSpace.add(copy);
+                        queue.add(copy);
+                    }
+                }
+            }
+            return true;
+        } else if (!(this.node instanceof Sink)){
+            throw new RuntimeException(String.format("ArrivalEvent at %s not supported!", this.node.getName()));
+        }
 
         return true;
     }
 
+    public boolean updateEventSpace(SSAStateMatrix networkState, Random random, ArrayList<EventData> eventSpace, Event event, Queue<SSAStateMatrix> queue, SSAStateMatrix copy, Set<EventData> eventSet, Pair<OutputEvent, Double> outputEventDoublePair) {
+        if (this.isStateful) {
+            if(networkState.getState(this.statefulIndex, this.classIndex) >= networkState.getCapacity(this.statefulIndex, this.classIndex)) {
+                return false;
+            }
+            PhaseList phaseList = networkState.getPhaseList(this.statefulIndex);
+            CumulativeDistribution<Integer> startingPhaseProbabilities =  phaseList.getStartingPhaseProbabilities(this.classIndex);
+            ArrayList<Pair<Double, Integer>> possibleStarts = startingPhaseProbabilities.getPossibleEventProbability();
+            for(Pair<Double, Integer> start : possibleStarts) {
+                if(start.getLeft() > 0) {
+                    SSAStateMatrix copy2 = new SSAStateMatrix(networkState);
+                    copy2.stateArrivalAtPosition(this.statefulIndex, this.classIndex, start.getRight());
+                    Pair<OutputEvent, Double> newOutputEventPair = new Pair<>(outputEventDoublePair.getLeft(), outputEventDoublePair.getRight() * start.getLeft());
+                    EventData eventData = new EventData(event, newOutputEventPair,copy,copy2);
+                    if (!copy2.exceedsCutoff() && !eventSet.contains(eventData)) {
+                        eventSet.add(eventData);
+                        eventSpace.add(eventData);
+                        queue.add(copy2);
+                    }
+                }
+            }
+            return true;
+        } else if (!(this.node instanceof Sink)){
+            throw new RuntimeException(String.format("ArrivalEvent at %s not supported!", this.node.getName()));
+        }
+        EventData eventData = new EventData(event, outputEventDoublePair,copy, networkState);
+        if (!networkState.exceedsCutoff() && !eventSet.contains(eventData)) {
+            eventSet.add(eventData);
+            eventSpace.add(eventData);
+            queue.add(networkState);
+        }
+        return true;
+    }
+
     @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         int res = 0;
 
         if (this.isStateful) {
-            res = stateMatrix.stateArrivalN(n, this.statefulIndex, this.classIndex);
+            res = networkState.stateArrivalN(n, this.statefulIndex, this.classIndex);
         } else if (!(this.node instanceof Sink)) {
             throw new RuntimeException(String.format("ArrivalEvent at %s not supported!", this.node.getName()));
         }
 
-        timeline.preRecord(this, stateMatrix,n); // NOT n-res to control the buffer.
+        timeline.preRecord(this, networkState,n); // NOT n-res to control the buffer.
 
         return res;
     }

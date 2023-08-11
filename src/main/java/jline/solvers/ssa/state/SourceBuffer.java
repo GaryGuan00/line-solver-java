@@ -1,11 +1,9 @@
 package jline.solvers.ssa.state;
 
-import jline.util.Cdf;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class SourceBuffer extends StateCell {
+public class SourceBuffer extends SSAStateCell {
     protected int nClasses;
 
     protected PhaseList phaseList;
@@ -21,6 +19,10 @@ public class SourceBuffer extends StateCell {
     }
 
     public void addNToBuffer(int classIdx, int n) {
+
+    }
+
+    public void addToBufferAtPosition(int nodeIdx, int classIdx, int position) {
 
     }
 
@@ -41,7 +43,7 @@ public class SourceBuffer extends StateCell {
         this.removeFirstOfClass(classIdx);
     }
 
-    public StateCell createCopy() {
+    public SSAStateCell createCopy() {
         SourceBuffer copyBuffer = new SourceBuffer(this.nClasses, this.phaseList.createCopy());
 
         return copyBuffer;

@@ -1,6 +1,7 @@
 package jline.lang;
 
 
+import jline.lang.constant.GlobalConstants;
 import jline.lang.constant.SchedStrategy;
 import jline.lang.distributions.Distribution;
 import jline.lang.distributions.Exp;
@@ -43,7 +44,7 @@ public class Task extends LayeredNetworkElement{
         this.model = model;
         this.multiplicity = multiplicity;
         this.scheduling = scheduling;
-        setThinkTime(Distribution.zeroRn);
+        setThinkTime(GlobalConstants.Zero);
         model.tasks.put(model.tasks.size(),this);
         this.entries = new ArrayList<>();
         this.activities =new ArrayList<>();
@@ -58,7 +59,7 @@ public class Task extends LayeredNetworkElement{
         this.model = model;
         this.multiplicity = multiplicity;
         this.scheduling = SchedStrategy.INF;
-        setThinkTime(Distribution.zeroRn);
+        setThinkTime(GlobalConstants.Zero);
         this.entries = new ArrayList<>();
         this.activities =new ArrayList<>();
         this.precedences = new ArrayList<>();
@@ -72,7 +73,7 @@ public class Task extends LayeredNetworkElement{
         this.model = model;
         this.multiplicity = 1;
         this.scheduling = SchedStrategy.INF;
-        setThinkTime(Distribution.zeroRn);
+        setThinkTime(GlobalConstants.Zero);
         this.entries = new ArrayList<>();
         this.activities =new ArrayList<>();
         this.precedences = new ArrayList<>();
@@ -100,10 +101,10 @@ public class Task extends LayeredNetworkElement{
     }
 
     public void setThinkTime(double thinkTime){
-        if(thinkTime<=Distribution.zeroRn){
+        if(thinkTime<=GlobalConstants.Zero){
             this.thinkTime = new Immediate();
-            this.thinkTimeMean = Distribution.zeroRn;
-            this.thinkTimeSCV = Distribution.zeroRn;
+            this.thinkTimeMean = GlobalConstants.Zero;
+            this.thinkTimeSCV = GlobalConstants.Zero;
         }else {
             this.thinkTime = new Exp(1/thinkTime);
             this.thinkTimeMean = thinkTime;

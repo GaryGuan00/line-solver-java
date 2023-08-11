@@ -3,17 +3,15 @@
 
 package jline.util;
 
-import jline.lang.JLineMatrix;
-
 public class Sequence {
 
   // Return a sequence of non-negative vectors less than a given vector - init
-  public static JLineMatrix pprod(JLineMatrix n) {
-    return new JLineMatrix(n.getNumRows(), n.getNumCols());
+  public static Matrix pprod(Matrix n) {
+    return new Matrix(n.getNumRows(), n.getNumCols());
   }
 
   // Return a sequence of non-negative vectors less than a given vector - next state
-  public static JLineMatrix pprod(JLineMatrix n, JLineMatrix N) {
+  public static Matrix pprod(Matrix n, Matrix N) {
 
     int R = N.length();
     int countEqual = 0;
@@ -25,18 +23,18 @@ public class Sequence {
       }
     }
     if (countEqual == R) {
-      n = new JLineMatrix(1, 1);
+      n = new Matrix(1, 1);
       n.set(0, 0, -1);
       return n;
     }
 
     int s = R - 1;
-    while (s > 0 && n.get(0, s) == N.get(0, s)) {
+    while (s >= 0 && n.get(0, s) == N.get(0, s)) {
       n.set(0, s, 0);
       s--;
     }
 
-    if (s == 0) {
+    if (s == -1) {
       return n;
     }
 

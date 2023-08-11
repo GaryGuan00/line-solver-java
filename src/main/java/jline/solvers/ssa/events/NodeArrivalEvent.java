@@ -3,7 +3,7 @@ package jline.solvers.ssa.events;
 import jline.lang.JobClass;
 import jline.lang.nodes.Node;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 import java.util.Random;
 
@@ -13,13 +13,13 @@ public class NodeArrivalEvent extends ArrivalEvent {
     }
 
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
         OutputEvent nodeOutputEvent = node.getOutputEvent(jobClass, random);
-        return nodeOutputEvent.stateUpdate(stateMatrix, random, timeline);
+        return nodeOutputEvent.stateUpdate(networkState, random, timeline);
     }
     @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         OutputEvent nodeOutputEvent = node.getOutputEvent(jobClass, random);
-        return nodeOutputEvent.stateUpdateN(n, stateMatrix, random, timeline);
+        return nodeOutputEvent.stateUpdateN(n, networkState, random, timeline);
     }
 }

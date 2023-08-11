@@ -1,25 +1,25 @@
 package jline.solvers.fluid.smoothing;
 
-import jline.lang.JLineMatrix;
+import jline.util.Matrix;
 import jline.lang.Network;
 import jline.solvers.fluid.SolverFluid;
 import org.apache.commons.math3.analysis.MultivariateFunction;
 
 public class PStarOptimisationFunction implements MultivariateFunction {
 
-  private final JLineMatrix QNSSA;
+  private final Matrix QNSSA;
   private final Network model;
   private final boolean stiff;
   private int iteration;
 
-  public PStarOptimisationFunction(JLineMatrix QNSSA, Network model, boolean stiff) {
+  public PStarOptimisationFunction(Matrix QNSSA, Network model, boolean stiff) {
     this.QNSSA = QNSSA;
     this.model = model;
     this.stiff = stiff;
     this.iteration = 0;
   }
 
-  private double computeError(JLineMatrix QNFluid) {
+  private double computeError(Matrix QNFluid) {
     // Compute Error (L2 Norm - Euclidean)
     double tmpErrorValue = 0;
     for (int i = 0; i < QNSSA.getNumRows(); i++) {
@@ -42,10 +42,10 @@ public class PStarOptimisationFunction implements MultivariateFunction {
     solverFluid.options.stiff = this.stiff;
 
     for (int i = 0; i < doubles.length; i++) {
-      solverFluid.options.config.pStar.add(i, doubles[i]);
+      solverFluid.options.config.pstar.add(i, doubles[i]);
     }
     solverFluid.runAnalyzer();
-    JLineMatrix QNFluid = solverFluid.result.QN;
+    Matrix QNFluid = solverFluid.result.QN;
     double errorValue = computeError(QNFluid);
 
     System.out.format("Error Value: %f\n\n", errorValue);

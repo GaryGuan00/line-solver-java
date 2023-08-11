@@ -1,7 +1,7 @@
 package jline.solvers.ssa.metrics;
 
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 public class DummyMetric extends Metric<Double, Double>{
     public DummyMetric(int nodeIdx, int classIdx, int nServers) {
@@ -12,7 +12,7 @@ public class DummyMetric extends Metric<Double, Double>{
 
     }
 
-    public void fromStateMatrix(double t, StateMatrix stateMatrix) {
+    public void fromStateMatrix(double t, SSAStateMatrix networkState) {
 
     }
 

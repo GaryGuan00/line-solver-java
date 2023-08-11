@@ -5,28 +5,30 @@ import java.util.*;
 
 
 import jline.lang.constant.RoutingStrategy;
+import jline.lang.nodes.Cache;
 import jline.lang.nodes.ClassSwitch;
 import jline.lang.nodes.Node;
 import jline.lang.sections.ClassSwitcher;
+import jline.util.Matrix;
 
 public class RoutingMatrix implements Serializable {
-    private List<JobClass> jobClasses;
-    private List<Node> nodes;
+    private final List<JobClass> jobClasses;
+    private final List<Node> nodes;
     private Map<JobClass, Integer> classIndexMap;
     private Map<Node, Integer> nodeIndexMap;
     private boolean hasUnappliedConnections;
     
     //In order not to modify most part of the code, we will use list. But when set it to NetworkStruct, it will be transferred to map.
-    private List<List<JLineMatrix>> routings;
-    private JLineMatrix csMatrix;
+    private final List<List<Matrix>> routings;
+    private final Matrix csMatrix;
     private boolean hasClassSwitches;
-    private Network model;
+    private final Network model;
     
-    private JLineMatrix generateEmptyNodeOrClassRouting(int size) {
-    	return new JLineMatrix(size, size, size * size);
+    private Matrix generateEmptyNodeOrClassRouting(int size) {
+    	return new Matrix(size, size, size * size);
     }
 
-    private Map<JobClass, Map<JobClass, Double>> matrix2Hashmap(JLineMatrix classRouting){
+    private Map<JobClass, Map<JobClass, Double>> routingMatrixToMap(Matrix classRouting){
     	Map<JobClass, Map<JobClass, Double>> csm = new HashMap<JobClass, Map<JobClass, Double>>();
 		int[] col_idx = classRouting.col_idx;
 		int[] nz_rows = classRouting.nz_rows;
@@ -46,12 +48,12 @@ public class RoutingMatrix implements Serializable {
 		return csm;
     }
     
-    private Map<JobClass, Map<JobClass, JLineMatrix>> routingListToMap(){
-    	Map<JobClass, Map<JobClass, JLineMatrix>> routingMap = new HashMap<JobClass, Map<JobClass, JLineMatrix>>();
+    private Map<JobClass, Map<JobClass, Matrix>> routingListToMap(){
+    	Map<JobClass, Map<JobClass, Matrix>> routingMap = new HashMap<JobClass, Map<JobClass, Matrix>>();
     	for (int i = 0; i < routings.size(); i++) {
     		JobClass jobClass = jobClasses.get(i);
-    		List<JLineMatrix> routingList = routings.get(i);
-    		Map<JobClass, JLineMatrix> map = new HashMap<JobClass, JLineMatrix>();
+    		List<Matrix> routingList = routings.get(i);
+    		Map<JobClass, Matrix> map = new HashMap<JobClass, Matrix>();
     		for(int j = 0; j < routingList.size(); j++) {
     			map.put(jobClasses.get(j), routingList.get(j).clone());
     		}
@@ -67,10 +69,10 @@ public class RoutingMatrix implements Serializable {
         
         int I = this.nodes.size();
         int K = this.jobClasses.size();
-        this.csMatrix = new JLineMatrix(K,K,K*K);
+        this.csMatrix = new Matrix(K,K,K*K);
         for(int i = 0; i < K; i++)
         	this.csMatrix.set(i, i, 1.0);
-        this.routings = new ArrayList<List<JLineMatrix>>();
+        this.routings = new ArrayList<List<Matrix>>();
         this.model = new Network("");
         this.hasClassSwitches = false;
     }
@@ -89,14 +91,14 @@ public class RoutingMatrix implements Serializable {
         }
         
         this.model = model;
-        this.csMatrix = new JLineMatrix(nJobClasses, nJobClasses, nJobClasses*nJobClasses);
+        this.csMatrix = new Matrix(nJobClasses, nJobClasses, nJobClasses*nJobClasses);
         for(int i = 0; i < nJobClasses; i++)
         	this.csMatrix.set(i, i, 1.0);
         this.hasClassSwitches = false;
         
-        routings = new ArrayList<List<JLineMatrix>>(nJobClasses);
+        routings = new ArrayList<List<Matrix>>(nJobClasses);
         for(int i = 0; i < nJobClasses; i++) {
-        	List<JLineMatrix> frame = new ArrayList<JLineMatrix>(nJobClasses);
+        	List<Matrix> frame = new ArrayList<Matrix>(nJobClasses);
         	for(int j = 0; j < nJobClasses; j++)
         		frame.add(generateEmptyNodeOrClassRouting(nNodes));
         	
@@ -121,7 +123,7 @@ public class RoutingMatrix implements Serializable {
         this.csMatrix.expandMatrix(nJobClasses, nJobClasses, nJobClasses*nJobClasses);
         this.csMatrix.set(nJobClasses - 1, nJobClasses - 1, 1);
         
-        List<JLineMatrix> frame = new ArrayList<JLineMatrix>();
+        List<Matrix> frame = new ArrayList<Matrix>();
         for(int i = 0; i < nJobClasses - 1; i++) {
         	this.routings.get(i).add(this.generateEmptyNodeOrClassRouting(nNodes)); // Old class to the new class
         	frame.add(this.generateEmptyNodeOrClassRouting(nNodes)); // New class to old class
@@ -151,11 +153,13 @@ public class RoutingMatrix implements Serializable {
         
         int I = this.nodes.size();
         
-        for (List<JLineMatrix> classArray : this.routings) {
+        for (List<Matrix> classArray : this.routings) {
         	for(int i = 0; i < classArray.size(); i++)
         		classArray.get(i).expandMatrix(I, I, I*I);
         }
     }
+
+
 
     public void addConnection(Node sourceNode, Node destNode) {
         for (JobClass jobClass : this.jobClasses) {
@@ -169,7 +173,7 @@ public class RoutingMatrix implements Serializable {
         }
 
         this.hasUnappliedConnections = true;
-        this.addConnection(sourceNode, destNode, jobClass, jobClass, Double.NaN);
+        this.addConnection(jobClass, jobClass, sourceNode, destNode, Double.NaN);
     }
     
     public void addConnection(Node sourceNode, Node destNode, double probability) {
@@ -184,7 +188,7 @@ public class RoutingMatrix implements Serializable {
     	}
     	
     	this.hasUnappliedConnections = true;
-    	this.addConnection(sourceNode, destNode, originClass, targetClass, Double.NaN);
+    	this.addConnection(originClass, targetClass, sourceNode, destNode, Double.NaN);
     }
 
     public void addConnection(Node sourceNode, Node destNode, JobClass jobClass, double probability) {
@@ -196,17 +200,17 @@ public class RoutingMatrix implements Serializable {
         	this.hasUnappliedConnections = true;
         }
         
-        this.addConnection(sourceNode, destNode, jobClass, jobClass, probability);
+        this.addConnection(jobClass, jobClass, sourceNode, destNode, probability);
     }
     
-    public void addConnection(Node sourceNode, Node destNode, JobClass originClass, JobClass targetClass, double probability) {
+    public void addConnection(JobClass originClass, JobClass targetClass, Node sourceNode, Node destNode, double probability) {
     	   
     	int originClassIdx = getClassIndex(originClass);
     	int targetClassIdx = getClassIndex(targetClass);
     	int sourceNodeIdx = getNodeIndex(sourceNode);
     	int destNodeIdx = getNodeIndex(destNode);
     	
-        if (!originClass.equals(targetClass)) {
+        if (!originClass.equals(targetClass) || sourceNode instanceof Cache || destNode instanceof Cache) {
         	this.hasClassSwitches = true;
         }
     	
@@ -224,11 +228,11 @@ public class RoutingMatrix implements Serializable {
     	}
     }
 
-    public void resolveUnappliedConnections() {
+	public void resolveUnappliedConnections() {
     	 
         int I = nodes.size();
-        for (List<JLineMatrix> jobClassRouting : this.routings) {
-        	for (JLineMatrix nodeRouting : jobClassRouting) {
+        for (List<Matrix> jobClassRouting : this.routings) {
+        	for (Matrix nodeRouting : jobClassRouting) {
         		for(int row = 0; row < I; row++) {
         			double residProb = 1;
         			int nUnapplied = 0;
@@ -258,9 +262,9 @@ public class RoutingMatrix implements Serializable {
     	//line 163 - 168
     	int nNodes = nodes.size();
     	int nClasses = jobClasses.size();
-    	List<List<JLineMatrix>> csnodematrix = new ArrayList<List<JLineMatrix>>(nNodes);
+    	List<List<Matrix>> csnodematrix = new ArrayList<List<Matrix>>(nNodes);
     	for(int i = 0; i < nNodes; i++) {
-    		List<JLineMatrix> classMatrix = new ArrayList<JLineMatrix>(nNodes);
+    		List<Matrix> classMatrix = new ArrayList<Matrix>(nNodes);
     		for(int j = 0; j < nNodes; j++)
     			classMatrix.add(generateEmptyNodeOrClassRouting(nClasses));
     		csnodematrix.add(classMatrix);
@@ -269,7 +273,7 @@ public class RoutingMatrix implements Serializable {
     	//line 170 - 179
     	for(int row = 0; row < nClasses; row++) {
     		for(int col = 0; col < nClasses; col++) {
-    			JLineMatrix nodeRouting = routings.get(row).get(col);
+    			Matrix nodeRouting = routings.get(row).get(col);
     			if (nodeRouting.getNonZeroLength() > 0) {
     				int[] col_idx = nodeRouting.col_idx;
     				int[] nz_rows = nodeRouting.nz_rows;
@@ -292,8 +296,8 @@ public class RoutingMatrix implements Serializable {
     	//line 196 - 207
     	for(int i = 0; i < nNodes; i++) {
     		for (int j = 0; j < nNodes; j++) {
-    			JLineMatrix classRouting = csnodematrix.get(i).get(j);
-    			JLineMatrix res = classRouting.sumRows();
+    			Matrix classRouting = csnodematrix.get(i).get(j);
+    			Matrix res = classRouting.sumRows();
 				classRouting.divideRows(res.nz_values, 0);
     			for(int r = 0; r < nClasses; r++) {
     				if (res.get(r) == 0)
@@ -306,14 +310,34 @@ public class RoutingMatrix implements Serializable {
     	int[][] csid = new int[nNodes][nNodes];
     	for(int i = 0; i < nNodes; i++) {
     		for(int j = 0; j < nNodes; j++) {
-    			JLineMatrix classRouting = csnodematrix.get(i).get(j);
+    			Matrix classRouting = csnodematrix.get(i).get(j);
     			if (!classRouting.isDiag()) {
     				String csname = "CS_" + nodes.get(i).getName() + "_to_" + nodes.get(j).getName();
-    				this.addNode(new ClassSwitch(model, csname, matrix2Hashmap(classRouting), classRouting)); //line 239 - 243
+					ClassSwitch csnode = new ClassSwitch(model, csname, classRouting);
+					csnode.autoAdded = true;
+    				this.addNode(csnode); //line 239 - 243
     				csid[i][j] = model.getNumberOfNodes() - 1;
     			}
     		}
     	}
+
+		// lines 222-233
+		for(int i = 0; i < nNodes; i++){
+			// This is to ensure that also stateful cs like caches are accounted
+			if(this.nodes.get(i) instanceof Cache){
+				Cache cache = (Cache) this.nodes.get(i);
+				for(int r = 0; r < cache.getHitClass().getNumCols(); r++){
+					if(cache.getHitClass().get(r) != -1){
+						csMatrix.set(r, (int) cache.getHitClass().get(r), 1);
+					}
+				}
+				for(int r = 0; r < cache.getMissClass().getNumCols(); r++){
+					if(cache.getMissClass().get(r) != -1){
+						csMatrix.set(r, (int) cache.getMissClass().get(r), 1);
+					}
+				}
+			}
+		}
     	
     	//line 245 - 260
     	for(int i = 0; i < nNodes; i++) {
@@ -321,13 +345,13 @@ public class RoutingMatrix implements Serializable {
     			if (csid[i][j] > 0) {
     				for(int r = 0; r < nClasses; r++) {
     					for (int s = 0; s < nClasses; s++) {
-    						JLineMatrix nodeRouting = routings.get(r).get(s);
+    						Matrix nodeRouting = routings.get(r).get(s);
     						if (nodeRouting.get(i, j) > 0) {
-    							JLineMatrix from = routings.get(r).get(r);
+    							Matrix from = routings.get(r).get(r);
     							from.set(i, csid[i][j], from.get(i, csid[i][j]) + nodeRouting.get(i, j));
     							nodeRouting.remove(i, j);
     						}
-    						JLineMatrix to = routings.get(s).get(s);
+    						Matrix to = routings.get(s).get(s);
     						to.set(csid[i][j], j, 1.0);
     					}
     				}
@@ -350,7 +374,7 @@ public class RoutingMatrix implements Serializable {
         
         //line 262-273
         for (int r = 0; r < this.jobClasses.size(); r++) {
-        	JLineMatrix routing = routings.get(r).get(r);
+        	Matrix routing = routings.get(r).get(r);
         
     		int[] col_idx = routing.col_idx;
     		int[] nz_rows = routing.nz_rows;
@@ -372,4 +396,17 @@ public class RoutingMatrix implements Serializable {
         this.model.setStruct(sn);
         this.model.setCsMatrix(this.csMatrix);
     }
+
+	public void set(JobClass jobclass1, JobClass jobclass2, Node srcNode, Node destNode, double probability) {
+		this.addConnection(jobclass1,jobclass2,srcNode,destNode,probability);
+	}
+	public void set(JobClass jobclass1, Node srcNode, Node destNode, double probability) {
+		this.addConnection(srcNode,destNode,jobclass1,probability);
+	}
+	public void set(Node srcNode, Node destNode, double probability) {
+		this.addConnection(srcNode,destNode,probability);
+	}
+	public void set(Node srcNode, Node destNode) {
+		this.addConnection(srcNode,destNode);
+	}
 }

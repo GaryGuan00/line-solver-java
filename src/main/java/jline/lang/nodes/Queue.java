@@ -1,10 +1,8 @@
 package jline.lang.nodes;
 
 import java.io.Serializable;
-import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
 
@@ -14,8 +12,9 @@ import jline.lang.constant.SchedStrategy;
 import jline.lang.constant.SchedStrategyType;
 import jline.lang.constant.ServiceStrategy;
 import jline.lang.distributions.*;
-import jline.lang.nodes.*;
 import jline.lang.sections.*;
+import jline.util.JFunction;
+import jline.util.Matrix;
 
 public class Queue extends Station implements HasSchedStrategy, Serializable {
     protected SchedStrategy schedStrategy;
@@ -25,7 +24,6 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
 
     public Queue(Network model, String name, SchedStrategy schedStrategy) {
         super(name);
-
         this.serviceProcesses = new ArrayList<ServiceBinding>();
         this.schedStrategyPar = new HashMap<JobClass, Double>();
 
@@ -180,7 +178,7 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
         return this.schedPolicy;
     }
     
-    public void setLoadDependence(JLineMatrix alpha) {
+    public void setLoadDependence(Matrix alpha) {
     	switch (this.schedStrategy) {
     		case PS:
     		case FCFS:
@@ -191,7 +189,7 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
     	}			
     }
     
-    public void setClassDependence(Function<JLineMatrix, Double> beta) {
+    public void setClassDependence(JFunction<Matrix, Double> beta) {
     	switch (this.schedStrategy) {
 	    	case PS:
 	    	case FCFS:
@@ -246,4 +244,5 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
         }
         return acc;
     }
+
 }

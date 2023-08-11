@@ -1,29 +1,47 @@
 package jline.lang.distributions;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import jline.lang.JLineMatrix;
+import jline.lang.constant.GlobalConstants;
+import jline.util.Matrix;
+import static jline.lib.KPCToolbox.*;
 
 @SuppressWarnings("unchecked")
-public class APH extends MarkovianDistribution{
+public class APH extends MarkovianDistribution {
 
-	public APH(List<Double> p, JLineMatrix generator) {
-        super("APH", 1);
-		
-        this.setParam(1, "p", p);
-        this.setParam(2, "generator", generator);
+	List<Double> totalPhaseRate;
+
+	public APH(List<Double> alpha, Matrix T) {
+        super("APH", 3);
+
+		int nPhases = alpha.size();
+
+		this.setParam(1, "n", nPhases);
+        this.setParam(2, "alpha", alpha);
+        this.setParam(3, "T", T);
+		this.totalPhaseRate = new ArrayList<Double>(nPhases);
+
+		for (int i = 0; i < nPhases; i++) {
+			double tpr = 0.0;
+			tpr -= T.get(i,i);
+			this.totalPhaseRate.add(tpr);
+		}
+	}
+
+	public Matrix getInitProb() {
+		List<Double> param1 = (List<Double>) this.getParam(2).getValue();
+		Matrix alpha = new Matrix(1, param1.size(), param1.size());
+		for(int i = 0; i < param1.size(); i++)
+			alpha.set(0, i, param1.get(i));
+		return alpha;
 	}
 
 	@Override
-	public long getNumberOfPhases() {
-		Map<Integer, JLineMatrix> PH = this.getRepres();
-		return PH.get(0).numCols;
+	public List<Double> sample(long n) {
+		return this.sample(n,null);
 	}
-
 	@Override
-	public List<Double> sample(int n) {
+	public List<Double> sample(long n, Random random) {
 		throw new RuntimeException("Not implemented");
 	}
 
@@ -64,33 +82,62 @@ public class APH extends MarkovianDistribution{
 	}
 
 	@Override
-	public Map<Integer, JLineMatrix> getPH() {
-		Map<Integer, JLineMatrix> res = new HashMap<Integer, JLineMatrix>();
-		JLineMatrix T = getSubgenerator();
-		
-		JLineMatrix ones = new JLineMatrix(T.numCols,1,T.numCols);
-		JLineMatrix expression1 = new JLineMatrix(0,0,0);
-		JLineMatrix expression2 = new JLineMatrix(0,0,0);
+	public Map<Integer, Matrix> getPH() {
+		Map<Integer, Matrix> res = new HashMap<Integer, Matrix>();
+		Matrix T = getSubgenerator();
+
+		Matrix ones = new Matrix(T.numCols,1,T.numCols);
+		Matrix Te = new Matrix(0,0,0);
+		Matrix Tepie = new Matrix(0,0,0);
 		ones.fill(1.0);
-		T.mult(ones, expression1);
-		expression1.mult(this.getInitProb(), expression2);
-		expression2.removeZeros(0);
-		expression2.changeSign();
-		
-		res.put(0, T.clone());
-		res.put(1, expression2);
+		T.mult(ones, Te);
+		Te.mult(this.getInitProb(), Tepie);
+		//Tepie.removeZeros(0);
+		Tepie.changeSign();
+
+		res = map_normalize(T,Tepie);
 		return res;
 	}
-	
-	public JLineMatrix getSubgenerator() {
-		return (JLineMatrix) this.getParam(2).getValue();
+
+	@Override
+	public long getNumberOfPhases() {
+		return (long) this.getParam(1).getValue();
 	}
-	
-	public JLineMatrix getInitProb() {
-		List<Double> param1 = (List<Double>) this.getParam(1).getValue();
-		JLineMatrix alpha = new JLineMatrix(1, param1.size(), param1.size());
-		for(int i = 0; i < param1.size(); i++)
-			alpha.set(0, i, param1.get(i));
-		return alpha;
+
+	public Matrix getSubgenerator() {
+		return (Matrix) this.getParam(3).getValue();
+	}
+
+	public static APH fitMeanAndSCV(double mean, double scv) {
+		APH ex;
+		if (mean <= GlobalConstants.FineTol) {
+			Matrix T = new Matrix(1,1);
+			T.set(0,0,-1/mean);
+			List<Double> alpha = Collections.singletonList(1.0);
+			ex = new APH(alpha, T);
+		} else {
+			double e1 = mean;
+			double e2 = (1+scv)*e1*e1;
+			double cv2 = e2/e1/e1 - 1.0;
+			double lambda = 1.0 / e1;
+			int N = Math.max((int)Math.ceil(1.0/cv2), 2);
+			double p = 1.0 / (cv2 + 1.0 + (cv2-1.0)/(N-1));
+			Matrix T = new Matrix(N,N);
+			Matrix.eye(N).scale(-lambda*p*N,T);
+			for (int i=0;i<N-1;i++) {
+				T.set(i,i+1,-1.0*T.get(i,i));
+			}
+			T.set(N-1,N-1,-lambda*N);
+			Matrix alpha = new Matrix(1,N);
+			alpha.set(0,0,p);
+			alpha.set(0,N-1,1.0 - p);
+			ex = new APH(alpha.toList1D(), T);
+			ex.immediate = false;
+		}
+		return ex;
+	}
+
+	public double getTotalPhaseRate(int i) {
+		return totalPhaseRate.get(i);
 	}
 }

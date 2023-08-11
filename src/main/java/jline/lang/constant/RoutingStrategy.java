@@ -8,5 +8,22 @@ public enum RoutingStrategy {
     JSQ,
     DISABLED,
     FIRING,
-    KCHOICES
+    KCHOICES;
+
+    public static String toFeature(RoutingStrategy routing){
+        switch (routing){
+            case RAND:
+                return "RoutingStrategy_RAND";
+            case PROB:
+                return "RoutingStrategy_PROB";
+            case RROBIN:
+                return "RoutingStrategy_RROBIN";
+            case WRROBIN:
+                return "RoutingStrategy_WRROBIN";
+            case KCHOICES:
+                return "RoutingStrategy_KCHOICES";
+            default:
+                return "";
+        }
+    }
 }

@@ -5,7 +5,7 @@ import jline.lang.OutputStrategy;
 import jline.lang.nodes.Node;
 import jline.lang.sections.OutputSection;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 
 import java.util.*;
@@ -43,7 +43,7 @@ public class JoinOutputEvent extends OutputEvent {
         }
     }
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
         OutputSection os = timeline.getLastOutputEvent().getOutputSection();
         this.seenSet.add(os);
         this.waitingJobs.put(os, this.waitingJobs.get(os) + 1);
@@ -54,7 +54,7 @@ public class JoinOutputEvent extends OutputEvent {
             }
 
             for (OutputStrategy outputStrategy : this.outputSection.getOutputStrategies()) {
-                outputStrategy.getDestination().getArrivalEvent(this.jobClass).stateUpdate(stateMatrix, random, timeline);
+                outputStrategy.getDestination().getArrivalEvent(this.jobClass).stateUpdate(networkState, random, timeline);
             }
         }
 
@@ -62,10 +62,10 @@ public class JoinOutputEvent extends OutputEvent {
     }
 
     @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
         int nUnapplied = 0;
         for (int i = 0; i < n; i++) {
-            if (this.stateUpdate(stateMatrix, random, timeline)) {
+            if (this.stateUpdate(networkState, random, timeline)) {
                 nUnapplied += (n-i);
             }
         }

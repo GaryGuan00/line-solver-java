@@ -1,97 +1,189 @@
 package jline.solvers.ssa;
 
 import jline.lang.*;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.lang.constant.SolverType;
+import jline.lang.nodes.Node;
+import jline.lang.nodes.StatefulNode;
+import jline.solvers.NetworkSolver;
+import jline.solvers.SolverOptions;
+import jline.solvers.SolverResult;
+import jline.solvers.ssa.events.DepartureEvent;
+import jline.solvers.ssa.events.Event;
+import jline.solvers.ssa.events.EventStack;
+import jline.solvers.ssa.metrics.Metrics;
+import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.solvers.ssa.strategies.TauLeapingStateStrategy;
+import jline.solvers.ssa.strategies.TauLeapingType;
+import jline.util.Matrix;
 //import jline.util.JLineAPI;
 
 import java.util.*;
 
-public class SolverSSA {
+public class SolverSSA extends NetworkSolver {
 
-    protected SSAOptions ssaOptions;
-    protected Network network;
-    protected SSAStruct simStruct;
-    protected SSAData simCache;
-    protected Random random;
+    protected NetworkStruct sn;
+    public Map<Node, Map<JobClass, Double>> cutoffMatrix;
+    public Map<Node, Double> nodeCutoffMatrix;
+    public double timeout;
 
-    public SolverSSA() {
-        this.network = null;
-        this.simStruct = null;
-        this.ssaOptions = new SSAOptions();
-        this.random = new Random();
+    // tau leaping configuration
+    public TauLeapingType tauLeapingType;
+    public boolean useTauLeap;
+
+    // metrics configurations
+    public boolean useMSER5;
+    public boolean useR5;
+    public int R5value;
+    public boolean recordMetricTimeline;
+    public double steadyStateTime;
+    public boolean disableResTime;
+    public boolean disableTransientState;
+    public EventStack eventStack;
+
+    public SolverSSA(Network model) {
+        this(model, new SolverOptions(SolverType.SSA));
     }
 
-    public SSAOptions setOptions() {
-        return this.ssaOptions;
+    public SolverSSA(Network model, SolverOptions options) {
+            super(model, "SSA", options);
+
+        this.model = model;
+        this.sn = null;
+
+        this.disableResTime = false;
+        this.timeout = Double.POSITIVE_INFINITY;
+        this.cutoffMatrix = new HashMap<Node, Map<JobClass, Double>>();
+        this.nodeCutoffMatrix = new HashMap<Node, Double>();
+        this.tauLeapingType = null;
+        this.useTauLeap = false;
+        this.useMSER5 = false;
+        this.useR5 = false;
+        this.recordMetricTimeline = true;
+        this.R5value = 19;
+        this.steadyStateTime = -1;
+        this.disableTransientState = false;
+
+        this.eventStack = new EventStack();
+
+        // loop through each node and add active events to the eventStack
+        ListIterator<Node> nodeIter = model.getNodes().listIterator();
+        int nodeIdx = -1;
+        while (nodeIter.hasNext()) {
+            Node node = nodeIter.next();
+            if (!(node instanceof StatefulNode)) {
+                continue;
+            }
+
+            nodeIdx++;
+            Iterator<JobClass> jobClassIter = model.getClasses().listIterator();
+
+            while (jobClassIter.hasNext()) {
+                JobClass jobClass = jobClassIter.next();
+                int jobClassIdx = jobClass.getJobClassIdx();
+//                if (network.getClassLinks(node, jobClass) == 0) {
+//                    this.simStruct.classcap[nodeIdx][jobClassIdx] = 0;
+//                } else {
+//                    double jobCap = jobClass.getNumberOfJobs();
+//                    jobCap = Math.min(jobCap, node.getClassCap(jobClass));
+//                    if ((jobCap == Double.POSITIVE_INFINITY) || (node.getDropStrategy() == DropStrategy.WaitingQueue)) {
+//                        this.simStruct.classcap[nodeIdx][jobClassIdx] = Integer.MAX_VALUE;
+//                    } else {
+//                        this.simStruct.classcap[nodeIdx][jobClassIdx] = (int) jobCap;
+//                    }
+//                }
+                Event dEvent = DepartureEvent.fromNodeAndClass(node, jobClass);
+                this.eventStack.addEvent(dEvent);
+                if (dEvent instanceof DepartureEvent) {
+                    if (((DepartureEvent) dEvent).getPhaseEvent() != null) {
+                        this.eventStack.addEvent(((DepartureEvent) dEvent).getPhaseEvent());
+                    }
+                }
+            }
+
+//            double nodeCap = node.getCap();
+//            if (nodeCap == Double.POSITIVE_INFINITY) {
+//                this.simStruct.cap[nodeIdx] = Integer.MAX_VALUE;
+//            } else {
+//                this.simStruct.cap[nodeIdx] = (int) nodeCap;
+//            }
+        }
     }
 
-    public void compile(Network network) {
-        this.network = network;
-        this.simCache = new SSAData(this.network);
-    }
+    public void runAnalyzer() throws IllegalAccessException {
+        Timeline timeline = this.solve();
 
-    public void compile(SSAStruct networkStruct) {
-        this.simStruct = networkStruct;
-        this.simCache = new SSAData(this.simStruct);
-        throw new RuntimeException("Network structs not supported");
+        this.result = new SolverResult();
+
+        int M = this.sn.nstateful;
+        int K = this.sn.nclasses;
+
+        this.result.UN = new Matrix(M,K);
+        this.result.QN = new Matrix(M,K);
+        this.result.RN = new Matrix(M,K);
+        this.result.TN = new Matrix(M,K);
+        this.result.XN = new Matrix(1,K);
+        this.result.CN = new Matrix(1,K);
+
+        for (int i = 0; i <M; i++) {
+            for (int r = 0; r <K; r++) {
+                Metrics metrics = timeline.getMetrics(i, r);
+                this.result.QN.set(i,r,metrics.getMetricValueByName("Queue Length"));
+                this.result.UN.set(i,r,metrics.getMetricValueByName("Utilization"));
+                this.result.TN.set(i,r,metrics.getMetricValueByName("Throughput"));
+                this.result.RN.set(i,r,metrics.getMetricValueByName("Response Time"));
+            }
+        }
     }
 
     public Timeline solve() {
-        if (this.simCache == null) {
-            if (this.simStruct == null) {
-                this.compile(this.simStruct);
-            } else if (this.network == null) {
-                this.compile(this.network);
-            } else {
-                throw new RuntimeException("Network data not provided!");
+            if (this.sn == null) {
+                this.sn = this.model.getStruct(true);
             }
-        }
 
-        this.random = new Random(this.ssaOptions.seed);
+        this.random = new Random(this.options.seed);
         int samplesCollected = 1;
-        int maxSamples = ssaOptions.samples;
-        double curTime = ssaOptions.timeInterval.getLeft();
-        double maxTime = ssaOptions.timeInterval.getRight();
+        int maxSamples = options.samples;
+        double curTime = options.timespan[0];
+        double maxTime = options.timespan[1];
 
         // Add ClosedClass instances to the reference station
-        StateMatrix stateMatrix = new StateMatrix(this.simCache.simStruct, this.random);
-        for (JobClass jobClass : this.network.getClasses()) {
+        SSAStateMatrix networkState = new SSAStateMatrix(this.sn, this.random);
+        for (JobClass jobClass : this.model.getClasses()) {
             if (jobClass instanceof ClosedClass) {
-                int classIdx = this.network.getJobClassIndex(jobClass);
+                int classIdx = this.model.getJobClassIndex(jobClass);
                 ClosedClass cClass = (ClosedClass) jobClass;
-                int stationIdx = this.network.getStatefulNodeIndex(cClass.getRefstat());
-                stateMatrix.setState(stationIdx, classIdx, (int)cClass.getPopulation());
+                int stationIdx = this.model.getStatefulNodeIndex(cClass.getRefstat());
+                networkState.setState(stationIdx, classIdx, (int)cClass.getPopulation());
                 for (int i = 0; i < cClass.getPopulation(); i++) {
-                    stateMatrix.addToBuffer(stationIdx, classIdx);
+                    networkState.addToBuffer(stationIdx, classIdx);
                 }
             }
         }
 
-        Timeline timeline = new Timeline(this.simCache.simStruct);
+        Timeline timeline = new Timeline(this.sn);
 
-        if (ssaOptions.disableResTime) {
+        if (this.disableResTime) {
             timeline.disableResidenceTime();
         }
 
-        if (ssaOptions.disableTransientState) {
+        if (this.disableTransientState) {
             timeline.disableTransientState();
         }
 
-        if (ssaOptions.useMSER5) {
+        if (this.useMSER5) {
             timeline.useMSER5();
-        } else if (ssaOptions.useR5) {
-            timeline.useR5(ssaOptions.r5value);
+        } else if (this.useR5) {
+            timeline.useR5(this.R5value);
         }
 
-        if (!ssaOptions.recordMetricTimeline) {
+        if (!this.recordMetricTimeline) {
             timeline.setMetricRecord(false);
         }
 
-        if (ssaOptions.useTauLeap) {
-            this.simCache.eventStack.configureTauLeap(ssaOptions.tauLeapingType);
-            if ((ssaOptions.tauLeapingType.stateStrategy == TauLeapingStateStrategy.TimeWarp) ||
-                    (ssaOptions.tauLeapingType.stateStrategy == TauLeapingStateStrategy.TauTimeWarp)) {
+        if (this.useTauLeap) {
+            this.eventStack.configureTauLeap(this.tauLeapingType);
+            if ((this.tauLeapingType.getStateStrategy() == TauLeapingStateStrategy.TimeWarp) ||
+                    (this.tauLeapingType.getStateStrategy() == TauLeapingStateStrategy.TauTimeWarp)) {
                 timeline.cacheRecordings();
             }
         }
@@ -102,29 +194,36 @@ public class SolverSSA {
         boolean beforeSState = false;
 
         // collect samples and update states
-        while ((samplesCollected < maxSamples) && (curTime < maxTime) && (sysTime < this.ssaOptions.timeout)) {
-            beforeSState = curTime < this.ssaOptions.steadyStateTime;
+        while ((samplesCollected < maxSamples) && (curTime < maxTime) && (sysTime < this.timeout)) {
+            beforeSState = curTime < this.steadyStateTime;
 
-            if (ssaOptions.useTauLeap) {
-                curTime = this.simCache.eventStack.tauLeapUpdate(stateMatrix, timeline, curTime, random);
+            if (this.useTauLeap) {
+                curTime = this.eventStack.tauLeapUpdate(networkState, timeline, curTime, random);
             } else {
-                curTime = this.simCache.eventStack.updateState(stateMatrix, timeline, curTime, random);
+                curTime = this.eventStack.updateState(networkState, timeline, curTime, random);
             }
 
-            if (beforeSState && (curTime > this.ssaOptions.steadyStateTime)) {
+            if (beforeSState && (curTime > this.steadyStateTime)) {
                 timeline.resetHistory();
             }
-
             samplesCollected++;
             sysTime = (System.currentTimeMillis() - startTime)/1000.0;
 
         }
 
-        //System.out.format("Solver finished. %d samples in %f time\n", samplesCollected, curTime);
-
         timeline.taper(curTime);
-        //timeline.printSummary(this.network);
 
         return timeline;
+    }
+
+    public void enableMSER5() {
+        this.useMSER5 = true;
+        this.useR5 = false;
+    }
+
+    public void enableR5(int k) {
+        this.useR5 = true;
+        this.useMSER5 = false;
+        this.R5value = k;
     }
 }

@@ -1,20 +1,21 @@
 package jline.lang.distributions;
 
-import jline.lang.JLineMatrix;
+import jline.util.Matrix;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 
 @SuppressWarnings("unchecked")
 public class HyperExp extends MarkovianDistribution  implements Serializable {
 	
-    private long nPhases;
+    private final long nPhases;
     
     public HyperExp(double p, double lambda1, double lambda2) {
-    	super("HyperExponential", 1);
+    	super("HyperExp", 1);
     	
     	this.setParam(1, "p", p);
     	this.setParam(2, "lambda1", lambda1);
@@ -27,9 +28,20 @@ public class HyperExp extends MarkovianDistribution  implements Serializable {
     	this(p, lambda, lambda);
     }
 
-    public List<Double> sample(int n)  {
-        throw new RuntimeException("Not Implemented!");
-    }
+	/**
+	 * Gets n samples from the distribution
+	 * @param n - the number of samples
+	 * @return - n samples from the distribution
+	 */
+	@Override
+	public List<Double> sample(long n) {
+		return this.sample(n,new Random());
+	}
+
+	@Override
+	public List<Double> sample(long n, Random random) {
+		throw new RuntimeException("Not implemented");
+	}
 
 	public long getNumberOfPhases() {
         return nPhases;
@@ -46,14 +58,14 @@ public class HyperExp extends MarkovianDistribution  implements Serializable {
     	}
     }
 
-	public Map<Integer, JLineMatrix> getPH() {
-    	Map<Integer, JLineMatrix> res = new HashMap<Integer, JLineMatrix>();
+	public Map<Integer, Matrix> getPH() {
+    	Map<Integer, Matrix> res = new HashMap<Integer, Matrix>();
     	
     	double p = (double) this.getParam(1).getValue();
     	double mu1 = (double) this.getParam(2).getValue();
     	double mu2 = (double) this.getParam(3).getValue();
-		JLineMatrix D0 = new JLineMatrix(2,2,4);
-		JLineMatrix D1 = new JLineMatrix(2,2,4);
+		Matrix D0 = new Matrix(2,2,4);
+		Matrix D1 = new Matrix(2,2,4);
 		D0.set(0, 0, -mu1); D0.set(1, 1, -mu2);
 		D1.set(0, 0, mu1*p); D1.set(0, 1, mu1*(1-p)); D1.set(1, 0, mu2*p); D1.set(1, 1, mu2*(1-p));
 		res.put(0, D0);

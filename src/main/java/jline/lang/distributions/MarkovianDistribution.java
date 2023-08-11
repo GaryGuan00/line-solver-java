@@ -1,43 +1,56 @@
 package jline.lang.distributions;
 
 import java.io.Serializable;
-import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
-import org.ejml.data.DMatrixRMaj;
-import org.ejml.dense.row.CommonOps_DDRM;
-import org.ejml.ops.DConvertMatrixStruct;
-import org.qore.KPC.MAP;
 
-import jline.lang.JLineMatrix;
+import jline.lang.processes.MAP;
+import jline.util.Matrix;
+
 import jline.util.Interval;
+import static jline.lib.KPCToolbox.*;
 
 abstract public class MarkovianDistribution extends Distribution implements Serializable {
 	
-	protected Map<Integer, JLineMatrix> representation; // <0, D0>, <1, D1>, <2, D2>
-	
+	protected Map<Integer, Matrix> representation; // <0, D0>, <1, D1>, <2, D2>
+	public Matrix initProb;
+	public Matrix invSubgenerator;
+
     public MarkovianDistribution(String name, int numParam) {
         super(name, numParam, new Interval(0, Double.POSITIVE_INFINITY));
     }
 
-    public abstract long getNumberOfPhases();
-    public abstract Map<Integer, JLineMatrix> getPH();
-    
-    public JLineMatrix getMu() {
-    	JLineMatrix aph_1 = getRepres().get(0);
+	public long getNumberOfPhases() {
+		Map<Integer, Matrix> PH = this.getRepres();
+		return PH.get(1).numCols;
+	}
+
+	public Matrix getD0() {
+		return getRepres().get(0);
+	}
+
+	public Matrix getD1() {
+		return getRepres().get(1);
+	}
+
+	public abstract Map<Integer, Matrix> getPH();
+
+    public Matrix getMu() {
+    	Matrix aph_1 = getD0();
     	int size = Math.min(aph_1.numCols, aph_1.numRows);
-    	JLineMatrix res = new JLineMatrix(size, 1, size);
+    	Matrix res = new Matrix(size, 1, size);
     	for(int i = 0; i < size; i++) {
     		res.set(i, 0, -aph_1.get(i, i));
     	}
     	return res;
     }
     
-    public JLineMatrix getPhi() {
-    	Map<Integer, JLineMatrix> aph = this.getRepres();
-    	JLineMatrix ones = new JLineMatrix(aph.get(0).numRows, 1, aph.get(0).numRows);
-    	JLineMatrix res = new JLineMatrix(aph.get(1).numRows, 1);
-    	JLineMatrix mu = getMu();
+    public Matrix getPhi() {
+    	Map<Integer, Matrix> aph = this.getRepres();
+    	Matrix ones = new Matrix(aph.get(0).numRows, 1, aph.get(0).numRows);
+    	Matrix res = new Matrix(aph.get(1).numRows, 1);
+    	Matrix mu = getMu();
     	
     	ones.fill(1.0);
     	aph.get(1).mult(ones, res);
@@ -45,7 +58,7 @@ abstract public class MarkovianDistribution extends Distribution implements Seri
     	return res;
     }
     
-    public Map<Integer, JLineMatrix> getRepres() {
+    public Map<Integer, Matrix> getRepres() {
 		try {
 			if (this.representation == null)
 				this.representation = getPH();
@@ -56,83 +69,74 @@ abstract public class MarkovianDistribution extends Distribution implements Seri
     }
 
     public double getMean() {
-    	Map<Integer, JLineMatrix> rep = getRepres();
+    	Map<Integer, Matrix> rep = getRepres();
     	if (rep.get(0).hasNaN()) {
     		return Double.NaN;
     	} else {
-    		DMatrixRMaj D0 = DConvertMatrixStruct.convert(rep.get(0), (DMatrixRMaj)null);
-    		DMatrixRMaj D1 = DConvertMatrixStruct.convert(rep.get(1), (DMatrixRMaj)null);
-    		MAP map = new MAP(D0, D1);
-    		return map.getMean();
+    		Matrix D0 = getD0();
+    		Matrix D1 = getD1();
+    		return map_mean(D0,D1);
     	}
     }
     
     public double getSCV() {
-    	Map<Integer, JLineMatrix> rep = getRepres();
+    	Map<Integer, Matrix> rep = getRepres();
     	if (rep.get(0).hasNaN()) {
     		return Double.NaN;
     	} else {
-    		DMatrixRMaj D0 = DConvertMatrixStruct.convert(rep.get(0), (DMatrixRMaj)null);
-    		DMatrixRMaj D1 = DConvertMatrixStruct.convert(rep.get(1), (DMatrixRMaj)null);
-    		MAP map = new MAP(D0, D1);
-    		return map.getSCV();
+			Matrix D0 = getD0();
+			Matrix D1 = getD1();
+			return map_scv(D0,D1);
     	}
     }
     
     public double evalCDF(double t) {
-    	Map<Integer, JLineMatrix> rep = getRepres();
-		DMatrixRMaj D0 = DConvertMatrixStruct.convert(rep.get(0), (DMatrixRMaj)null);
-		DMatrixRMaj D1 = DConvertMatrixStruct.convert(rep.get(1), (DMatrixRMaj)null);
-		MAP map = new MAP(D0, D1);
+    	Map<Integer, Matrix> rep = getRepres();
+		Matrix D0 = getD0();
+		Matrix D1 = getD1();
 		//return map.evalCDF(t); Not implemented in MAP
 		throw new RuntimeException("Not implemented");
     }
     
     public double evalLST(double t) {
-    	Map<Integer, JLineMatrix> rep = getRepres();
-		DMatrixRMaj D0 = DConvertMatrixStruct.convert(rep.get(0), (DMatrixRMaj)null);
-		DMatrixRMaj D1 = DConvertMatrixStruct.convert(rep.get(1), (DMatrixRMaj)null);
-		MAP map = new MAP(D0, D1);
+    	Map<Integer, Matrix> rep = getRepres();
+		Matrix D0 = rep.get(0);
+		Matrix D1 = rep.get(1);
 		
 		//Below is the function map_pie
-		DMatrixRMaj PIE = new DMatrixRMaj();
-		CommonOps_DDRM.mult(map.ctmc(false), D1, PIE);
-		DMatrixRMaj ones = new DMatrixRMaj(D1.numCols, 1);
-		CommonOps_DDRM.fill(ones, 1);
-		DMatrixRMaj temp = new DMatrixRMaj();
-		CommonOps_DDRM.mult(PIE, ones, temp);
-		CommonOps_DDRM.divide(PIE, temp.get(0,0));
+		Matrix PIE = map_pie(D0,D1);
 		
-		DMatrixRMaj A = D0.copy();
-		DMatrixRMaj e = new DMatrixRMaj(PIE.numCols, 1);
-		CommonOps_DDRM.fill(e, 1);
-		
-		//pie*inv(s*eye(size(A))-A)*(-A)*e
-		double[] diagEl = new double[Math.min(A.numRows, A.numCols)];
-		Arrays.fill(diagEl, 1);
-		DMatrixRMaj eye = CommonOps_DDRM.diagR(A.numRows, A.numCols, diagEl);
-		CommonOps_DDRM.scale(t, eye);
-		DMatrixRMaj res = new DMatrixRMaj();
-		CommonOps_DDRM.subtract(eye, A, res);
-		CommonOps_DDRM.invert(res);
-		CommonOps_DDRM.mult(PIE, res.copy(), res);
-		CommonOps_DDRM.changeSign(A);
-		CommonOps_DDRM.mult(res.copy(), A, res);
-		CommonOps_DDRM.mult(res.copy(), e, res);
-    	return res.get(0,0);
+//		Matrix A = D0.copy();
+//		Matrix e = new Matrix(PIE.numCols, 1);
+//		CommonOps_DDRM.fill(e, 1);
+//
+//		//pie*inv(s*eye(size(A))-A)*(-A)*e
+//		double[] diagEl = new double[Math.min(A.numRows, A.numCols)];
+//		Arrays.fill(diagEl, 1);
+//		Matrix eye = CommonOps_DDRM.diagR(A.numRows, A.numCols, diagEl);
+//		CommonOps_DDRM.scale(t, eye);
+//		Matrix res = new Matrix();
+//		CommonOps_DDRM.subtract(eye, A, res);
+//		CommonOps_DDRM.invert(res);
+//		CommonOps_DDRM.mult(PIE, res.copy(), res);
+//		CommonOps_DDRM.changeSign(A);
+//		CommonOps_DDRM.mult(res.copy(), A, res);
+//		CommonOps_DDRM.mult(res.copy(), e, res);
+//    	return res.get(0,0);
+		return 0.0;
     }
     
     public double getSkew() {
-    	Map<Integer, JLineMatrix> rep = getRepres();
+    	Map<Integer, Matrix> rep = getRepres();
     	if (rep.get(0).hasNaN()) {
     		return Double.NaN;
     	} else {
-    		DMatrixRMaj D0 = DConvertMatrixStruct.convert(rep.get(0), (DMatrixRMaj)null);
-    		DMatrixRMaj D1 = DConvertMatrixStruct.convert(rep.get(1), (DMatrixRMaj)null);
-    		MAP map = new MAP(D0, D1);
-    		double[] m = map.getMoments();
-    		double M3 = m[2] - 3*m[1]*m[0] + 2*Math.pow(m[0], 3);
-    		return M3 / Math.pow(Math.sqrt(map.getSCV())*m[0], 3);
+			Matrix D0 = rep.get(0);
+			Matrix D1 = rep.get(1);
+			MAP map = new MAP(D0, D1);
+			List<Double> m = map.getMoments();
+    		double M3 = m.get(2) - 3*m.get(1)*m.get(0) + 2*Math.pow(m.get(0), 3);
+    		return M3 / Math.pow(Math.sqrt(map.getSCV())*m.get(0), 3);
     	}
     }
 }

@@ -11,9 +11,10 @@ import jline.lang.distributions.*;
 import jline.lang.nodes.*;
 import jline.lang.sections.*;
 import jline.util.CSFunInput;
+import jline.util.JFunction;
 
 public class ClassSwitcher extends ServiceSection implements Serializable {
-	protected Function<CSFunInput, Double> csFun;
+	protected JFunction<CSFunInput, Double> csFun;
     protected List<JobClass> jobClasses;
     
     public ClassSwitcher(List<JobClass> jobClasses, String name) {

@@ -1,33 +1,31 @@
 package jline.lang.sections;
 
+import jline.lang.JobClass;
+import jline.lang.constant.JoinStrategy;
+
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import jline.lang.JobClass;
-import jline.lang.Network;
-import jline.lang.OutputStrategy;
-import jline.lang.constant.JoinStrategy;
-import jline.lang.constant.RoutingStrategy;
-import jline.lang.nodes.Node;
-import jline.solvers.ssa.events.JoinOutputEvent;
 
 public class Joiner extends InputSection implements Serializable {
     protected List<JobClass> jobClasses;
     
     public Map<JobClass, JoinStrategy> joinStrategy;
     public Map<JobClass, Double> joinRequired;
+    public Map<JobClass, JobClass> joinJobClasses;
     
-    public Joiner(Network model) {
+    public Joiner(List<JobClass> customerClasses) {
         super("Joiner");
-        this.jobClasses = model.getClasses();
-        joinStrategy = new HashMap<JobClass, JoinStrategy>();
-        joinRequired = new HashMap<JobClass, Double>();
+        this.joinJobClasses = new HashMap<>();
+        this.jobClasses = customerClasses;
+        this.joinStrategy = new HashMap<JobClass, JoinStrategy>();
+        this.joinRequired = new HashMap<JobClass, Double>();
         
         for(JobClass jobclass : this.jobClasses) {
-        	joinStrategy.put(jobclass, JoinStrategy.STD);
-        	joinRequired.put(jobclass, -1.0);
+        	this.joinStrategy.put(jobclass, JoinStrategy.STD);
+        	this.joinRequired.put(jobclass, -1.0);
+            this.joinJobClasses.put(jobclass, jobclass);
         }
     }
 

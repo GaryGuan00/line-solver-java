@@ -1,25 +1,20 @@
 package jline.lang.nodes;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
-import org.ejml.sparse.csc.CommonOps_DSCC;
 
 import jline.lang.*;
 import jline.solvers.ssa.events.ArrivalEvent;
+import jline.util.Matrix;
 
 public class StatefulNode extends Node implements Serializable {
     private Integer statefulIndex;
-    private JLineMatrix state;
-    private JLineMatrix statePrior;
+    private Matrix state;
+    private Matrix statePrior;
     
     public StatefulNode(String name) {
         super(name);
         statefulIndex = null;
-        state = new JLineMatrix(0,0,0);
-        statePrior = new JLineMatrix(0,0,0);
+        state = new Matrix(0,0,0);
+        statePrior = new Matrix(0,0,0);
     }
 
     protected void clearState()  {
@@ -28,7 +23,7 @@ public class StatefulNode extends Node implements Serializable {
 
     public int getStatefulIndex() {
         if (this.statefulIndex == null) {
-            this.statefulIndex = this.model.getStatefulNodeIndex((Node)this);
+            this.statefulIndex = this.model.getStatefulNodeIndex(this);
         }
         return this.statefulIndex;
     }
@@ -37,20 +32,20 @@ public class StatefulNode extends Node implements Serializable {
         return 1;
     }
     
-    public JLineMatrix getState(){
+    public Matrix getState(){
     	return this.state;
     }
     
-    public void setState(JLineMatrix state) {
+    public void setState(Matrix state) {
     	this.state = state;
     	if (state.getNumRows() != statePrior.getNumRows()) { 		
-    		JLineMatrix initPrior = new JLineMatrix(state.getNumRows(), 1, state.getNumRows());
+    		Matrix initPrior = new Matrix(state.getNumRows(), 1, state.getNumRows());
         	initPrior.set(0, 0, 1);
         	this.setStatePrior(initPrior);
     	}
     }
     
-    public void setStatePrior(JLineMatrix prior) {
+    public void setStatePrior(Matrix prior) {
     	this.statePrior = prior;
     	try {
     		if(state.getNumRows() != statePrior.getNumRows())
@@ -60,7 +55,7 @@ public class StatefulNode extends Node implements Serializable {
     	}
     }
     
-    public JLineMatrix getStatePrior(){
+    public Matrix getStatePrior(){
     	return this.statePrior;
     }
 

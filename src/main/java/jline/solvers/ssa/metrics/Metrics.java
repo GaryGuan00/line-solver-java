@@ -2,7 +2,7 @@ package jline.solvers.ssa.metrics;
 
 import jline.lang.Network;
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 import java.io.FileWriter;
 import java.util.ArrayList;
@@ -230,13 +230,12 @@ public class Metrics {
             writer.flush();
             writer.close();
         } catch(java.io.IOException e) {
-            return;
         }
     }
 
-    public void fromStateMatrix(double t, StateMatrix stateMatrix) {
+    public void fromStateMatrix(double t, SSAStateMatrix networkState) {
         for (Metric metric : this.stateMetrics) {
-            metric.fromStateMatrix(t, stateMatrix);
+            metric.fromStateMatrix(t, networkState);
         }
     }
 

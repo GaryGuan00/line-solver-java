@@ -1,6 +1,7 @@
 package jline.solvers.ssa.state;
 
-import jline.util.Cdf;
+import jline.util.CumulativeDistribution;
+import jline.util.Matrix;
 
 import java.util.*;
 import java.util.stream.Stream;
@@ -18,7 +19,7 @@ public class PhaseList {
 
     protected int phaseListOffset = 0;
 
-    protected List<Cdf<Integer>> startingPhaseProbabilities;
+    protected List<CumulativeDistribution<Integer>> startingPhaseProbabilities;
     protected Set<Integer> customStartClasses;
 
     public PhaseList(int[] nPhases, int nClasses, Random random) {
@@ -47,9 +48,9 @@ public class PhaseList {
         }
         this.phaseListOffset = 0;
 
-        this.startingPhaseProbabilities = new ArrayList<Cdf<Integer>>();
+        this.startingPhaseProbabilities = new ArrayList<CumulativeDistribution<Integer>>();
         for (int i = 0; i < nClasses; i++) {
-            this.startingPhaseProbabilities.add(new Cdf<Integer>(this.random));
+            this.startingPhaseProbabilities.add(new CumulativeDistribution<Integer>(this.random));
             this.startingPhaseProbabilities.get(i).addElement(0, 1);
             for (int j = 0; j < nPhases[i]; j++) {
                 this.startingPhaseProbabilities.get(i).addElement(j, 0);
@@ -58,9 +59,9 @@ public class PhaseList {
         this.customStartClasses = new HashSet<Integer>();
     }
 
-    public void setPhaseStart(int classIdx, List<Double> classProbabilities) {
-        this.startingPhaseProbabilities.set(classIdx, new Cdf<Integer>(this.random));
-        for (int i = 0; i < classProbabilities.size(); i++) {
+    public void setPhaseStart(int classIdx, Matrix classProbabilities) {
+        this.startingPhaseProbabilities.set(classIdx, new CumulativeDistribution<Integer>(this.random));
+        for (int i = 0; i < classProbabilities.length(); i++) {
             this.startingPhaseProbabilities.get(classIdx).addElement(i, classProbabilities.get(i));
         }
         this.customStartClasses.add(classIdx);
@@ -189,11 +190,12 @@ public class PhaseList {
     public boolean updatePhase(int classIdx, int startingPhase, int newPhase) {
         int offset = this.phaseListStart[classIdx];
 
-        if (this.nInPhase[offset+startingPhase] == 0) {
+        if (startingPhase != -1 && this.nInPhase[offset+startingPhase] == 0) {
             return false;
         }
-        this.nInPhase[offset+startingPhase] -= 1;
-
+        if(startingPhase != -1) {
+            this.nInPhase[offset + startingPhase] -= 1;
+        }
         if (newPhase == -1) {
             // absorbing departure phase
             return true;
@@ -211,14 +213,27 @@ public class PhaseList {
         return this.globalPhases[classIdx];
     }
 
+    public CumulativeDistribution<Integer> getStartingPhaseProbabilities(int classIdx) {
+        return this.startingPhaseProbabilities.get(classIdx);
+    }
+
     public PhaseList createCopy() {
         PhaseList outList = new PhaseList(this.nPhases, this.nClasses, this.random);
         outList.nInPhase = new Integer[this.nInPhase.length];
         for(int i=0;i< nInPhase.length;i++){
-            Integer temp = Integer.valueOf(this.nInPhase[i]);
+            Integer temp = this.nInPhase[i];
             outList.nInPhase[i]=temp;
         }
         outList.globalPhases = this.globalPhases.clone();
+
+        List<CumulativeDistribution<Integer>> originalList = this.startingPhaseProbabilities;
+        List<CumulativeDistribution<Integer>> clonedList = new ArrayList<>();
+
+        for (CumulativeDistribution<Integer> item : originalList) {
+            clonedList.add(item.clone());
+        }
+
+        outList.startingPhaseProbabilities = clonedList;
         outList.phaseListStart = this.phaseListStart.clone();
         outList.totalInList = this.totalInList.clone();
 
@@ -235,5 +250,9 @@ public class PhaseList {
 
     public Stream<Integer> getStream() {
         return Arrays.stream(this.nInPhase);
+    }
+
+    public int getNPhases(int classIndex) {
+        return this.nPhases[classIndex];
     }
 }

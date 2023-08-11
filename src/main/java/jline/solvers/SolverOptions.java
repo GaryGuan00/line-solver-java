@@ -3,7 +3,7 @@
 
 package jline.solvers;
 
-import jline.lang.JLineMatrix;
+import jline.util.Matrix;
 import jline.lang.constant.SolverType;
 import org.apache.commons.math3.ode.FirstOrderIntegrator;
 import org.apache.commons.math3.ode.nonstiff.*;
@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static java.lang.Double.POSITIVE_INFINITY;
+
+import odesolver.LSODA;
 
 public class SolverOptions {
 
@@ -23,18 +25,24 @@ public class SolverOptions {
 
   public static class Config {
 
-    public String highVar; // TODO: enum?
-    public String multiServer; // TODO: enum?
+    public String highvar; // TODO: enum?
+    public String multiserver; // TODO: enum?
     public String np_priority; // TODO: enum?
-    public List<Double> pStar; // For p-norm smoothing in SolverFluid
+    public List<Double> pstar; // For p-norm smoothing in SolverFluid
+    public String fork_join;
+    public String merge;
+    public String compress;
+    public int space_max;
   }
 
   public static class ODESolvers {
+    public double odeminstep;
+    public double odemaxstep;
 
     public FirstOrderIntegrator fastODESolver;
     public FirstOrderIntegrator accurateODESolver;
-    public FirstOrderIntegrator fastStiffODESolver;
-    public FirstOrderIntegrator accurateStiffODESolver;
+    public LSODA fastStiffODESolver;
+    public LSODA accurateStiffODESolver;
   }
 
   public boolean cache;
@@ -42,17 +50,16 @@ public class SolverOptions {
   public Config config;
   public boolean force;
   public boolean hide_immediate;
-  public JLineMatrix init_sol;
+  public Matrix init_sol;
   public int iter_max;
   public double iter_tol;
   public double tol;
   public boolean keep;
+  public String lang;
   public String method;
   public boolean remote;
-  // TODO: remote_endpoint
-  public double odeMinStep;
-  public double odeMaxStep;
-  public ODESolvers odeSolvers;
+  public String remote_endpoint;
+  public ODESolvers odesolvers;
   public int samples;
   public int seed;
   public boolean stiff;
@@ -65,30 +72,34 @@ public class SolverOptions {
     this.cache = true;
     this.cutoff = POSITIVE_INFINITY;
     this.config = new Config();
-    this.config.pStar = new ArrayList<>();
+    this.config.pstar = new ArrayList<>();
+    this.config.fork_join = "default";
     this.force = false;
     this.hide_immediate = true; // Hide immediate transitions if possible
-    this.init_sol = new JLineMatrix(0, 0);
+    this.init_sol = new Matrix(0, 0);
     this.iter_max = 10;
     this.iter_tol = 0.0001; // Convergence tolerance to stop iterations
     this.tol = 0.0001; // Tolerance for all other uses
     this.keep = false;
+    this.lang = "java";
     this.method = "default";
     this.remote = false;
-    // TODO: this.remote_endpoint = '127.0.0.1';
+    this.remote_endpoint = "127.0.0.1";
 
-    this.odeMinStep = 0.001;
+    this.odesolvers = new ODESolvers();
+    this.odesolvers.odeminstep = 0.001;
     //this.odeMinStep = 0.00000001;
-    this.odeMaxStep = POSITIVE_INFINITY;
-    this.odeSolvers = new ODESolvers();
-    this.odeSolvers.fastODESolver = null; // TODO
-    this.odeSolvers.accurateODESolver =
-	new DormandPrince54Integrator(odeMinStep, odeMaxStep, tol, tol);
-    this.odeSolvers.fastStiffODESolver = null; // TODO
-    this.odeSolvers.accurateStiffODESolver = null; // TODO
+    this.odesolvers.odemaxstep = POSITIVE_INFINITY;
+    this.odesolvers.fastODESolver = null; // TODO
+    this.odesolvers.accurateODESolver =
+            new DormandPrince54Integrator(this.odesolvers.odeminstep, this.odesolvers.odemaxstep, tol, tol);
+    this.odesolvers.fastStiffODESolver =
+            new LSODA(this.odesolvers.odeminstep, this.odesolvers.odemaxstep, tol, tol, 3, 3); // TODO
+    this.odesolvers.accurateStiffODESolver =
+            new LSODA(this.odesolvers.odeminstep, this.odesolvers.odemaxstep, tol, tol, 12, 5);
 
     this.samples = 10000;
-    // TODO: this.seed = randi([1,1e6]);
+    this.seed = Math.toIntExact(Math.round((Math.random() * (1e6 - 1)) + 1));
     this.stiff = true;
     this.timespan = new double[2];
     this.timespan[0] = POSITIVE_INFINITY;
@@ -107,7 +118,7 @@ public class SolverOptions {
         this.verbose = VerboseLevel.SILENT;
         break;
       case FLUID:
-        this.config.highVar = "none";
+        this.config.highvar = "none";
         this.iter_max = 5;
         this.timespan[0] = 0;
         break;
@@ -123,36 +134,44 @@ public class SolverOptions {
         break;
       case MVA:
         this.iter_max = 1000;
-        this.config.highVar = "none";
-        this.config.multiServer = "default";
+        this.config.highvar = "none";
+        this.config.multiserver = "default";
         this.config.np_priority = "default";
+        this.config.fork_join = "default";
         break;
       case NC:
         this.samples = 100000;
-        this.config.highVar = "interp";
+        this.config.highvar = "interp";
         break;
       case SSA:
         this.timespan[0] = 0;
+        break;
+      case JMT:
+        //TODO add configs
         break;
       default: // Global options unless overridden by a solver
     }
   }
 
   public void setODEMinStep(double odeMinStep) {
-    this.odeMinStep = odeMinStep;
-    this.odeSolvers.fastODESolver = null; // TODO
-    this.odeSolvers.accurateODESolver =
-            new DormandPrince54Integrator(this.odeMinStep, odeMaxStep, tol, tol);
-    this.odeSolvers.fastStiffODESolver = null; // TODO
-    this.odeSolvers.accurateStiffODESolver = null; // TODO
+    this.odesolvers.odeminstep = odeMinStep;
+    this.odesolvers.fastODESolver = null; // TODO
+    this.odesolvers.accurateODESolver =
+            new DormandPrince54Integrator(this.odesolvers.odeminstep, this.odesolvers.odemaxstep, tol, tol);
+    this.odesolvers.fastStiffODESolver =
+            new LSODA(this.odesolvers.odeminstep, this.odesolvers.odemaxstep, tol, tol, 3, 3); // TODO
+    this.odesolvers.accurateStiffODESolver =
+            new LSODA(this.odesolvers.odeminstep, this.odesolvers.odemaxstep, tol, tol, 12, 5);
   }
 
   public void setODEMaxStep(double odeMaxStep) {
-    this.odeMaxStep = odeMaxStep;
-    this.odeSolvers.fastODESolver = null; // TODO
-    this.odeSolvers.accurateODESolver =
-            new DormandPrince54Integrator(odeMinStep, this.odeMaxStep, tol, tol);
-    this.odeSolvers.fastStiffODESolver = null; // TODO
-    this.odeSolvers.accurateStiffODESolver = null; // TODO
+    this.odesolvers.odemaxstep = odeMaxStep;
+    this.odesolvers.fastODESolver = null; // TODO
+    this.odesolvers.accurateODESolver =
+            new DormandPrince54Integrator(this.odesolvers.odeminstep, this.odesolvers.odemaxstep, tol, tol);
+    this.odesolvers.fastStiffODESolver =
+            new LSODA(this.odesolvers.odeminstep, this.odesolvers.odemaxstep, tol, tol, 3, 3); // TODO
+    this.odesolvers.accurateStiffODESolver =
+            new LSODA(this.odesolvers.odeminstep, this.odesolvers.odemaxstep, tol, tol, 12, 5);
   }
 }

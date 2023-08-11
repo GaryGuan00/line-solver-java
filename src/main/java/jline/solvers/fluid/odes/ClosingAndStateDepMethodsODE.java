@@ -3,8 +3,7 @@
 
 package jline.solvers.fluid.odes;
 
-import jline.api.MAM;
-import jline.lang.JLineMatrix;
+import jline.util.Matrix;
 import jline.lang.JobClass;
 import jline.lang.NetworkStruct;
 import jline.lang.nodes.Station;
@@ -12,32 +11,31 @@ import jline.solvers.SolverOptions;
 import org.apache.commons.math3.exception.DimensionMismatchException;
 import org.apache.commons.math3.exception.MaxCountExceededException;
 import org.apache.commons.math3.ode.FirstOrderDifferentialEquations;
-import org.ejml.data.DMatrixRMaj;
-import org.qore.KPC.MAP;
 
 import java.util.Map;
 import java.util.Objects;
 
 import static java.lang.Math.min;
 import static jline.lang.constant.SchedStrategy.DPS;
+import static jline.lib.KPCToolbox.*;
 
 public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquations {
   private final NetworkStruct sn;
-  private final Map<Station, Map<JobClass, JLineMatrix>> mu;
-  private final Map<Station, Map<JobClass, JLineMatrix>> phi;
-  private final Map<Station, Map<JobClass, Map<Integer, JLineMatrix>>> proc;
-  private final JLineMatrix rt;
-  private final JLineMatrix nservers;
+  private final Map<Station, Map<JobClass, Matrix>> mu;
+  private final Map<Station, Map<JobClass, Matrix>> phi;
+  private final Map<Station, Map<JobClass, Map<Integer, Matrix>>> proc;
+  private final Matrix rt;
+  private final Matrix nservers;
   private final SolverOptions options;
   private final int numDimensions;
 
   public ClosingAndStateDepMethodsODE(
       NetworkStruct sn,
-      Map<Station, Map<JobClass, JLineMatrix>> mu,
-      Map<Station, Map<JobClass, JLineMatrix>> phi,
-      Map<Station, Map<JobClass, Map<Integer, JLineMatrix>>> proc,
-      JLineMatrix rt,
-      JLineMatrix S,
+      Map<Station, Map<JobClass, Matrix>> mu,
+      Map<Station, Map<JobClass, Matrix>> phi,
+      Map<Station, Map<JobClass, Map<Integer, Matrix>>> proc,
+      Matrix rt,
+      Matrix S,
       SolverOptions options,
       int numDimensions) {
     this.sn = sn;
@@ -52,16 +50,16 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
 
   public ClosingAndStateDepMethodsODE(
       NetworkStruct sn,
-      Map<Station, Map<JobClass, JLineMatrix>> mu,
-      Map<Station, Map<JobClass, JLineMatrix>> phi,
-      Map<Station, Map<JobClass, Map<Integer, JLineMatrix>>> proc,
-      JLineMatrix rt,
-      JLineMatrix S,
+      Map<Station, Map<JobClass, Matrix>> mu,
+      Map<Station, Map<JobClass, Matrix>> phi,
+      Map<Station, Map<JobClass, Map<Integer, Matrix>>> proc,
+      Matrix rt,
+      Matrix S,
       SolverOptions options) {
     this(sn, mu, phi, proc, rt, S, options, options.init_sol.length());
   }
 
-  private void setNextJump(JLineMatrix jumps, int completionIdx, int startIdx) {
+  private void setNextJump(Matrix jumps, int completionIdx, int startIdx) {
 
     int jumpsCols = jumps.getNumCols();
     jumps.expandMatrix(jumps.getNumRows(), jumpsCols + 1, jumps.getNumElements() + 2);
@@ -69,13 +67,13 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
     jumps.set(startIdx, jumpsCols, 1); // type c job starts in stat j
   }
 
-  private JLineMatrix calculateJumps(boolean[][] enabled, JLineMatrix qIndices, JLineMatrix Kic) {
+  private Matrix calculateJumps(boolean[][] enabled, Matrix qIndices, Matrix Kic) {
 
     int M = sn.nstations; // Number of stations
     int K = mu.get(sn.stations.get(0)).size(); // Number of classes
     int jumpsRows = (int) Kic.elementSum();
-    JLineMatrix jumps =
-        new JLineMatrix(jumpsRows, 0); // Returns state changes triggered by all the events
+    Matrix jumps =
+        new Matrix(jumpsRows, 0); // Returns state changes triggered by all the events
 
     for (int i = 0; i < M; i++) { // state changes from departures in service phases 2
       for (int c = 0; c < K; c++) {
@@ -117,10 +115,10 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
 
   private void calculateRateBaseAndEventIdxs(
       boolean[][] enabled,
-      JLineMatrix qIndices,
-      JLineMatrix Kic,
-      JLineMatrix rateBase,
-      JLineMatrix eventIdx) {
+      Matrix qIndices,
+      Matrix Kic,
+      Matrix rateBase,
+      Matrix eventIdx) {
 
     int M = sn.nstations; // Number of stations
     int K = mu.get(sn.stations.get(0)).size(); // Number of classes
@@ -132,18 +130,15 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
         if (enabled[i][c]) {
           for (int j = 0; j < M; j++) {
             for (int l = 0; l < K; l++) {
-              JLineMatrix pie;
-              if (proc.get(sn.stations.get(j)).get(sn.jobClasses.get(l)).isEmpty()) {
-                pie = new JLineMatrix(1, 1, 1);
+              Matrix pie;
+              if (proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).isEmpty()) {
+                pie = new Matrix(1, 1, 1);
                 pie.set(0, 0, 1);
               } else {
-                pie =
-                    MAM.map_pie(
-                        new MAP(
-                            new DMatrixRMaj(
-                                proc.get(sn.stations.get(j)).get(sn.jobClasses.get(l)).get(0)),
-                            new DMatrixRMaj(
-                                proc.get(sn.stations.get(j)).get(sn.jobClasses.get(l)).get(1))));
+                Matrix D0 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(0);
+                Matrix D1 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(1);
+
+                pie = map_pie(D0,D1);
               }
               if (rt.get(i * K + c, j * K + l) > 0) {
                 for (int kicIdx = 0; kicIdx < Kic.get(i, c); kicIdx++) {
@@ -151,8 +146,8 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                     rateBase.set(
                         rateIdx,
                         0,
-                        phi.get(sn.stations.get(i)).get(sn.jobClasses.get(c)).get(kicIdx, 0)
-                            * mu.get(sn.stations.get(i)).get(sn.jobClasses.get(c)).get(kicIdx, 0)
+                        phi.get(sn.stations.get(i)).get(sn.jobclasses.get(c)).get(kicIdx, 0)
+                            * mu.get(sn.stations.get(i)).get(sn.jobclasses.get(c)).get(kicIdx, 0)
                             * rt.get(i * K + c, j * K + l)
                             * pie.get(0, kjl));
                     eventIdx.set(rateIdx, 0, qIndices.get(i, c) + kicIdx);
@@ -177,7 +172,7 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                     rateIdx,
                     0,
                     proc.get(sn.stations.get(i))
-                        .get(sn.jobClasses.get(c))
+                        .get(sn.jobclasses.get(c))
                         .get(0)
                         .get(kicIdx, kicp));
                 eventIdx.set(rateIdx, 0, qIndices.get(i, c) + kicIdx);
@@ -190,21 +185,21 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
     }
   }
 
-  private JLineMatrix calculatedxdtClosingMethod(
+  private Matrix calculatedxdtClosingMethod(
       double[] x,
-      JLineMatrix w,
+      Matrix w,
       boolean[][] enabled,
-      JLineMatrix qIndices,
-      JLineMatrix Kic,
-      JLineMatrix allJumps,
-      JLineMatrix rateBase,
-      JLineMatrix eventIdx) {
+      Matrix qIndices,
+      Matrix Kic,
+      Matrix allJumps,
+      Matrix rateBase,
+      Matrix eventIdx) {
 
     int M = sn.nstations; // Number of stations
     int K = mu.get(sn.stations.get(0)).size(); // Number of classes
 
     // Basic vector valid for INF and PS case min(ni, nservers(i)) = ni
-    JLineMatrix rates = new JLineMatrix(x.length, 1);
+    Matrix rates = new Matrix(x.length, 1);
     for (int i = 0; i < x.length; i++) {
       rates.set(i, 0, x[i]);
     }
@@ -278,7 +273,7 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
     }
 
     int numEventIndices = eventIdx.length();
-    JLineMatrix newRates = new JLineMatrix(numEventIndices, 1);
+    Matrix newRates = new Matrix(numEventIndices, 1);
     for (int i = 0; i < numEventIndices; i++) {
       newRates.set(i, 0, rates.get((int) eventIdx.get(i, 0), 0));
     }
@@ -286,12 +281,12 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
     return allJumps.mult(newRates, null);
   }
 
-  private JLineMatrix calculatedxdtStateDepMethod(
-      double[] x, boolean[][] enabled, JLineMatrix qIndices, JLineMatrix Kic, JLineMatrix w) {
+  private Matrix calculatedxdtStateDepMethod(
+          double[] x, boolean[][] enabled, Matrix qIndices, Matrix Kic, Matrix w) {
 
     int M = sn.nstations; // Number of stations
     int K = mu.get(sn.stations.get(0)).size(); // Number of classes
-    JLineMatrix dxdt = new JLineMatrix(x.length, 1);
+    Matrix dxdt = new Matrix(x.length, 1);
 
     for (int i = 0; i < M; i++) {
       switch (sn.sched.get(sn.stations.get(i))) {
@@ -305,7 +300,7 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                   if (kicIdx != kic_p) {
                     double rate =
                         proc.get(sn.stations.get(i))
-                            .get(sn.jobClasses.get(c))
+                            .get(sn.jobclasses.get(c))
                             .get(0)
                             .get(kicIdx, kic_p);
                     dxdt.set(xic + kicIdx, 0, dxdt.get(xic + kicIdx, 0) - (x[xic + kicIdx] * rate));
@@ -323,23 +318,18 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                 for (int l = 0; l < K; l++) {
                   int xjl = (int) qIndices.get(j, l);
                   if (enabled[j][l]) {
-                    JLineMatrix pie =
-                        MAM.map_pie(
-                            new MAP(
-                                new DMatrixRMaj(
-                                    proc.get(sn.stations.get(j)).get(sn.jobClasses.get(l)).get(0)),
-                                new DMatrixRMaj(
-                                    proc.get(sn.stations.get(j))
-                                        .get(sn.jobClasses.get(l))
-                                        .get(1))));
+                    Matrix D0 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(0);
+                    Matrix D1 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(1);
+                    Matrix pie =
+                        map_pie(D0,D1);
                     if (rt.get(i * K + c, j * K + l) > 0) {
                       for (int kicIdx = 0; kicIdx < Kic.get(i, c); kicIdx++) {
                         for (int kjl = 0; kjl < Kic.get(j, l); kjl++) {
                           if (j != i) {
                             double rate =
-                                phi.get(sn.stations.get(i)).get(sn.jobClasses.get(c)).get(kicIdx, 0)
+                                phi.get(sn.stations.get(i)).get(sn.jobclasses.get(c)).get(kicIdx, 0)
                                     * mu.get(sn.stations.get(i))
-                                        .get(sn.jobClasses.get(c))
+                                        .get(sn.jobclasses.get(c))
                                         .get(kicIdx, 0)
                                     * rt.get(i * K + c, j * K + l)
                                     * pie.get(0, kjl);
@@ -382,7 +372,7 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                   if (kicIdx != kic_p) {
                     double rate =
                         proc.get(sn.stations.get(i))
-                            .get(sn.jobClasses.get(c))
+                            .get(sn.jobclasses.get(c))
                             .get(0)
                             .get(kicIdx, kic_p);
                     if (ni > sn.nservers.get(i, 0)) {
@@ -414,22 +404,17 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                 for (int l = 0; l < K; l++) {
                   int xjl = (int) qIndices.get(j, l);
                   if (enabled[j][l]) {
-                    JLineMatrix pie =
-                        MAM.map_pie(
-                            new MAP(
-                                new DMatrixRMaj(
-                                    proc.get(sn.stations.get(j)).get(sn.jobClasses.get(l)).get(0)),
-                                new DMatrixRMaj(
-                                    proc.get(sn.stations.get(j))
-                                        .get(sn.jobClasses.get(l))
-                                        .get(1))));
+                    Matrix D0 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(0);
+                    Matrix D1 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(1);
+                    Matrix pie = map_pie(D0,D1);
+
                     if (rt.get(i * K + c, j * K + l) > 0) {
                       for (int kicIdx = 0; kicIdx < Kic.get(i, c); kicIdx++) {
                         for (int kjl = 0; kjl < Kic.get(j, l); kjl++) {
                           double rate =
-                              phi.get(sn.stations.get(i)).get(sn.jobClasses.get(c)).get(kicIdx, 0)
+                              phi.get(sn.stations.get(i)).get(sn.jobclasses.get(c)).get(kicIdx, 0)
                                   * mu.get(sn.stations.get(i))
-                                      .get(sn.jobClasses.get(c))
+                                      .get(sn.jobclasses.get(c))
                                       .get(kicIdx, 0)
                                   * rt.get(i * K + c, j * K + l)
                                   * pie.get(0, kjl);
@@ -468,7 +453,7 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                     kicIdx,
                     -1
                         / proc.get(sn.stations.get(i))
-                            .get(sn.jobClasses.get(c))
+                            .get(sn.jobclasses.get(c))
                             .get(0)
                             .get(kicIdx, kicIdx));
                 wni += w.get(c, kicIdx) * x[xic + kicIdx];
@@ -484,7 +469,7 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                   if (kicIdx != kic_p) {
                     double rate =
                         proc.get(sn.stations.get(i))
-                                .get(sn.jobClasses.get(c))
+                                .get(sn.jobclasses.get(c))
                                 .get(0)
                                 .get(kicIdx, kic_p)
                             * min(ni, sn.nservers.get(i, 0))
@@ -505,22 +490,17 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                 for (int l = 0; l < K; l++) {
                   int xjl = (int) qIndices.get(j, l);
                   if (enabled[j][l]) {
-                    JLineMatrix pie =
-                        MAM.map_pie(
-                            new MAP(
-                                new DMatrixRMaj(
-                                    proc.get(sn.stations.get(j)).get(sn.jobClasses.get(l)).get(0)),
-                                new DMatrixRMaj(
-                                    proc.get(sn.stations.get(j))
-                                        .get(sn.jobClasses.get(l))
-                                        .get(1))));
+                    Matrix D0 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(0);
+                    Matrix D1 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(1);
+                    Matrix pie = map_pie(D0,D1);
+
                     if (rt.get(i * K + c, j * K + l) > 0) {
                       for (int kicIdx = 0; kicIdx < Kic.get(i, c); kicIdx++) {
                         for (int kjl = 0; kjl < Kic.get(j, l); kjl++) {
                           double rate =
-                              phi.get(sn.stations.get(i)).get(sn.jobClasses.get(c)).get(kicIdx, 0)
+                              phi.get(sn.stations.get(i)).get(sn.jobclasses.get(c)).get(kicIdx, 0)
                                   * mu.get(sn.stations.get(i))
-                                      .get(sn.jobClasses.get(c))
+                                      .get(sn.jobclasses.get(c))
                                       .get(kicIdx, 0)
                                   * rt.get(i * K + c, j * K + l)
                                   * pie.get(0, kjl)
@@ -562,7 +542,7 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                   if (kicIdx != kic_p) {
                     double rate =
                         proc.get(sn.stations.get(i))
-                            .get(sn.jobClasses.get(c))
+                            .get(sn.jobclasses.get(c))
                             .get(0)
                             .get(kicIdx, kic_p);
                     if (wni > sn.nservers.get(i, 0)) {
@@ -602,22 +582,17 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
                 for (int l = 0; l < K; l++) {
                   int xjl = (int) qIndices.get(j, l);
                   if (enabled[j][l]) {
-                    JLineMatrix pie =
-                        MAM.map_pie(
-                            new MAP(
-                                new DMatrixRMaj(
-                                    proc.get(sn.stations.get(j)).get(sn.jobClasses.get(l)).get(0)),
-                                new DMatrixRMaj(
-                                    proc.get(sn.stations.get(j))
-                                        .get(sn.jobClasses.get(l))
-                                        .get(1))));
+                    Matrix D0 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(0);
+                    Matrix D1 = proc.get(sn.stations.get(j)).get(sn.jobclasses.get(l)).get(1);
+                    Matrix pie = map_pie(D0,D1);
+
                     if (rt.get(i * K + c, j * K + l) > 0) {
                       for (int kicIdx = 0; kicIdx < Kic.get(i, c); kicIdx++) {
                         for (int kjl = 0; kjl < Kic.get(j, l); kjl++) {
                           double rate =
-                              phi.get(sn.stations.get(i)).get(sn.jobClasses.get(c)).get(kicIdx, 0)
+                              phi.get(sn.stations.get(i)).get(sn.jobclasses.get(c)).get(kicIdx, 0)
                                   * mu.get(sn.stations.get(i))
-                                      .get(sn.jobClasses.get(c))
+                                      .get(sn.jobclasses.get(c))
                                       .get(kicIdx, 0)
                                   * rt.get(i * K + c, j * K + l)
                                   * pie.get(0, kjl);
@@ -655,7 +630,7 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
     int M = sn.nservers.length(); // Number of stations
     int K = mu.get(sn.stations.get(0)).size(); // Number of classes
 
-    JLineMatrix w = new JLineMatrix(M, K);
+    Matrix w = new Matrix(M, K);
     boolean[][] enabled = new boolean[M][K]; // Indicates whether a class is served at a station
     for (int i = 0; i < M; i++) {
       for (int k = 0; k < K; k++) {
@@ -663,14 +638,14 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
         enabled[i][k] = false;
       }
     }
-    JLineMatrix qIndices = new JLineMatrix(M, K);
-    JLineMatrix Kic = new JLineMatrix(M, K);
+    Matrix qIndices = new Matrix(M, K);
+    Matrix Kic = new Matrix(M, K);
     int cumSum = 0;
 
     for (int i = 0; i < M; i++) {
       Station station = sn.stations.get(i);
       for (int c = 0; c < K; c++) {
-        JobClass jobClass = sn.jobClasses.get(c);
+        JobClass jobClass = sn.jobclasses.get(c);
         int numPhases = 0;
         int numNans = 0;
         int rows = mu.get(station).get(jobClass).getNumRows();
@@ -699,16 +674,16 @@ public class ClosingAndStateDepMethodsODE implements FirstOrderDifferentialEquat
       }
     }
 
-    JLineMatrix dxdtTmp;
+    Matrix dxdtTmp;
     if (Objects.equals(options.method, "statedep")) {
       dxdtTmp = calculatedxdtStateDepMethod(x, enabled, qIndices, Kic, w);
     } else {
       // Determine all the jumps and save them for later use
-      JLineMatrix allJumps = calculateJumps(enabled, qIndices, Kic);
+      Matrix allJumps = calculateJumps(enabled, qIndices, Kic);
       // Determines a vector with the fixed part of the rates and defines the indexes that
       // correspond to the events that occur
-      JLineMatrix rateBase = new JLineMatrix(allJumps.getNumCols(), 1);
-      JLineMatrix eventIdx = new JLineMatrix(allJumps.getNumCols(), 1);
+      Matrix rateBase = new Matrix(allJumps.getNumCols(), 1);
+      Matrix eventIdx = new Matrix(allJumps.getNumCols(), 1);
       calculateRateBaseAndEventIdxs(enabled, qIndices, Kic, rateBase, eventIdx);
       dxdtTmp =
           calculatedxdtClosingMethod(x, w, enabled, qIndices, Kic, allJumps, rateBase, eventIdx);

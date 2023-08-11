@@ -4,7 +4,7 @@ import java.util.Random;
 
 import jline.lang.nodes.Node;
 import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
 public class SinkArrivalEvent extends ArrivalEvent{
     public SinkArrivalEvent(Node node) {
@@ -12,13 +12,13 @@ public class SinkArrivalEvent extends ArrivalEvent{
     }
 
     @Override
-    public boolean stateUpdate(StateMatrix stateMatrix, Random random, Timeline timeline) {
-        timeline.record(this, stateMatrix);
+    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
+        timeline.record(this, networkState);
         return true;
     }
     @Override
-    public int stateUpdateN(int n, StateMatrix stateMatrix, Random random, Timeline timeline) {
-        timeline.preRecord(this, stateMatrix, n);
+    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
+        timeline.preRecord(this, networkState, n);
         return 0;
     }
 }

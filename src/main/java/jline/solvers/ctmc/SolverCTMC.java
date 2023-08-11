@@ -2,402 +2,413 @@ package jline.solvers.ctmc;
 
 import jline.api.CTMC;
 import jline.lang.*;
-import jline.solvers.ssa.SSAData;
-import jline.solvers.ssa.SSAOptions;
-import jline.solvers.ssa.SSAStruct;
-import jline.solvers.ssa.Timeline;
-import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.events.OutputEvent;
-import jline.solvers.ssa.state.StateMatrix;
-import jline.solvers.ssa.strategies.TauLeapingStateStrategy;
+import jline.lang.constant.SchedStrategy;
+import jline.lang.constant.SolverType;
+import jline.lang.distributions.Distribution;
+import jline.lang.nodes.Node;
+import jline.lang.nodes.Source;
+import jline.lang.nodes.StatefulNode;
+import jline.lang.state.State;
+import jline.solvers.NetworkSolver;
+import jline.solvers.SolverOptions;
+import jline.solvers.ssa.events.*;
+import jline.solvers.ssa.state.SSAStateMatrix;
 
-import jline.util.Pair;
-import org.javatuples.Quartet;
+import jline.util.Matrix;
 
 import java.util.*;
 
-public class SolverCTMC {
+public class  SolverCTMC extends NetworkSolver {
 
-    protected SSAOptions simOptions;
-    protected Network network;
-    protected SSAStruct simStruct;
-    protected SSAData simCache;
-    protected Random random;
+    public Map<Node, Map<JobClass, Double>> cutoffMatrix;
+    public Map<Node, Double> nodeCutoffMatrix;
+    public EventStack eventStack;
+    private final SolverCTMCResult ctmcResult;
 
-    public SolverCTMC() {
-        this.network = null;
-        this.simStruct = null;
-        this.simOptions = new SSAOptions();
-        this.random = new Random();
+    private Map<SSAStateMatrix,Integer> indexMap = null;
+    private int stateN = 0;
+    private SSAStateMatrix initialNetworkState;
+
+    public SolverCTMC(Network model) {
+        this(model, new SolverOptions(SolverType.CTMC));
     }
 
-    public SSAOptions setOptions() {
-        return this.simOptions;
+    public SolverCTMC(Network model, SolverOptions options) {
+        super(model, "CTMC", options);
+        this.ctmcResult = new SolverCTMCResult();
+        computeInitialStateMatrix();
+
+        this.eventStack = new EventStack();
+
+        // loop through each node and add active events to the eventStack
+        ListIterator<Node> nodeIter = model.getNodes().listIterator();
+        int nodeIdx = -1;
+        while (nodeIter.hasNext()) {
+            Node node = nodeIter.next();
+            if (!(node instanceof StatefulNode)) {
+                continue;
+            }
+
+            nodeIdx++;
+            Iterator<JobClass> jobClassIter = model.getClasses().listIterator();
+
+            while (jobClassIter.hasNext()) {
+                JobClass jobClass = jobClassIter.next();
+                int jobClassIdx = jobClass.getJobClassIdx();
+//                if (network.getClassLinks(node, jobClass) == 0) {
+//                    this.simStruct.classcap[nodeIdx][jobClassIdx] = 0;
+//                } else {
+//                    double jobCap = jobClass.getNumberOfJobs();
+//                    jobCap = Math.min(jobCap, node.getClassCap(jobClass));
+//                    if ((jobCap == Double.POSITIVE_INFINITY) || (node.getDropStrategy() == DropStrategy.WaitingQueue)) {
+//                        this.simStruct.classcap[nodeIdx][jobClassIdx] = Integer.MAX_VALUE;
+//                    } else {
+//                        this.simStruct.classcap[nodeIdx][jobClassIdx] = (int) jobCap;
+//                    }
+//                }
+                Event dEvent = DepartureEvent.fromNodeAndClass(node, jobClass);
+                this.eventStack.addEvent(dEvent);
+                if (dEvent instanceof DepartureEvent) {
+                    if (((DepartureEvent) dEvent).getPhaseEvent() != null) {
+                        this.eventStack.addEvent(((DepartureEvent) dEvent).getPhaseEvent());
+                    }
+                }
+            }
+
+//            double nodeCap = node.getCap();
+//            if (nodeCap == Double.POSITIVE_INFINITY) {
+//                this.simStruct.cap[nodeIdx] = Integer.MAX_VALUE;
+//            } else {
+//                this.simStruct.cap[nodeIdx] = (int) nodeCap;
+//            }
+        }
     }
 
-    public void compile(Network network) {
-        this.network = network;
-        this.simCache = new SSAData(this.network);
-    }
-
-    public void compile(SSAStruct simStruct) {
-        this.simStruct = simStruct;
-        this.simCache = new SSAData(this.simStruct);
-        throw new RuntimeException("SSA structs not supported");
-    }
-
-    public Timeline solve() {
-        if (this.simCache == null) {
-            if (this.simStruct == null) {
-                this.compile(this.simStruct);
-            } else if (this.network == null) {
-                this.compile(this.network);
-            } else {
-                throw new RuntimeException("Network data not provided!");
+    public void computeInitialStateMatrix() {
+        SSAStateMatrix networkState = new SSAStateMatrix(this.sn,this.random);
+        for (JobClass jobClass : this.model.getClasses()) {
+            if (jobClass instanceof ClosedClass) {
+                int classIdx = this.model.getJobClassIndex(jobClass);
+                ClosedClass cClass = (ClosedClass) jobClass;
+                int stationIdx = this.model.getStatefulNodeIndex(cClass.getRefstat());
+                networkState.setState(stationIdx, classIdx, (int)cClass.getPopulation());
+                for (int i = 0; i < cClass.getPopulation(); i++) {
+                    networkState.addToBuffer(stationIdx, classIdx);
+                }
             }
         }
+        this.initialNetworkState = networkState;
+    }
 
-        this.random = new Random(this.simOptions.seed);
-        int samplesCollected = 1;
-        int maxSamples = simOptions.samples;
-        double curTime = simOptions.timeInterval.getLeft();
-        double maxTime = simOptions.timeInterval.getRight();
+    public SolverOptions setOptions() {
+        return this.options;
+    }
 
+    public ArrayList<SSAStateMatrix> getStateSpace() {
+        if(ctmcResult.stateSpace == null) {
+            solver_ctmc();
+        }
+        System.out.println("\nStateSpace =");
+        for(SSAStateMatrix state : ctmcResult.stateSpace) {
+            state.printStateVector();
+        }
+        return ctmcResult.stateSpace;
+    }
+
+    public Matrix getGenerator() {
+        if(ctmcResult.infGen == null) {
+            solver_ctmc();
+        }
+        System.out.println("\nInfGen =");
+        for (int i = 0; i < ctmcResult.infGen.getNumRows(); i++) {
+            for (int j = 0; j < ctmcResult.infGen.getNumCols(); j++) {
+                System.out.print(ctmcResult.infGen.get(i, j) + "  ");
+            }
+            System.out.println();
+        }
+        return ctmcResult.infGen;
+    }
+
+    public void getProbabilityVector() {
+        if(ctmcResult.piVector == null) {
+            solver_ctmc_analyzer();
+        }
+        System.out.println("\nProbability Vector =");
+        ctmcResult.piVector.print();
+    }
+
+
+    @Override
+    public void runAnalyzer(){
+        if (this.model == null)
+            throw new RuntimeException("Model is not provided");
+        if (this.sn == null)
+            this.sn = this.model.getStruct(false);
+
+//        simCache.applyCutoff(simOptions, model);
         // Add ClosedClass instances to the reference station
-        StateMatrix stateMatrix = new StateMatrix(this.simCache.simStruct, this.random);
-        for (JobClass jobClass : this.network.getClasses()) {
-            if (jobClass instanceof ClosedClass) {
-                int classIdx = this.network.getJobClassIndex(jobClass);
-                ClosedClass cClass = (ClosedClass) jobClass;
-                int stationIdx = this.network.getStatefulNodeIndex(cClass.getRefstat());
-                stateMatrix.setState(stationIdx, classIdx, (int)cClass.getPopulation());
-                for (int i = 0; i < cClass.getPopulation(); i++) {
-                    stateMatrix.addToBuffer(stationIdx, classIdx);
+//        if(this.options.timespan[1] == 0) {
+            solver_ctmc_analyzer();
+//        }
+//        else {
+            //TODO transient analysis
+//        }
+    }
+
+    public void applyCutoff(double cutoff){
+        this.cutoffMatrix = new HashMap<Node, Map<JobClass, Double>>();
+
+        this.options.cutoff = cutoff;
+        for (int i = 0; i < this.sn.nstateful; i++) {
+            Node nodeIter = model.getStatefulNodeFromIndex(i);
+            for (int j = 0; j < this.sn.nclasses; j++) {
+                JobClass jobClassIter = model.getJobClassFromIndex(j);
+                double cutoffVal = cutoff;
+                if(this.cutoffMatrix.get(nodeIter) != null && this.cutoffMatrix.get(nodeIter).get(jobClassIter) != null) {
+                    cutoffVal = Math.min(cutoffVal, this.cutoffMatrix.get(nodeIter).get(jobClassIter));
+                }
+                if (cutoffVal != Double.POSITIVE_INFINITY) {
+                    this.sn.classcap.set(Math.min((int)this.sn.classcap.get(i,j), (int) cutoff),i,j);
+                }
+            }
+            double nodeCutoff = cutoff;
+            if(this.cutoffMatrix.get(nodeIter) != null) {
+                nodeCutoff = Math.min(nodeCutoff, this.nodeCutoffMatrix.get(nodeIter));
+            }
+            if (nodeCutoff != Double.POSITIVE_INFINITY) {
+                this.sn.cap.set(Math.min((int)this.sn.cap.get(i), (int) nodeCutoff),i);
+            }
+        }
+    }
+
+    public void solver_ctmc_analyzer() {
+        long startTime = System.currentTimeMillis();
+        solver_ctmc();
+
+        // Compute probability vector
+
+        ctmcResult.piVector = CTMC.ctmc_solve(ctmcResult.infGen);
+        this.stateN = this.initialNetworkState.state.length;
+
+        int nClasses = model.getNumberOfClasses();
+
+        double[][] ssprobabilities = ctmcResult.piVector.toArray2D();
+        double [][][] arrRates = new double[stateN][nClasses][ctmcResult.stateSpace.size()];
+        Matrix UN = new Matrix(stateN, nClasses);
+        Matrix QN = new Matrix(stateN, nClasses);
+        Matrix TN = new Matrix(stateN, nClasses);
+        Matrix RN = new Matrix(stateN, nClasses);
+        Matrix XN = new Matrix(1, nClasses);
+        Matrix CN = new Matrix(1, nClasses);
+
+
+
+        // q length
+        for (int i=0;i<ctmcResult.stateSpace.size();i++){
+            if(ssprobabilities[0][i]>0){
+                SSAStateMatrix currState = ctmcResult.stateSpace.get(i);
+                int[][] state = currState.state;
+                for(int j = 0;j<state.length;j++){
+                    for(int k=0;k<state[j].length;k++){
+                        QN.set(j, k, QN.get(j, k) + ssprobabilities[0][i]*state[j][k]);
+                    }
                 }
             }
         }
 
-        Timeline timeline = new Timeline(this.simCache.simStruct);
+        // arrival rates, throughput
+        for(EventData eventData : ctmcResult.eventSpace){
+            int eventIdx = eventData.getValue0().getNode().getNodeIdx();
+            int event2Idx;
+            int classIdx = eventData.getValue1().getLeft().getClassIdx();
 
-        if (simOptions.disableResTime) {
-            timeline.disableResidenceTime();
-        }
 
-        if (simOptions.disableTransientState) {
-            timeline.disableTransientState();
-        }
-
-        if (simOptions.useMSER5) {
-            timeline.useMSER5();
-        } else if (simOptions.useR5) {
-            timeline.useR5(simOptions.r5value);
-        }
-
-        if (!simOptions.recordMetricTimeline) {
-            timeline.setMetricRecord(false);
-        }
-
-        if (simOptions.useTauLeap) {
-            this.simCache.eventStack.configureTauLeap(simOptions.tauLeapingType);
-            if ((simOptions.tauLeapingType.getStateStrategy() == TauLeapingStateStrategy.TimeWarp) ||
-                    (simOptions.tauLeapingType.getStateStrategy() == TauLeapingStateStrategy.TauTimeWarp)) {
-                timeline.cacheRecordings();
-            }
-        }
-
-        double sysTime = 0;
-        double startTime = System.currentTimeMillis();
-
-        boolean beforeSState = false;
-
-        // collect samples and update states
-        while ((samplesCollected < maxSamples) && (curTime < maxTime) && (sysTime < this.simOptions.timeout)) {
-            beforeSState = curTime < this.simOptions.steadyStateTime;
-
-            if (simOptions.useTauLeap) {
-                curTime = this.simCache.eventStack.tauLeapUpdate(stateMatrix, timeline, curTime, random);
-            } else {
-                curTime = this.simCache.eventStack.updateState(stateMatrix, timeline, curTime, random);
-            }
-
-            if (beforeSState && (curTime > this.simOptions.steadyStateTime)) {
-                timeline.resetHistory();
-            }
-
-            samplesCollected++;
-            sysTime = (System.currentTimeMillis() - startTime)/1000.0;
-
-        }
-
-        //System.out.format("Solver finished. %d samples in %f time\n", samplesCollected, curTime);
-
-        timeline.taper(curTime);
-        //timeline.printSummary(this.network);
-
-        return timeline;
-    }
-
-    public ArrayList<StateMatrix> getStateSpace(){
-        if (this.simCache == null) {
-            if (this.simStruct == null) {
-                this.compile(this.simStruct);
-            } else if (this.network == null) {
-                this.compile(this.network);
-            } else {
-                throw new RuntimeException("Network data not provided!");
-            }
-        }
-
-        this.random = new Random(this.simOptions.seed);
-        double curTime = simOptions.timeInterval.getLeft();
-        double maxTime = simOptions.timeInterval.getRight();
-
-        // Add ClosedClass instances to the reference station
-        StateMatrix stateMatrix = new StateMatrix(this.simCache.simStruct,this.random);
-        ArrayList<StateMatrix> stateSpace = new ArrayList<>();
-        for (JobClass jobClass : this.network.getClasses()) {
-            if (jobClass instanceof ClosedClass) {
-                int classIdx = this.network.getJobClassIndex(jobClass);
-                ClosedClass cClass = (ClosedClass) jobClass;
-                int stationIdx = this.network.getStatefulNodeIndex(cClass.getRefstat());
-                stateMatrix.setState(stationIdx, classIdx, (int)cClass.getPopulation());
-                for (int i = 0; i < cClass.getPopulation(); i++) {
-                    stateMatrix.addToBuffer(stationIdx, classIdx);
+            //departure event
+            if(!eventData.getValue1().getLeft().isDummy()) {
+                event2Idx = eventData.getValue1().getLeft().getNode().getNodeIdx();
+                SSAStateMatrix depState = eventData.getValue2();
+                double rate = eventData.getValue1().getRight();
+                double prob = ctmcResult.piVector.get(indexMap.get(depState));
+                if(!(eventData.getValue0() instanceof ErlangPhaseEvent) && !(eventData.getValue0() instanceof APHPhaseEvent)) {
+                    rate *= eventData.getValue0().getRate(eventData.getValue2());
+                }
+                else if(!eventData.getValue1().getLeft().isDummy()) {
+                    if(eventData.getValue0() instanceof ErlangPhaseEvent) {
+                        rate *= ((ErlangPhaseEvent) eventData.getValue0()).getDepartureRate(eventData.getValue2());
+                    }
+                    else if(eventData.getValue0() instanceof APHPhaseEvent) {
+                        rate *= ((APHPhaseEvent) eventData.getValue0()).getDepartureRate(eventData.getValue2());
+                    }
+                }
+                if(eventData.getValue1().getLeft().getNode().isStateful()) {
+                    arrRates[event2Idx][classIdx][indexMap.get(eventData.getValue2())] += rate;
+                }
+                TN.set(eventIdx, classIdx, TN.get(eventIdx, classIdx) + rate * prob);
+                if (sn.refstat.get(classIdx, 0) == event2Idx) {
+                    XN.set(0, classIdx, XN.get(0, classIdx) + prob * rate);
                 }
             }
         }
 
-        Timeline timeline = new Timeline(this.simCache.simStruct);
-
-        if (simOptions.disableResTime) {
-            timeline.disableResidenceTime();
+        for(int k = 0; k < nClasses; k++) {
+            CN.set(0, k, sn.njobs.get(0, k) / (k + 1));
         }
 
-        if (simOptions.useMSER5) {
-            timeline.useMSER5();
-        } else if (simOptions.useR5) {
-            timeline.useR5(simOptions.r5value);
-        }
-
-        if (!simOptions.recordMetricTimeline) {
-            timeline.setMetricRecord(false);
-        }
-
-        if (simOptions.useTauLeap) {
-            this.simCache.eventStack.configureTauLeap(simOptions.tauLeapingType);
-            if ((simOptions.tauLeapingType.getStateStrategy() == TauLeapingStateStrategy.TimeWarp) ||
-                    (simOptions.tauLeapingType.getStateStrategy() == TauLeapingStateStrategy.TauTimeWarp)) {
-                timeline.cacheRecordings();
-            }
-        }
-//        JLineMatrix jLineMatrix = new JLineMatrix(stateMatrix.state.length, stateMatrix.state[0].length);
-        stateSpace.add(stateMatrix);
-        stateMatrix.printStateVector();
-//        jLineMatrix.array2DtoJLineMatrix(stateMatrix.state);
-//        jLineMatrix.print();
-
-        double sysTime = 0;
-        double startTime = System.currentTimeMillis();
-
-        boolean beforeSState = false;
-
-        Queue<StateMatrix> queue = new LinkedList<>();
-        queue.add(stateMatrix);
-
-        while (!queue.isEmpty() && (curTime < maxTime) && (sysTime < this.simOptions.timeout)) {
-            beforeSState = curTime < this.simOptions.steadyStateTime;
-
-            if (simOptions.useTauLeap) {
-
-                curTime = this.simCache.eventStack.tauLeapUpdate(stateMatrix, timeline, curTime, random);
-            } else {
-                curTime = this.simCache.eventStack.updateStateSpace(timeline, curTime, random,stateSpace,queue);
-
-            }
-
-            if (beforeSState && (curTime > this.simOptions.steadyStateTime)) {
-                timeline.resetHistory();
-            }
-
-            sysTime = (System.currentTimeMillis() - startTime)/1000.0;
-
-        }
-        //System.out.format("Solver finished. %d samples in %f time\n", samplesCollected, curTime);
-
-        timeline.taper(curTime);
-        //timeline.printSummary(this.network);
-
-        return stateSpace;
-    }
-
-    public ArrayList<Quartet<Event, Pair<OutputEvent,Double>,StateMatrix,StateMatrix>> getAllEvents(){
-        if (this.simCache == null) {
-            if (this.simStruct == null) {
-                this.compile(this.simStruct);
-            } else if (this.network == null) {
-                this.compile(this.network);
-            } else {
-                throw new RuntimeException("Network data not provided!");
-            }
-        }
-
-        this.random = new Random(this.simOptions.seed);
-        double curTime = simOptions.timeInterval.getLeft();
-        double maxTime = simOptions.timeInterval.getRight();
-
-        // Add ClosedClass instances to the reference station
-        StateMatrix stateMatrix = new StateMatrix(this.simCache.simStruct,this.random);
-        ArrayList<Quartet<Event, Pair<OutputEvent,Double>,StateMatrix,StateMatrix>>  eventSpace = new ArrayList<>();
-        for (JobClass jobClass : this.network.getClasses()) {
-            if (jobClass instanceof ClosedClass) {
-                int classIdx = this.network.getJobClassIndex(jobClass);
-                ClosedClass cClass = (ClosedClass) jobClass;
-                int stationIdx = this.network.getStatefulNodeIndex(cClass.getRefstat());
-                stateMatrix.setState(stationIdx, classIdx, (int)cClass.getPopulation());
-                for (int i = 0; i < cClass.getPopulation(); i++) {
-                    stateMatrix.addToBuffer(stationIdx, classIdx);
+        // utilisation
+        for(int i = 0; i < stateN; i++) {
+            Node node = model.getStatefulNodeFromIndex(i);
+            SchedStrategy strategy = this.sn.sched.get(this.sn.stations.get(i));
+            if(!(node instanceof Source)) {
+                StatefulNode statefulNode;
+                if(node instanceof StatefulNode) {
+                    statefulNode = (StatefulNode) node;
+                }
+                else {
+                    continue;
+                }
+                switch (strategy) {
+                    case INF:
+                        for(int k = 0; k < nClasses; k++) {
+                            UN.set(i, k, QN.get(i, k));
+                        }
+                        break;
+                    case GPS:
+                    case DPS:
+                    case PS:
+                        if(this.model.getLimitedLoadDependence().isEmpty() && (this.model.getLimitedClassDependence() == null || this.model.getLimitedClassDependence().isEmpty())) {
+                            for(int k = 0; k < nClasses; k++) {
+                                Distribution dist =  node.getServer().getServiceDistribution(this.model.getJobClassFromIndex(k));
+                                double arrEstimate = 0.0;
+                                for(int j = 0; j < ctmcResult.stateSpace.size(); j++) {
+                                    arrEstimate += ctmcResult.piVector.get(j) * arrRates[i][k][j];
+                                }
+                                arrEstimate = arrEstimate * dist.getMean() / statefulNode.getNumberOfServers();
+                                double depEstimate = TN.get(i, k) * dist.getMean() / statefulNode.getNumberOfServers();
+                                UN.set(i, k, UN.get(i, k) + Math.max(arrEstimate, depEstimate));
+                            }
+                        }
+                        else {
+                            //TODO lld/cd cases not finished
+                            double arrEstimate, depEstimate;
+                            for(int j = 0; j < ctmcResult.stateSpace.size(); j++) {
+                                State.StateMarginalStatistics stats = State.toMarginal(sn, i, sn.state.get(sn.stations.get(i)), null, null, null, null, null);
+                                Matrix ni = stats.ni;
+                                Matrix nir = stats.nir;
+                                if(ni.get(0,0) > 0) {
+                                    for(int k = 0; k < nClasses; k++) {
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    default:
+                        if(this.model.getLimitedLoadDependence().isEmpty() && (this.model.getLimitedClassDependence() == null || this.model.getLimitedClassDependence().isEmpty())) {
+                            for(int k = 0; k < nClasses; k++) {
+                                Distribution dist =  node.getServer().getServiceDistribution(this.model.getJobClassFromIndex(k));
+                                double arrEstimate = 0.0;
+                                for(int j = 0; j < ctmcResult.stateSpace.size(); j++) {
+                                    arrEstimate += ctmcResult.piVector.get(j) * arrRates[i][k][j];
+                                }
+                                arrEstimate = arrEstimate * dist.getMean() / statefulNode.getNumberOfServers();
+                                double depEstimate = TN.get(i, k) * dist.getMean() / statefulNode.getNumberOfServers();
+                                UN.set(i, k, UN.get(i, k) + Math.max(arrEstimate, depEstimate));
+                            }
+                        }
+                        else {
+                            //TODO lld/cd cases
+                        }
+                        break;
                 }
             }
         }
-
-        Timeline timeline = new Timeline(this.simCache.simStruct);
-
-        if (simOptions.disableResTime) {
-            timeline.disableResidenceTime();
-        }
-
-        if (simOptions.useMSER5) {
-            timeline.useMSER5();
-        } else if (simOptions.useR5) {
-            timeline.useR5(simOptions.r5value);
-        }
-
-        if (!simOptions.recordMetricTimeline) {
-            timeline.setMetricRecord(false);
-        }
-
-        if (simOptions.useTauLeap) {
-            this.simCache.eventStack.configureTauLeap(simOptions.tauLeapingType);
-            if ((simOptions.tauLeapingType.getStateStrategy() == TauLeapingStateStrategy.TimeWarp) ||
-                    (simOptions.tauLeapingType.getStateStrategy() == TauLeapingStateStrategy.TauTimeWarp)) {
-                timeline.cacheRecordings();
+        for(int k = 0; k < nClasses; k++) {
+            for(int i = 0; i < stateN; i++) {
+                if(TN.get(i, k) > 0) {
+                    RN.set(i, k, QN.get(i, k) / TN.get(i ,k));
+                }
+                else {
+                    RN.set(i, k, 0);
+                }
             }
         }
-        JLineMatrix jLineMatrix = new JLineMatrix(stateMatrix.state.length, stateMatrix.state[0].length);
-        eventSpace.add(Quartet.with(null,null,stateMatrix,null));
-//        jLineMatrix.array2DtoJLineMatrix(stateMatrix.state);
-//        jLineMatrix.print();
+        long endTime = System.currentTimeMillis();
+        long runTime = endTime - startTime;
+        result.QN = QN;
+        result.UN = UN;
+        result.TN = TN;
+        result.RN = RN;
+        result.XN = XN;
+        result.CN = CN;
+        result.runtime = runTime/1000.0;
+        System.out.println("CTMC Analysis completed. Runtime: " + result.runtime + " seconds");
+    }
 
-        double sysTime = 0;
-        double startTime = System.currentTimeMillis();
-
-        boolean beforeSState = false;
-
-        Queue<StateMatrix> queue = new LinkedList<>();
-        queue.add(stateMatrix);
-
-        while (!queue.isEmpty() && (curTime < maxTime) && (sysTime < this.simOptions.timeout)) {
-            beforeSState = curTime < this.simOptions.steadyStateTime;
-
-            if (simOptions.useTauLeap) {
-                curTime = this.simCache.eventStack.tauLeapUpdate(stateMatrix, timeline, curTime, random);
-            } else {
-                curTime = this.simCache.eventStack.updateEventSpace(timeline, curTime, random,eventSpace,queue);
-
-            }
-
-            if (beforeSState && (curTime > this.simOptions.steadyStateTime)) {
-                timeline.resetHistory();
-            }
-
-            sysTime = (System.currentTimeMillis() - startTime)/1000.0;
-
+    public void solver_ctmc() {
+        ArrayList<SSAStateMatrix> stateSpace = new ArrayList<>();
+        ArrayList<EventData>  eventSpace = new ArrayList<>();
+        Queue<SSAStateMatrix> queue = new LinkedList<>();
+        Set<EventData> eventSet = new HashSet<>();
+        // Compute state space
+        if(this.options.cutoff != -1) {
+            initialNetworkState.setCutoff(this.options.cutoff);
         }
+        stateSpace.add(this.initialNetworkState);
+        queue.add(this.initialNetworkState);
+        Set<SSAStateMatrix> stateSet = new HashSet<>();
+        stateSet.add(initialNetworkState);
+        this.eventStack.updateStateSpace(stateSpace,queue, stateSet);
+        ctmcResult.stateSpace = stateSpace;
+        // Compute event space
+        eventSet.add(new EventData(null,null,this.initialNetworkState,null));
+        eventSpace.add(new EventData(null,null,this.initialNetworkState,null));
+        queue.add(this.initialNetworkState);
 
-
-
-        //System.out.format("Solver finished. %d samples in %f time\n", samplesCollected, curTime);
-
-        timeline.taper(curTime);
-        //timeline.printSummary(this.network);
+        this.eventStack.updateEventSpace(eventSpace,queue, eventSet);
 
         eventSpace.remove(0);
-
-        ArrayList<StateMatrix> stateMatrices = getStateSpace();
-        int size = stateMatrices.size();
-
-        Map<StateMatrix,Integer> indexMap = new HashMap<>();
-        for(int i =0;i< stateMatrices.size();i++){
-            indexMap.put(stateMatrices.get(i),i);
+        ctmcResult.eventSpace = eventSpace;
+        int size = stateSpace.size();
+        Map<SSAStateMatrix,Integer> indexMap = new HashMap<>();
+        for(int i = 0; i< stateSpace.size(); i++){
+            indexMap.put(stateSpace.get(i),i);
         }
+        this.indexMap = indexMap;
 
-        double[][] rateMatrix = new double[size][size];
+        // Compute inf generator
+        Matrix infGen = new Matrix(size, size);
         for(int i =0;i<size;i++){
             for(int j=0;j<size;j++){
-                rateMatrix[i][j]=0.0;
+                infGen.set(i, j, 0.0);
             }
         }
+        for(EventData eventData : eventSpace){
+            double rate = eventData.getValue1().getRight();
+            if(!(eventData.getValue0() instanceof ErlangPhaseEvent) && !(eventData.getValue0() instanceof APHPhaseEvent)) {
+                rate *= eventData.getValue0().getRate(eventData.getValue2());
+            }
+            else{
+                if(!eventData.getValue1().getLeft().isDummy()) {
+                    if(eventData.getValue0() instanceof ErlangPhaseEvent) {
+                        rate *= ((ErlangPhaseEvent) eventData.getValue0()).getDepartureRate(eventData.getValue2());
+                    }
+                    else if(eventData.getValue0() instanceof APHPhaseEvent) {
+                        rate *= ((APHPhaseEvent) eventData.getValue0()).getDepartureRate(eventData.getValue2());
 
-//        for(int i=0;i<eventSpace.size();i++){
-//            for(int j=i+1;j< eventSpace.size();j++){
-//                if(StateMatrix.multipleEventSameState(eventSpace.get(i),eventSpace.get(j))){
-//                    System.out.println(true);
-//                }
-//            }
-//        }
-
-        for(Quartet<Event, Pair<OutputEvent, Double>, StateMatrix, StateMatrix> quartet : eventSpace){
-            double rate = quartet.getValue0().getRate(quartet.getValue2())*quartet.getValue1().getRight();
-            rateMatrix[indexMap.get(quartet.getValue2())][indexMap.get(quartet.getValue3())] = rate;
+                    }
+                }
+            }
+            infGen.set(indexMap.get(eventData.getValue2()), indexMap.get(eventData.getValue3()), infGen.get(indexMap.get(eventData.getValue2()), indexMap.get(eventData.getValue3())) + rate);
         }
 
         for(int i = 0; i<size;i++){
             double sum = 0;
             for(int j=0;j<size;j++){
                 if(j!=i){
-                    sum+=rateMatrix[i][j];
+                    sum+=infGen.get(i, j);
                 }
             }
-            rateMatrix[i][i]= -sum;
+            infGen.set(i, i, - sum);
         }
-
-        for(int i = 0; i<size;i++){
-            for(int j=0;j<size;j++){
-                System.out.print(rateMatrix[i][j]+"  ");
-            }
-            System.out.println();
-        }
-
-        JLineMatrix rateLineMatrix = new JLineMatrix(size,size);
-        rateLineMatrix.array2DtoJLineMatrix(rateMatrix);
-
-        JLineMatrix piVector = CTMC.ctmc_solve(rateLineMatrix);
-
-        piVector.print();
-
-        double[][] U = piVector.toArray2D();
-        double[] utilisation = new double[stateMatrix.state.length];
-        double[] qLength = new double[stateMatrix.state.length];
-        for (int i=0;i<size;i++){
-            if(U[0][i]>0){
-                int[][] state = stateMatrices.get(i).state;
-                for(int j = 0;j<state.length;j++){
-                    int tempSum =0;
-                    for(int k=0;k<state[j].length;k++){
-                        tempSum+=state[j][k];
-                    }
-                    if(tempSum>0){
-                        utilisation[j]+=U[0][i];
-                        qLength[j]+=U[0][i]*tempSum;
-                    }
-                }
-            }
-        }
-        for(int i=0;i<utilisation.length;i++){
-            System.out.println(utilisation[i]+" "+qLength[i]);
-        }
-
-        return eventSpace;
+        ctmcResult.infGen = infGen;
     }
-
 }

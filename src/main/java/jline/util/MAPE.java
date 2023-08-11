@@ -3,13 +3,11 @@
 
 package jline.util;
 
-import jline.lang.JLineMatrix;
-
 public class MAPE {
 
   // TODO: polymorphic version that also returns nanMean
   // Return mean absolute percentage error of approx with respect to exact
-  public static double mape(JLineMatrix approx, JLineMatrix exact) {
+  public static double mape(Matrix approx, Matrix exact) {
 
     int numRows = approx.getNumRows();
     double totalAbsolutePercentageError = 0;

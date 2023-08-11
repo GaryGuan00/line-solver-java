@@ -3,13 +3,11 @@ package jline.lang.sections;
 import java.io.Serializable;
 import java.util.*;
 
-import jline.util.Cdf;
+import jline.util.CumulativeDistribution;
 import jline.lang.*;
 import jline.lang.constant.RoutingStrategy;
 import jline.lang.constant.SchedStrategyType;
-import jline.lang.distributions.*;
 import jline.lang.nodes.*;
-import jline.lang.sections.*;
 import jline.solvers.ssa.events.OutputEvent;
 import jline.util.Pair;
 
@@ -64,6 +62,18 @@ public class OutputSection extends Section implements Serializable {
         outputEvents = new HashMap<OutputStrategy, OutputEvent>();
     }
 
+    public void setOutputStrategy(JobClass jobClass, RoutingStrategy routingStrategy) {
+        for (OutputStrategy outputStrategy : this.outputStrategies) {
+            if ((outputStrategy.getJobClass() == jobClass)) {
+                outputStrategy.setRoutingStrategy(routingStrategy);
+                return;
+            }
+        }
+
+        OutputStrategy outputStrategy = new OutputStrategy(jobClass, routingStrategy);
+        outputStrategies.add(outputStrategy);
+    }
+
     public void setOutputStrategy(JobClass jobClass, RoutingStrategy routingStrategy, Node destination, double probability) {
         for (OutputStrategy outputStrategy : this.outputStrategies) {
             if ((outputStrategy.getJobClass() == jobClass) && (outputStrategy.getDestination() == destination)) {
@@ -105,7 +115,7 @@ public class OutputSection extends Section implements Serializable {
     }
 
     public OutputEvent getOutputEvent(JobClass jobClass, Random random) {
-        Cdf<OutputStrategy> outputStrategyCdf = new Cdf<OutputStrategy>(random);
+        CumulativeDistribution<OutputStrategy> outputStrategyCumulativeDistribution = new CumulativeDistribution<OutputStrategy>(random);
 
         if (this.outputStrategies.size() == 0) {
             throw new RuntimeException("No output strategies found!");
@@ -118,14 +128,15 @@ public class OutputSection extends Section implements Serializable {
                 continue;
             }
 
-            outputStrategyCdf.addElement(outputStrategy, outputStrategy.getProbability());
+            outputStrategyCumulativeDistribution.addElement(outputStrategy, outputStrategy.getProbability());
         }
 
-        return this.outputEvents.get(outputStrategyCdf.generate());
+        return this.outputEvents.get(outputStrategyCumulativeDistribution.generate());
     }
 
+    @SuppressWarnings("unchecked")
     public ArrayList<Pair<OutputEvent,Double>>  getOutputEvents(JobClass jobClass, Random random) {
-        Cdf<OutputStrategy> outputStrategyCdf = new Cdf<OutputStrategy>(random);
+        CumulativeDistribution<OutputStrategy> outputStrategyCumulativeDistribution = new CumulativeDistribution<OutputStrategy>(random);
 
         if (this.outputStrategies.size() == 0) {
             throw new RuntimeException("No output strategies found!");
@@ -138,9 +149,9 @@ public class OutputSection extends Section implements Serializable {
                 continue;
             }
 
-            outputStrategyCdf.addElement(outputStrategy, outputStrategy.getProbability());
+            outputStrategyCumulativeDistribution.addElement(outputStrategy, outputStrategy.getProbability());
         }
-        ArrayList<Pair<Double,OutputStrategy>> outputStrategies = outputStrategyCdf.getPossibleEventProbability();
+        ArrayList<Pair<Double,OutputStrategy>> outputStrategies = outputStrategyCumulativeDistribution.getPossibleEventProbability();
         ArrayList<Pair<OutputEvent,Double>> outputEvents = new ArrayList<>();
         for(Pair<Double,OutputStrategy> pair : outputStrategies){
             outputEvents.add(new Pair(this.outputEvents.get(pair.getRight()),pair.getLeft()));
@@ -148,8 +159,7 @@ public class OutputSection extends Section implements Serializable {
         return outputEvents;
     }
 
-
-
+    @SuppressWarnings("unchecked")
     public OutputEvent getOutputEvent(JobClass jobClass) {
         return this.getOutputEvent(jobClass, new Random());
     }

@@ -3,9 +3,9 @@
 
 package jline.solvers.fluid.odes;
 
-import jline.lang.JLineMatrix;
+import jline.lang.constant.GlobalConstants;
+import jline.util.Matrix;
 import jline.lang.NetworkStruct;
-import jline.lang.distributions.Distribution;
 import org.apache.commons.math3.exception.DimensionMismatchException;
 import org.apache.commons.math3.exception.MaxCountExceededException;
 import org.apache.commons.math3.ode.FirstOrderDifferentialEquations;
@@ -28,22 +28,22 @@ public class MatrixMethodODE implements FirstOrderDifferentialEquations {
   private DMatrixSparseCSC pQa;
 
   public MatrixMethodODE(
-      JLineMatrix W, JLineMatrix SQ, JLineMatrix S, JLineMatrix Qa, JLineMatrix ALambda, int numDimensions) {
-    this.W = W.JLineMatrix2DMatrixSparseCSC();
-    this.SQ = SQ.JLineMatrix2DMatrixSparseCSC();
-    this.S = S.JLineMatrix2DMatrixSparseCSC();
-    this.Qa = Qa.JLineMatrix2DMatrixSparseCSC();
-    this.ALambda = ALambda.JLineMatrix2DMatrixSparseCSC();
+          Matrix W, Matrix SQ, Matrix S, Matrix Qa, Matrix ALambda, int numDimensions) {
+    this.W = W.toDMatrixSparseCSC();
+    this.SQ = SQ.toDMatrixSparseCSC();
+    this.S = S.toDMatrixSparseCSC();
+    this.Qa = Qa.toDMatrixSparseCSC();
+    this.ALambda = ALambda.toDMatrixSparseCSC();
     this.numDimensions = numDimensions;
     this.pQa = new DMatrixSparseCSC(0, 0);
   }
 
   public MatrixMethodODE(
-      JLineMatrix W,
-      JLineMatrix SQ,
-      JLineMatrix S,
-      JLineMatrix Qa,
-      JLineMatrix ALambda,
+      Matrix W,
+      Matrix SQ,
+      Matrix S,
+      Matrix Qa,
+      Matrix ALambda,
       int numDimensions,
       NetworkStruct sn,
       List<Double> pStarValues) {
@@ -54,7 +54,7 @@ public class MatrixMethodODE implements FirstOrderDifferentialEquations {
     int row = 0;
     for (int i = 0; i < sn.nstations; i++) {
       double pStarValue = pStarValues.get(i);
-      for (int j = 0; j < sn.nClasses; j++) {
+      for (int j = 0; j < sn.nclasses; j++) {
         int nPhases = (int) sn.phases.get(i, j);
         for (int k = 0; k < nPhases; k++) {
           pQa.set(row, 0, pStarValue);
@@ -79,7 +79,7 @@ public class MatrixMethodODE implements FirstOrderDifferentialEquations {
     }
 
     Equation calculateSumXQa = new Equation();
-    calculateSumXQa.alias(xDMS, "x", SQ, "SQ", Distribution.zeroRn, "distribZero");
+    calculateSumXQa.alias(xDMS, "x", SQ, "SQ", GlobalConstants.FineTol, "distribZero");
     calculateSumXQa.process("sumXQa = distribZero + SQ * x");
     SimpleMatrix sumXQa = calculateSumXQa.lookupSimple("sumXQa");
 

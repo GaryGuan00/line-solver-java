@@ -1,29 +1,29 @@
 package jline.lang.distributions;
 
-import jline.lang.JLineMatrix;
-import jline.lang.distributions.MarkovianDistribution;
-import jline.util.Interval;
-import jline.util.Pair;
+import jline.lang.constant.GlobalConstants;
+import jline.util.Matrix;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import static java.lang.Math.exp;
-import static java.lang.Math.log;
 
 public class Exp extends MarkovianDistribution  implements Serializable {
     public Exp(double lambda) {
-        super("Exponential", 1);
+        super("Exp", 1);
         this.setParam(1, "lambda", lambda);
     }
 
-    public List<Double> sample(int n)  {
-        double lambda = (double)this.getParam(1).getValue();
-        //return exprnd(1/lambda, n, 1);
-        throw new RuntimeException("Not Implemented!");
+    @Override
+    public List<Double> sample(long n) {
+        throw new RuntimeException("Not implemented");
+    }
+
+    public List<Double> sample(long n, Random random) {
+        return this.sample(n,random);
     }
 
     public long getNumberOfPhases() {
@@ -35,13 +35,13 @@ public class Exp extends MarkovianDistribution  implements Serializable {
         return 1-exp(-lambda*t);
     }
 
-    public Map<Integer, JLineMatrix> getPH() {
+    public Map<Integer, Matrix> getPH() {
         double lambda = (double) this.getParam(1).getValue();
-        JLineMatrix D0 = new JLineMatrix(1,1,1);
-        JLineMatrix D1 = new JLineMatrix(1,1,1);
+        Matrix D0 = new Matrix(1,1,1);
+        Matrix D1 = new Matrix(1,1,1);
         D0.set(0, 0, -lambda);
         D1.set(0, 0, lambda);
-        Map<Integer, JLineMatrix> res = new HashMap<Integer, JLineMatrix>();
+        Map<Integer, Matrix> res = new HashMap<Integer, Matrix>();
         res.put(0, D0);
         res.put(1, D1);
         return res;
@@ -50,6 +50,12 @@ public class Exp extends MarkovianDistribution  implements Serializable {
     public double evalLST(double s) {
         double lambda = (double) this.getParam(1).getValue();
         return (lambda/(lambda+s));
+    }
+
+    public void updateRate(double rate){
+        this.setParam(1, "lambda", rate);
+        this.mean = 1.0/rate;
+        this.immediate = 1.0/rate < GlobalConstants.FineTol;
     }
 
     public double getSCV() {
@@ -74,5 +80,9 @@ public class Exp extends MarkovianDistribution  implements Serializable {
 
     public String toString() {
         return String.format("jline.Exp(%f)", this.getRate());
+    }
+
+    public static Exp fitMean(double mean) {
+        return new Exp(1/mean);
     }
 }

@@ -3,22 +3,21 @@
 
 package jline.solvers.env;
 
+
 import jline.lang.*;
 import jline.solvers.EnsembleSolver;
 import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
 import jline.solvers.fluid.smoothing.PStarSearcher;
 import jline.util.MAPE;
-import kpcToolbox.Map;
+import jline.util.Matrix;
 import org.apache.commons.math3.optim.PointValuePair;
-import org.ejml.data.DMatrixRMaj;
-import org.qore.KPC.MAP;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
+import static jline.lib.KPCToolbox.*;
 // Solver for models immersed in a random environment
 public class SolverEnv extends EnsembleSolver {
 
@@ -54,13 +53,13 @@ public class SolverEnv extends EnsembleSolver {
   protected boolean converged(int it) {
 
     int M = sn[0].nstations;
-    int K = sn[0].nClasses;
+    int K = sn[0].nclasses;
     int E = getNumberOfModels();
 
     if (it <= 1) {
       return false;
     }
-    JLineMatrix mapes = new JLineMatrix(1, E);
+    Matrix mapes = new Matrix(1, E);
     for (int e = 0; e < E; e++) {
       for (int i = 0; i < M; i++) {
         for (int j = 0; j < K; j++) {
@@ -71,8 +70,8 @@ public class SolverEnv extends EnsembleSolver {
               Math.max(
                   mapes.get(0, e),
                   MAPE.mape(
-                      JLineMatrix.extractRows(results.get(it).get(e).QNt[i][j], 0, 1, null),
-                      JLineMatrix.extractRows(results.get(it - 1).get(e).QNt[i][j], 0, 1, null))));
+                      Matrix.extractRows(results.get(it).get(e).QNt[i][j], 0, 1, null),
+                      Matrix.extractRows(results.get(it - 1).get(e).QNt[i][j], 0, 1, null))));
         }
       }
     }
@@ -81,8 +80,6 @@ public class SolverEnv extends EnsembleSolver {
 
   @Override
   protected void init() {
-    // TODO: implement the below method and then uncomment
-    // resetRandomGeneratorSeed(options.seed);
     envObj.init();
   }
 
@@ -109,14 +106,14 @@ public class SolverEnv extends EnsembleSolver {
     // TODO: [Qt,Ut,Tt] = self.ensemble{e}.getTranHandles;
     this.solvers[e].resetResults();
     // If pStar values exist, implement p-norm smoothing
-    if (this.solvers[e].options.config.pStar.size() != 0) {
+    if (this.solvers[e].options.config.pstar.size() != 0) {
       PStarSearcher searcher = new PStarSearcher();
-      JLineMatrix targetQueueLengths = searcher.generateTargetQueueLengths(this.solvers[e].model);
+      Matrix targetQueueLengths = searcher.generateTargetQueueLengths(this.solvers[e].model);
       PointValuePair pStarValues =
           searcher.findPStarValues(this.solvers[e].model, targetQueueLengths);
-      solvers[e].options.config.pStar.clear();
+      solvers[e].options.config.pstar.clear();
       for (int i = 0; i < this.solvers[e].model.getNumberOfNodes(); i++) {
-        solvers[e].options.config.pStar.add(i, pStarValues.getPoint()[i]);
+        solvers[e].options.config.pstar.add(i, pStarValues.getPoint()[i]);
       }
     }
     this.solvers[e].getTranAvg();
@@ -126,44 +123,43 @@ public class SolverEnv extends EnsembleSolver {
   protected void post(int it) {
 
     int M = sn[0].nstations;
-    int K = sn[0].nClasses;
+    int K = sn[0].nclasses;
     int E = getNumberOfModels();
-    JLineMatrix[][] QExit = new JLineMatrix[E][E];
-    JLineMatrix[][] UExit = new JLineMatrix[E][E];
-    JLineMatrix[][] TExit = new JLineMatrix[E][E];
-    JLineMatrix[][] w = new JLineMatrix[E][E];
-    JLineMatrix[] QEntry = new JLineMatrix[E]; // Average entry queue-length
+    Matrix[][] QExit = new Matrix[E][E];
+    Matrix[][] UExit = new Matrix[E][E];
+    Matrix[][] TExit = new Matrix[E][E];
+    Matrix[][] w = new Matrix[E][E];
+    Matrix[] QEntry = new Matrix[E]; // Average entry queue-length
 
     for (int e = 0; e < E; e++) {
       for (int h = 0; h < E; h++) {
-        QExit[e][h] = new JLineMatrix(M, K);
-        UExit[e][h] = new JLineMatrix(M, K);
-        TExit[e][h] = new JLineMatrix(M, K);
-        MAP map =
-            new MAP(
-                new DMatrixRMaj(envObj.proc[e][h].get(0)),
-                new DMatrixRMaj(envObj.proc[e][h].get(1)));
+        QExit[e][h] = new Matrix(M, K);
+        UExit[e][h] = new Matrix(M, K);
+        TExit[e][h] = new Matrix(M, K);
+        Matrix D0 = envObj.proc[e][h].get(0);
+        Matrix D1 = envObj.proc[e][h].get(1);
+        map_normalize(D0,D1);
         for (int i = 0; i < M; i++) {
           for (int r = 0; r < K; r++) {
-            w[e][h] = new JLineMatrix(1, 1);
-            JLineMatrix cdf1 =
-                Map.mapCDF(
-                    map,
-                    JLineMatrix.extractRows(
+            w[e][h] = new Matrix(1, 1);
+            Matrix cdf1 =
+                map_cdf(
+                        D0,D1,
+                    Matrix.extractRows(
                         results.get(it).get(e).t, 1, results.get(it).get(e).t.getNumRows(), null));
 
-            JLineMatrix cdf2 =
-                Map.mapCDF(
-                    map,
-                    JLineMatrix.extractRows(
+            Matrix cdf2 =
+                map_cdf(
+                        D0,D1,
+                    Matrix.extractRows(
                         results.get(it).get(e).t,
                         0,
                         results.get(it).get(e).t.getNumRows() - 1,
                         null));
 
-            JLineMatrix cdfDiff = cdf1.sub(1, cdf2);
+            Matrix cdfDiff = cdf1.sub(1, cdf2);
             cdfDiff = cdfDiff.transpose();
-            w[e][h] = JLineMatrix.concatRows(w[e][h], cdfDiff, null);
+            w[e][h] = Matrix.concatRows(w[e][h], cdfDiff, null);
 
             if (!w[e][h].hasNaN()) {
               QExit[e][h].set(
@@ -188,11 +184,11 @@ public class SolverEnv extends EnsembleSolver {
     }
 
     for (int e = 0; e < E; e++) {
-      QEntry[e] = new JLineMatrix(M, K);
+      QEntry[e] = new Matrix(M, K);
       for (int h = 0; h < E; h++) {
         // Probability of coming from h to e \times resetFun(Qexit from h to e
         if (envObj.probOrig.get(h, e) > 0) {
-          JLineMatrix partialQEntry = new JLineMatrix(0, 0);
+          Matrix partialQEntry = new Matrix(0, 0);
           resetFromMarginal[h][e]
               .reset(QExit[h][e])
               .scale(envObj.probOrig.get(h, e), partialQEntry);
@@ -200,6 +196,7 @@ public class SolverEnv extends EnsembleSolver {
         }
       }
       solvers[e].resetResults();
+
       ensemble[e].initFromMarginal(QEntry[e]);
     }
 
@@ -228,44 +225,43 @@ public class SolverEnv extends EnsembleSolver {
     // Use last iteration
     int it = results.size();
     int M = sn[0].nstations;
-    int K = sn[0].nClasses;
+    int K = sn[0].nclasses;
     int E = getNumberOfModels();
-    JLineMatrix[] QExit = new JLineMatrix[E];
-    JLineMatrix[] UExit = new JLineMatrix[E];
-    JLineMatrix[] TExit = new JLineMatrix[E];
-    JLineMatrix[] w = new JLineMatrix[E];
+    Matrix[] QExit = new Matrix[E];
+    Matrix[] UExit = new Matrix[E];
+    Matrix[] TExit = new Matrix[E];
+    Matrix[] w = new Matrix[E];
 
     for (int e = 0; e < E; e++) {
-      QExit[e] = new JLineMatrix(M, K);
-      UExit[e] = new JLineMatrix(M, K);
-      TExit[e] = new JLineMatrix(M, K);
+      QExit[e] = new Matrix(M, K);
+      UExit[e] = new Matrix(M, K);
+      TExit[e] = new Matrix(M, K);
       if (it > 0) {
-        MAP map =
-            new MAP(
-                new DMatrixRMaj(envObj.holdTime[e].get(0)),
-                new DMatrixRMaj(envObj.holdTime[e].get(1)));
+        Matrix D0 = envObj.holdTime[e].get(0);
+        Matrix D1 = envObj.holdTime[e].get(1);
+        map_normalize(D0,D1);
         for (int i = 0; i < M; i++) {
           for (int r = 0; r < K; r++) {
-            w[e] = new JLineMatrix(1, 1);
+            w[e] = new Matrix(1, 1);
             w[e].set(0, 0, 0);
-            JLineMatrix cdf1 =
-                Map.mapCDF(
-                    map,
-                    JLineMatrix.extractRows(
+            Matrix cdf1 =
+                map_cdf(
+                        D0, D1,
+                    Matrix.extractRows(
                         results.get(it).get(e).t, 1, results.get(it).get(e).t.getNumRows(), null));
 
-            JLineMatrix cdf2 =
-                Map.mapCDF(
-                    map,
-                    JLineMatrix.extractRows(
+            Matrix cdf2 =
+                map_cdf(
+                        D0, D1,
+                    Matrix.extractRows(
                         results.get(it).get(e).t,
                         0,
                         results.get(it).get(e).t.getNumRows() - 1,
                         null));
 
-            JLineMatrix cdfDiff = cdf1.sub(1, cdf2);
+            Matrix cdfDiff = cdf1.sub(1, cdf2);
             cdfDiff = cdfDiff.transpose();
-            w[e] = JLineMatrix.concatRows(w[e], cdfDiff, new JLineMatrix(0, 0));
+            w[e] = Matrix.concatRows(w[e], cdfDiff, new Matrix(0, 0));
 
             QExit[e].set(
                 i,
@@ -275,7 +271,7 @@ public class SolverEnv extends EnsembleSolver {
                         .get(e)
                         .QNt[i][r]
                         .transpose()
-                        .mult(w[e], new JLineMatrix(0, 0))
+                        .mult(w[e], new Matrix(0, 0))
                         .get(0, 0)
                     / w[e].elementSum());
             UExit[e].set(
@@ -286,7 +282,7 @@ public class SolverEnv extends EnsembleSolver {
                         .get(e)
                         .UNt[i][r]
                         .transpose()
-                        .mult(w[e], new JLineMatrix(0, 0))
+                        .mult(w[e], new Matrix(0, 0))
                         .get(0, 0)
                     / w[e].elementSum());
             TExit[e].set(
@@ -297,7 +293,7 @@ public class SolverEnv extends EnsembleSolver {
                         .get(e)
                         .TNt[i][r]
                         .transpose()
-                        .mult(w[e], new JLineMatrix(0, 0))
+                        .mult(w[e], new Matrix(0, 0))
                         .get(0, 0)
                     / w[e].elementSum());
           }
@@ -305,14 +301,14 @@ public class SolverEnv extends EnsembleSolver {
       }
     }
 
-    JLineMatrix QVal = QExit[0].clone();
-    JLineMatrix UVal = UExit[0].clone();
-    JLineMatrix TVal = TExit[0].clone();
+    Matrix QVal = QExit[0].clone();
+    Matrix UVal = UExit[0].clone();
+    Matrix TVal = TExit[0].clone();
     QVal.zero();
     UVal.zero();
     TVal.zero();
     for (int e = 0; e < E; e++) {
-      JLineMatrix partialResult = new JLineMatrix(0, 0);
+      Matrix partialResult = new Matrix(0, 0);
       QExit[e].scale(envObj.probEnv.get(e), partialResult);
       QVal = partialResult.add(1, QVal);
       UExit[e].scale(envObj.probEnv.get(e), partialResult);
@@ -354,9 +350,9 @@ public class SolverEnv extends EnsembleSolver {
     boolean keepDisabled = false;
 
     this.getAvg();
-    JLineMatrix QN = this.result.QN;
-    JLineMatrix UN = this.result.UN;
-    JLineMatrix TN = this.result.TN;
+    Matrix QN = this.result.QN;
+    Matrix UN = this.result.UN;
+    Matrix TN = this.result.TN;
 
     int M = QN.getNumRows();
     int K = QN.getNumCols();
@@ -380,7 +376,7 @@ public class SolverEnv extends EnsembleSolver {
             Uval.add(UN.get(i, k));
             Tval.add(TN.get(i, k));
             respTVal.add(QN.get(i, k) / TN.get(i, k));
-            className.add(sn[0].jobClasses.get(k).getName());
+            className.add(sn[0].jobclasses.get(k).getName());
             stationName.add(sn[0].stations.get(i).getName());
           }
         }

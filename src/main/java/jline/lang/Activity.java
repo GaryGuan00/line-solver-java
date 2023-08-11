@@ -1,13 +1,17 @@
 package jline.lang;
 
 
+import jline.lang.constant.GlobalConstants;
+import jline.lang.constant.SchedStrategy;
 import jline.lang.distributions.Distribution;
 import jline.lang.distributions.Exp;
 import jline.lang.distributions.Immediate;
+import jline.util.Matrix;
 
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 public class Activity extends LayeredNetworkElement {
     protected Distribution hostDemand;//TODO [Distribution]
@@ -18,10 +22,10 @@ public class Activity extends LayeredNetworkElement {
     protected String boundToEntry;
     protected String callOrder;
     protected Map<Integer,String> syncCallDests = new HashMap<>();
-    protected JLineMatrix syncCallMeans = new JLineMatrix(1,1000,1000);
+    protected Matrix syncCallMeans = new Matrix(1,1,0);
     protected Map<Integer,String> asyncCallDests = new HashMap<>();
-    protected JLineMatrix asyncCallMeans = new JLineMatrix(1,1000,1000);
-    protected JLineMatrix scheduling = new JLineMatrix(0,0,0);
+    protected Matrix asyncCallMeans = new Matrix(1,1,0);
+    protected Matrix scheduling = new Matrix(0,0,0);
 
     public Activity(LayeredNetwork model, String name, Distribution hostDemand, String boundToEntry, String callOrder) {
         super(name);
@@ -77,7 +81,7 @@ public class Activity extends LayeredNetworkElement {
 
 
     public void setHostDemand(double hostDemand) {
-        if (hostDemand <= Distribution.zeroRn){
+        if (hostDemand <= GlobalConstants.Zero){
             this.hostDemand = new Immediate();
             this.hostDemandMean = 1e-8;
             this.hostDemandSCV = 1e-8;
@@ -96,12 +100,10 @@ public class Activity extends LayeredNetworkElement {
 
     public void repliesTo(Entry entry) throws Exception {
         if(this.parent!=null){
-            switch (this.parent.scheduling) {
-                case REF:
-                    throw  new Exception("Activities in reference tasks cannot reply.");
-                default:
-                    entry.replyActivity.put(entry.replyActivity.size(), this.getName());
-                    break;
+            if (Objects.requireNonNull(this.parent.scheduling) == SchedStrategy.REF) {
+                throw new Exception("Activities in reference tasks cannot reply.");
+            } else {
+                entry.replyActivity.put(entry.replyActivity.size(), this.getName());
             }
         }else{
             entry.replyActivity.put( entry.replyActivity.size(), this.getName());
@@ -139,7 +141,8 @@ public class Activity extends LayeredNetworkElement {
     public void synchCall(Entry synchCallDest){//TODO:condition?
         this.syncCallDests.put(syncCallDests.size(),synchCallDest.name);
         this.syncCallMeans.growMaxColumns(syncCallMeans.numCols+1,true);
-        this.syncCallMeans.set(0,syncCallMeans.length()-1,1);
+        this.syncCallMeans.growMaxLength(syncCallMeans.nz_length+1,true);
+        this.syncCallMeans.set(0,syncCallMeans.numCols-1,1);
     }
 
     public void synchCall(String synchCallDest){//TODO:condition?

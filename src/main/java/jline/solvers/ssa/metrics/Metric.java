@@ -3,7 +3,7 @@ package jline.solvers.ssa.metrics;
 import java.util.*;
 
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.state.StateMatrix;
+import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.util.Pair;
 
 public abstract class Metric<T extends Number, U> {
@@ -78,7 +78,7 @@ public abstract class Metric<T extends Number, U> {
     }
 
     protected abstract void addSample(double currentTime, T metric);
-    public abstract void fromStateMatrix(double t, StateMatrix stateMatrix);
+    public abstract void fromStateMatrix(double t, SSAStateMatrix networkState);
     public abstract void fromEvent(double t, Event e);
     public abstract void fromEvent(double t, Event e, int n);
     public abstract T getMetric();

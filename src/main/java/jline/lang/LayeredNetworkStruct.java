@@ -1,67 +1,144 @@
 package jline.lang;
 
+import jline.lang.constant.CallType;
 import jline.lang.constant.SchedStrategy;
+import jline.lang.distributions.DiscreteDistribution;
 import jline.lang.distributions.Distribution;
+import jline.lang.distributions.Geometric;
+import jline.util.Matrix;
 
 import java.util.List;
 import java.util.Map;
 
 public class LayeredNetworkStruct {
 
-    protected int nidx;
-    protected int nhosts;
-    protected int ntasks;
-    protected int nreftasks;
-    protected int nacts;
-    protected int nentries;
-    protected JLineMatrix ntasksof;
-    protected JLineMatrix nentriesof;
-    protected JLineMatrix nactsof;
-    protected int tshift;
-    protected int eshift;
-    protected int ashift;
-    protected JLineMatrix hostidx;
-    protected JLineMatrix taskidx;
-    protected JLineMatrix entryidx;
-    protected JLineMatrix actidx;
-    protected Map<Integer, Integer> tasksof;
-    protected Map<Integer, List<Integer>> entriesof;
-    protected Map<Integer, List<Integer>> actsof;
-    protected Map<Integer, List<Integer>> callsof;
-    protected Map<Integer, Distribution> hostdem;
-    protected Map<Integer, Distribution> think;
-    protected Map<Integer, SchedStrategy> sched;
-    protected JLineMatrix schedid;
-    protected Map<Integer, String> names;
-    protected Map<Integer, String> hashnames;
-    protected JLineMatrix mult;
-    protected JLineMatrix repl;
-    protected JLineMatrix type;
-    protected JLineMatrix graph;
-    protected List<Boolean> replies;
-    protected JLineMatrix replygraph;
-    protected Map<Integer, Integer> nitems;
-    protected Map<Integer, Integer> itemlevelcap;
-    protected Map<Integer, String> replacementpolicy;
-    protected Map<Integer, Integer> nitemsof;
-    protected Map<Integer, Distribution> itemsdistribution;
-    protected JLineMatrix iscache;
-    protected JLineMatrix parent;
-    protected JLineMatrix callidx;
-    protected JLineMatrix calltype;
-    protected JLineMatrix iscaller;
-    protected JLineMatrix issynccaller;
-    protected JLineMatrix isasynccaller;
-    protected JLineMatrix callpair;
-    protected JLineMatrix taskgraph;
-    protected Map<Integer, Geometric> callproc;
-    protected Map<Integer, String> callnames;
-    protected Map<Integer, String> callhashnames;
-    protected JLineMatrix taskgrpaph;
-    protected JLineMatrix actpretype;
-    protected JLineMatrix actposttype;
+    public  int nidx;
+    public  int nhosts;
+    public  int ntasks;
 
-    protected int ncalls;
-    protected boolean isref;
+    public  int nacts;
+    public  int nentries;
 
-};
+
+
+    public  int tshift;
+    public  int eshift;
+    public  int ashift;
+
+    public int hshift;
+
+    public int cshift;
+
+    public  Map<Integer, List<Integer>> tasksof;
+    public  Map<Integer, List<Integer>> entriesof;
+    public  Map<Integer, List<Integer>> actsof;
+    public  Map<Integer, List<Integer>> callsof;
+    public  Map<Integer, Distribution> hostdem;
+    public  Map<Integer, Distribution> think;
+
+    public  Map<Integer, SchedStrategy> sched;
+    public Matrix schedid;
+    public  Map<Integer, String> names;
+    public Map<Integer, String> hashnames;
+    public Matrix mult;
+    public Matrix repl;
+    public Matrix type;
+    public Matrix graph;
+
+    public Matrix replygraph;
+    public Matrix nitems;
+
+    public Map<Integer, Integer> itemcap;
+
+    public Map<Integer, DiscreteDistribution> itemproc;
+
+
+    public Matrix replacement;
+
+    public Matrix iscache;
+    public Matrix parent;
+
+    public Map<Integer, CallType> calltype;
+    public Matrix iscaller;
+    public Matrix issynccaller;
+    public Matrix isasynccaller;
+    public Matrix callpair;
+    public Matrix taskgraph;
+    public Map<Integer, Geometric> callproc;
+    public Map<Integer, String> callnames;
+    public Map<Integer, String> callhashnames;
+
+    public Matrix actpretype;
+    public Matrix actposttype;
+
+    public int ncalls;
+    public Matrix isref;
+    
+    public void print(){
+        System.out.println("nidx: "+ nidx);
+        System.out.println("nhosts: "+nhosts);
+        System.out.println("ntasks: "+ntasks);
+        System.out.println("nentries: "+nentries);
+        System.out.println("nacts: "+nacts);
+        System.out.println("ncalls: "+ncalls);
+        System.out.println("hshift: "+hshift);
+        System.out.println("tshift: "+tshift);
+        System.out.println("eshift: "+eshift);
+        System.out.println("ashift: "+ashift);
+        System.out.println("cshift: "+cshift);
+        System.out.println("tasksof: "+tasksof);
+        System.out.println("entriesof: "+entriesof);
+        System.out.println("actof: "+actsof);
+        System.out.println("callof: "+callsof);
+        System.out.println("hostdem: "+hostdem);
+        System.out.println("think: "+think);
+        System.out.println("sched: "+sched);
+        System.out.println("schedid: ");
+        schedid.print();
+        System.out.println("names: "+names);
+        System.out.println("hashnames: "+hashnames);
+        System.out.println("mult: ");
+        mult.print();
+        System.out.println("repl: ");
+        repl.print();
+        System.out.println("type: ");
+        type.print();
+        System.out.println("nitems: ");
+        nitems.print();
+        System.out.println("itemcap: "+itemcap);
+        System.out.println("replacement: ");
+        replacement.print();
+        System.out.println("itemproc: "+itemproc);
+        System.out.println("calltype: "+calltype);
+
+        System.out.println("callpair: ");
+        callpair.print();
+        System.out.println("callproc: "+callproc);
+
+        System.out.println("callnames: "+callnames);
+        System.out.println("callhashname: "+callhashnames);
+        System.out.println("actpretype: ");
+        actpretype.print();
+        System.out.println("actposttype: ");
+        actposttype.print();
+        System.out.println("graph: ");
+        graph.printNonZero();
+        System.out.println("parent: ");
+        parent.print();
+        System.out.println("replygraph: ");
+        replygraph.printNonZero();
+        System.out.println("iscache: ");
+        iscache.print();
+        System.out.println("iscaller: ");
+        iscaller.printNonZero();
+        System.out.println("issynccaller: ");
+        issynccaller.printNonZero();
+        System.out.println("isasynccaller: ");
+        isasynccaller.printNonZero();
+        System.out.println("isref: ");
+        isref.print();
+    }
+    
+
+
+}

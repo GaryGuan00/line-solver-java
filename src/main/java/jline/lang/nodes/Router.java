@@ -10,7 +10,7 @@ import jline.lang.distributions.*;
 import jline.lang.nodes.*;
 import jline.lang.sections.*;
 
-public class Router extends StatefulNode implements HasSchedStrategy, Serializable {
+public class Router extends Node implements HasSchedStrategy, Serializable {
     protected double cap;
     protected int numberOfServers;
     protected SchedStrategyType schedPolicy;

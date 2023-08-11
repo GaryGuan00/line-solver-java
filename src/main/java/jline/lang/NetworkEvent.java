@@ -1,20 +1,23 @@
 package jline.lang;
 
+import java.io.Serializable;
 import java.util.Map;
 import java.util.function.Function;
 
 import jline.lang.constant.EventType;
 import jline.lang.nodes.Node;
+import jline.util.JFunction;
+import jline.util.Matrix;
 import jline.util.Pair;
 
-public class NetworkEvent {
+public class NetworkEvent implements Serializable {
 	
 	protected int nodeIdx;
 	protected EventType event;
 	protected int jobclassIdx;
 	protected double prob;
-	protected Function<Pair<Map<Node, JLineMatrix>, Map<Node, JLineMatrix>>, Double> probFun;
-	protected JLineMatrix state;
+	protected JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> probFun;
+	protected Matrix state;
 	protected double t;
 	protected double job;
 	
@@ -24,7 +27,7 @@ public class NetworkEvent {
 	 * job = NaN if not set
 	 * state = new JLineMatrix(0,0) if not set
 	 */
-	public NetworkEvent(EventType event, int nodeIdx, int jobclassIdx, double prob, JLineMatrix state, double t, double job) {
+	public NetworkEvent(EventType event, int nodeIdx, int jobclassIdx, double prob, Matrix state, double t, double job) {
 		this.event = event;
 		this.nodeIdx = nodeIdx;
 		this.jobclassIdx = jobclassIdx;
@@ -38,7 +41,7 @@ public class NetworkEvent {
 	/*
 	 * The input probability might be a function
 	 */
-	public NetworkEvent(EventType event, int nodeIdx, int jobclassIdx, Function<Pair<Map<Node, JLineMatrix>, Map<Node, JLineMatrix>>, Double> probFun, JLineMatrix state, double t, double job) {
+	public NetworkEvent(EventType event, int nodeIdx, int jobclassIdx, JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> probFun, Matrix state, double t, double job) {
 		this.event = event;
 		this.nodeIdx = nodeIdx;
 		this.jobclassIdx = jobclassIdx;
@@ -77,7 +80,7 @@ public class NetworkEvent {
 		return prob;
 	}
 	
-	public double getProb(Pair<Map<Node, JLineMatrix>, Map<Node, JLineMatrix>> state) {
+	public double getProb(Pair<Map<Node, Matrix>, Map<Node, Matrix>> state) {
 		return this.probFun.apply(state);
 	}
 
@@ -85,19 +88,19 @@ public class NetworkEvent {
 		this.prob = prob;
 	}
 
-	public Function<Pair<Map<Node, JLineMatrix>, Map<Node, JLineMatrix>>, Double> getProbFun() {
+	public JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> getProbFun() {
 		return probFun;
 	}
 
-	public void setProbFun(Function<Pair<Map<Node, JLineMatrix>, Map<Node, JLineMatrix>>, Double> probFun) {
+	public void setProbFun(JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> probFun) {
 		this.probFun = probFun;
 	}
 
-	public JLineMatrix getState() {
+	public Matrix getState() {
 		return state;
 	}
 
-	public void setState(JLineMatrix state) {
+	public void setState(Matrix state) {
 		this.state = state;
 	}
 

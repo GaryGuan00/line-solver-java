@@ -3,10 +3,13 @@
 
 package jline.solvers;
 
-import jline.lang.JLineMatrix;
+import jline.lang.JobClass;
+import jline.lang.constant.GlobalConstants;
+import jline.lang.nodes.Station;
+import jline.util.Matrix;
 import jline.lang.Network;
 import jline.lang.NetworkStruct;
-import jline.lang.distributions.Distribution;
+import jline.util.NetworkAvgTable;
 
 import java.text.NumberFormat;
 import java.util.*;
@@ -27,9 +30,8 @@ public abstract class NetworkSolver extends Solver {
     if (model.getNumberOfNodes() == 0) {
       throw new RuntimeException("The model supplied in input is empty.");
     }
-    // TODO: get and set average and transient handles
-    // [Q,U,R,T,A] = model.getAvgHandles;
-    // self.setAvgHandles(Q,U,R,T,A);
+    this.handles = model.getAvgHandles();
+    // TODO: get and set transient handles
     // [Qt,Ut,Tt] = model.getTranHandles;
     // self.setTranHandles(Qt,Ut,Tt);
     this.sn = model.getStruct(true); // Force model to refresh
@@ -44,9 +46,8 @@ public abstract class NetworkSolver extends Solver {
     throw new RuntimeException("setTranHandles() has not yet been implemented in JLINE.");
   }
 
-  protected void setAvgHandles() {
-    // TODO: implementation - note arguments should likely not be void
-    throw new RuntimeException("setAvgHandles() has not yet been implemented in JLINE.");
+  public void setAvgHandles(SolverHandles handles) {
+    this.handles = handles;
   }
 
   protected void getTranHandles() {
@@ -54,9 +55,8 @@ public abstract class NetworkSolver extends Solver {
     throw new RuntimeException("getTranHandles() has not yet been implemented in JLINE.");
   }
 
-  protected void getAvgHandles() {
-    // TODO: implementation - note return type should likely not be void
-    throw new RuntimeException("getAvgHandles() has not yet been implemented in JLINE.");
+  public SolverHandles getAvgHandles() {
+    return this.handles;
   }
 
   protected void getAvgQLenHandles() {
@@ -81,15 +81,12 @@ public abstract class NetworkSolver extends Solver {
 
   // Returns true if the solver has computed steady-state average metrics.
   protected boolean hasAvgResults() {
-    if (this.hasResults()) {
-      return !result.QN.isEmpty()
-          && !result.UN.isEmpty()
-          && !result.RN.isEmpty()
-          && !result.TN.isEmpty()
-          && !result.CN.isEmpty()
-          && !result.XN.isEmpty();
-    }
-    return false;
+    return !((result.QN == null || result.QN.isEmpty()) &&
+            (result.UN == null || result.UN.isEmpty()) &&
+            (result.RN == null || result.RN.isEmpty()) &&
+            (result.TN == null || result.TN.isEmpty()) &&
+            (result.CN == null || result.CN.isEmpty()) &&
+            (result.XN == null || result.XN.isEmpty()));
   }
 
   // Returns true if the solver has computed transient average metrics.
@@ -160,6 +157,12 @@ public abstract class NetworkSolver extends Solver {
     // TODO: provide polymorphic version where handles can be passed in as parameters individually?
     // TODO: provide polymorphic version where handles can be passed in as a whole? (Lines 14-20)
 
+    if(this.handles == null || this.handles.Q == null || this.handles.U == null || this.handles.R == null ||
+            this.handles.T == null || this.handles.A == null){
+      resetResults();
+      this.handles = model.getAvgHandles();
+    }
+
     if (Double.isFinite(options.timespan[1])) {
       throw new RuntimeException(
           "The getAvg method does not support the timespan option, use the getTranAvg method instead.");
@@ -181,12 +184,12 @@ public abstract class NetworkSolver extends Solver {
     } // else return cached value
 
     int M = sn.nstations;
-    int K = sn.nClasses;
+    int K = sn.nclasses;
 
     int Vrows = sn.visits.get(0).getNumRows();
     int Vcols = sn.visits.get(0).getNumCols();
     int Vcells = sn.visits.size();
-    JLineMatrix V = new JLineMatrix(Vrows, Vcols);
+    Matrix V = new Matrix(Vrows, Vcols);
     for (int i = 0; i < Vrows; i++) {
       for (int j = 0; j < Vcols; j++) {
         double tmpSum = 0;
@@ -197,21 +200,20 @@ public abstract class NetworkSolver extends Solver {
       }
     }
 
-    JLineMatrix QNclass = new JLineMatrix(0, 0);
-    JLineMatrix UNclass = new JLineMatrix(0, 0);
-    JLineMatrix RNclass = new JLineMatrix(0, 0);
-    JLineMatrix TNclass = new JLineMatrix(0, 0);
-    JLineMatrix WNclass;
+    Matrix QNclass = new Matrix(0, 0);
+    Matrix UNclass = new Matrix(0, 0);
+    Matrix RNclass = new Matrix(0, 0);
+    Matrix TNclass = new Matrix(0, 0);
+    Matrix WNclass;
 
     if (!this.result.QN.isEmpty()) {
-      QNclass = new JLineMatrix(M, K);
+      QNclass = new Matrix(M, K);
       for (int k = 0; k < K; k++) {
         for (int i = 0; i < M; i++) {
-          // TODO: uncomment
-          if (
-          /*!handles.Q[i][k].isDisabled &&*/ !this.result.QN.isEmpty()) {
+          if (!this.handles.Q.get(this.model.getStations().get(i)).get(this.model.getClassByIndex(k)).isDisabled
+                  && !this.result.QN.isEmpty()) {
             QNclass.set(i, k, this.result.QN.get(i, k));
-            if (QNclass.get(i, k) < Distribution.zeroRn) { // Round to zero numerical perturbations
+            if (QNclass.get(i, k) < GlobalConstants.FineTol) { // Round to zero numerical perturbations
               QNclass.set(i, k, 0);
             }
             if (Double.isNaN(QNclass.get(i, k))) { // Indicates that a metric is disabled
@@ -225,14 +227,13 @@ public abstract class NetworkSolver extends Solver {
     }
 
     if (!this.result.UN.isEmpty()) {
-      UNclass = new JLineMatrix(M, K);
+      UNclass = new Matrix(M, K);
       for (int k = 0; k < K; k++) {
         for (int i = 0; i < M; i++) {
-          // TODO: uncomment
-          if (
-          /*!handles.U[i][k].isDisabled &&*/ !this.result.UN.isEmpty()) {
+          if (!this.handles.U.get(this.model.getStations().get(i)).get(this.model.getClassByIndex(k)).isDisabled
+                  && !this.result.UN.isEmpty()) {
             UNclass.set(i, k, this.result.UN.get(i, k));
-            if (UNclass.get(i, k) < Distribution.zeroRn) { // Round to zero numerical perturbations
+            if (UNclass.get(i, k) < GlobalConstants.FineTol) { // Round to zero numerical perturbations
               UNclass.set(i, k, 0);
             }
             if (Double.isNaN(UNclass.get(i, k))) { // Indicates that a metric is disabled
@@ -246,14 +247,13 @@ public abstract class NetworkSolver extends Solver {
     }
 
     if (!this.result.RN.isEmpty()) {
-      RNclass = new JLineMatrix(M, K);
+      RNclass = new Matrix(M, K);
       for (int k = 0; k < K; k++) {
         for (int i = 0; i < M; i++) {
-          // TODO: uncomment
-          if (
-          /*!handles.R[i][k].isDisabled &&*/ !this.result.RN.isEmpty()) {
+          if (!this.handles.R.get(this.model.getStations().get(i)).get(this.model.getClassByIndex(k)).isDisabled
+                  && !this.result.RN.isEmpty()) {
             RNclass.set(i, k, this.result.RN.get(i, k));
-            if (RNclass.get(i, k) < Distribution.zeroRn) { // Round to zero numerical perturbations
+            if (RNclass.get(i, k) < GlobalConstants.FineTol) { // Round to zero numerical perturbations
               RNclass.set(i, k, 0);
             }
             if (Double.isNaN(RNclass.get(i, k))) { // Indicates that a metric is disabled
@@ -267,14 +267,13 @@ public abstract class NetworkSolver extends Solver {
     }
 
     if (!this.result.TN.isEmpty()) {
-      TNclass = new JLineMatrix(M, K);
+      TNclass = new Matrix(M, K);
       for (int k = 0; k < K; k++) {
         for (int i = 0; i < M; i++) {
-          // TODO: uncomment
-          if (
-          /*!handles.T[i][k].isDisabled &&*/ !this.result.TN.isEmpty()) {
+          if (!this.handles.T.get(this.model.getStations().get(i)).get(this.model.getClassByIndex(k)).isDisabled
+                  && !this.result.TN.isEmpty()) {
             TNclass.set(i, k, this.result.TN.get(i, k));
-            if (TNclass.get(i, k) < Distribution.zeroRn) { // Round to zero numerical perturbations
+            if (TNclass.get(i, k) < GlobalConstants.FineTol) { // Round to zero numerical perturbations
               TNclass.set(i, k, 0);
             }
             if (Double.isNaN(TNclass.get(i, k))) { // Indicates that a metric is disabled
@@ -290,7 +289,7 @@ public abstract class NetworkSolver extends Solver {
     // Set to zero entries that are associated to immediate transitions
     for (int i = 0; i < M; i++) {
       for (int j = 0; j < K; j++) {
-        if (RNclass.get(i, j) < 10 / Distribution.infRateRep) {
+        if (RNclass.get(i, j) < 10 * GlobalConstants.FineTol) {
           QNclass.set(i, j, 0);
           UNclass.set(i, j, 0);
           RNclass.set(i, j, 0);
@@ -310,7 +309,7 @@ public abstract class NetworkSolver extends Solver {
               break;
             }
           }
-          if (RNclass.get(i, k) < Distribution.zeroRn) {
+          if (RNclass.get(i, k) < GlobalConstants.FineTol) {
             WNclass.set(i, k, RNclass.get(i, k));
           } else {
             int refClass = (int) sn.refclass.get(0, c);
@@ -336,8 +335,8 @@ public abstract class NetworkSolver extends Solver {
     for (int i = 0; i < M; i++) {
       for (int j = 0; j < K; j++) {
         if (Double.isNaN(WNclass.get(i, j))
-            || WNclass.get(i, j) < 10 / Distribution.infRateRep
-            || WNclass.get(i, j) < Distribution.zeroRn) {
+            || WNclass.get(i, j) < 10 * GlobalConstants.FineTol
+            || WNclass.get(i, j) < GlobalConstants.Zero) {
           WNclass.set(i, j, 0);
         }
       }
@@ -346,7 +345,7 @@ public abstract class NetworkSolver extends Solver {
     if (!UNclass.isEmpty()) {
       boolean unstableQueueFlag = false;
       for (int i = 0; i < M; i++) {
-        if (UNclass.sumRows(i) > 0.99 && sn.nservers.get(i, 0) > 0) {
+        if (UNclass.sumRows(i) > 0.99 * sn.nservers.get(i, 0) ) {
           unstableQueueFlag = true;
           break;
         }
@@ -381,7 +380,7 @@ public abstract class NetworkSolver extends Solver {
   }
 
   // Return table of average station metrics
-  public final List<List<Double>> getAvgTable() {
+  public final NetworkAvgTable getAvgTable() {
 
     // TODO: provide polymorphic version where handles can be passed in as parameters individually?
     // TODO: provide polymorphic version where handles can be passed in as a whole?
@@ -393,7 +392,7 @@ public abstract class NetworkSolver extends Solver {
     // TODO: [Q,U,R,T,~] = getAvgHandles(self);
 
     int M = sn.nstations;
-    int K = sn.nClasses;
+    int K = sn.nclasses;
 
     if (Double.isFinite(options.timespan[1])) {
       // TODO: [Qt,Ut,Tt] = getTranHandles(self);
@@ -402,10 +401,10 @@ public abstract class NetworkSolver extends Solver {
       getAvg();
     }
 
-    JLineMatrix QN = this.metrics.QNclass;
-    JLineMatrix UN = this.metrics.UNclass;
-    JLineMatrix RN = this.metrics.RNclass;
-    JLineMatrix TN = this.metrics.TNclass;
+    Matrix QN = this.metrics.QNclass;
+    Matrix UN = this.metrics.UNclass;
+    Matrix RN = this.metrics.RNclass;
+    Matrix TN = this.metrics.TNclass;
 
     if (QN.isEmpty()) {
       throw new RuntimeException(
@@ -413,7 +412,7 @@ public abstract class NetworkSolver extends Solver {
     }
 
     if (!keepDisabled) {
-      JLineMatrix V = new JLineMatrix(M, K);
+      Matrix V = new Matrix(sn.nstateful, K);
       for (int i = 0; i < sn.visits.size(); i++) {
         V = V.add(1, sn.visits.get(i));
       }
@@ -443,9 +442,9 @@ public abstract class NetworkSolver extends Solver {
             Uval.add(UN.get(i, k));
             Rval.add(RN.get(i, k));
             Tval.add(TN.get(i, k));
-            className.add(sn.jobClasses.get(k).getName());
+            className.add(sn.jobclasses.get(k).getName());
             stationName.add(sn.stations.get(i).getName());
-            if (RN.get(i, k) < Distribution.zeroRn) {
+            if (RN.get(i, k) < GlobalConstants.Zero) {
               Residval.add(RN.get(i, k));
             } else {
               if (sn.refclass.get(c) > 0) {
@@ -465,30 +464,10 @@ public abstract class NetworkSolver extends Solver {
         //  }
         }
       }
-
-      if (this.options.verbose != SolverOptions.VerboseLevel.SILENT) {
-        System.out.printf(
-                "%-12s\t %-12s\t %-10s\t %-10s\t %-10s\t %-10s\t %-10s",
-                "Station", "JobClass", "QLen", "Util", "RespT", "ResidT", "Tput");
-        System.out.println(
-                "\n----------------------------------------------------------------------------------------");
-        NumberFormat nf = NumberFormat.getNumberInstance();
-        nf.setMinimumFractionDigits(5);
-        for (int i = 0; i < stationName.size(); i++) {
-          System.out.format(
-                  "%-12s\t %-12s\t %-10s\t %-10s\t %-10s\t %-10s\t %-10s\n",
-                  stationName.get(i),
-                  className.get(i),
-                  nf.format(Qval.get(i)),
-                  nf.format(Uval.get(i)),
-                  nf.format(Rval.get(i)),
-                  nf.format(Residval.get(i)),
-                  nf.format(Tval.get(i)));
-        }
-        System.out.println(
-                "----------------------------------------------------------------------------------------");
-      }
-      return new ArrayList<>(Arrays.asList(Qval, Uval, Rval, Residval, Tval));
+      NetworkAvgTable avgTable = new NetworkAvgTable(Qval, Uval, Rval, Residval, Tval);
+      avgTable.setClassNames(className);
+      avgTable.setStationNames(stationName);
+      return avgTable;
     } else {
       // TODO: implementation if keepDisabled is set to true
       System.out.println("Warning: unimplemented code reached in NetworkSolver.getAvgTable 2.");
@@ -593,8 +572,8 @@ public abstract class NetworkSolver extends Solver {
       }
     }
 
-    boolean[] completes = new boolean[sn.nClasses];
-    for (int idx = 0; idx < sn.nClasses; idx++) {
+    boolean[] completes = new boolean[sn.nclasses];
+    for (int idx = 0; idx < sn.nclasses; idx++) {
       // TODO: entry = T{refstats(r),r}.class.completes;
       completes[idx] = true; // Replaced by above once implemented
     }
@@ -603,11 +582,11 @@ public abstract class NetworkSolver extends Solver {
     // This could be optimised by computing the statistics only for open chains
 
     // Compute chain visits
-    JLineMatrix alpha = new JLineMatrix(sn.nstations, sn.nClasses);
-    JLineMatrix CNclass = new JLineMatrix(1, sn.nClasses);
+    Matrix alpha = new Matrix(sn.nstations, sn.nclasses);
+    Matrix CNclass = new Matrix(1, sn.nclasses);
     if (!this.model.hasJoin() && !this.model.hasFork()) {
       for (int c = 0; c < sn.nchains; c++) {
-        JLineMatrix inchain = sn.inchain.get(c);
+        Matrix inchain = sn.inchain.get(c);
         for (int i = 0; i < inchain.length(); i++) {
           int r = (int) inchain.get(i);
           for (int j = 0; j < sn.nstations; j++) {
@@ -630,8 +609,8 @@ public abstract class NetworkSolver extends Solver {
     }
 
     for (int c = 0; c < sn.nchains; c++) {
-      JLineMatrix inchain = sn.inchain.get(c);
-      JLineMatrix completingClasses = JLineMatrix.extractRows(sn.chains, c, c + 1, null);
+      Matrix inchain = sn.inchain.get(c);
+      Matrix completingClasses = Matrix.extractRows(sn.chains, c, c + 1, null);
       for (int i = 0; i < completingClasses.length(); i++) {
         if (!completes[i]) {
           completingClasses.set(0, i, 0);
@@ -641,7 +620,7 @@ public abstract class NetworkSolver extends Solver {
         if (sn.refclass.get(c) >= 0) {
           // For all classes within the chain (a class belongs to a single chain, the reference
           // station must be identical for all classes within a chain)
-          List<Double> intersection = JLineMatrix.intersect(sn.refclass.findNonNegative(), inchain);
+          List<Double> intersection = Matrix.intersect(sn.refclass.findNonNegative(), inchain);
           for (double value : intersection) {
             int k = (int) value;
             int sumVisits = 0;
@@ -683,7 +662,7 @@ public abstract class NetworkSolver extends Solver {
       }
     }
     for (int i = 0; i < sn.nstations; i++) {
-      for (int k = 0; k < sn.nClasses; k++) {
+      for (int k = 0; k < sn.nclasses; k++) {
         if (!Double.isFinite(alpha.get(i, k))) {
           alpha.set(i, k, 0);
         }
@@ -691,12 +670,12 @@ public abstract class NetworkSolver extends Solver {
     }
 
     // Compute average chain metrics
-    this.metrics.CNchain = new JLineMatrix(1, sn.nchains);
-    this.metrics.XNchain = new JLineMatrix(1, sn.nchains);
+    this.metrics.CNchain = new Matrix(1, sn.nchains);
+    this.metrics.XNchain = new Matrix(1, sn.nchains);
 
     for (int c = 0; c < sn.nchains; c++) {
-      JLineMatrix inchain = sn.inchain.get(c);
-      JLineMatrix completingClasses = JLineMatrix.extractRows(sn.chains, c, c + 1, null).find();
+      Matrix inchain = sn.inchain.get(c);
+      Matrix completingClasses = Matrix.extractRows(sn.chains, c, c + 1, null).find();
       for (int i = 0; i < completingClasses.length(); i++) {
         if (!completes[i]) {
           completingClasses.set(0, i, 0);
@@ -711,7 +690,7 @@ public abstract class NetworkSolver extends Solver {
         for (int i = 0; i < sn.nstations; i++) {
           for (int j = 0; j < completingClasses.length(); j++) {
             int r = (int) completingClasses.get(j);
-            List<Double> intersection = JLineMatrix.intersect(sn.refclass.findNonNegative(), inchain);
+            List<Double> intersection = Matrix.intersect(sn.refclass.findNonNegative(), inchain);
             for (double value : intersection) {
               int s = (int) value;
               if (!Double.isNaN(this.result.TN.get(i, r))) {
@@ -719,7 +698,7 @@ public abstract class NetworkSolver extends Solver {
                     0,
                     c,
                     this.metrics.XNchain.get(0, c)
-                        + sn.rt.get(i * sn.nClasses + r, ref * sn.nClasses + s)
+                        + sn.rt.get(i * sn.nclasses + r, ref * sn.nclasses + s)
                             * this.result.TN.get(i, r));
               }
             }
@@ -730,7 +709,7 @@ public abstract class NetworkSolver extends Solver {
                     0,
                     c,
                     this.metrics.XNchain.get(0, c)
-                        + sn.rt.get(i * sn.nClasses + r, ref * sn.nClasses + s)
+                        + sn.rt.get(i * sn.nclasses + r, ref * sn.nclasses + s)
                             * this.result.TN.get(i, r));
               }
             }
@@ -786,7 +765,7 @@ public abstract class NetworkSolver extends Solver {
       System.out.format(
           "%-12s\t %-12s\t %-10s\t %-10s\n",
           i + 1,
-          sn.jobClasses.get(i).getName(),
+          sn.jobclasses.get(i).getName(),
           nf.format(this.metrics.CNchain.get(i)),
           nf.format(this.metrics.XNchain.get(i)));
     }
@@ -824,22 +803,22 @@ public abstract class NetworkSolver extends Solver {
       if (Double.isInfinite(options.timespan[0]) && Double.isInfinite(options.timespan[1])) {
         options.timespan[0] = 0;
         options.timespan[1] = 30 / minRate;
-        System.err.format(
-            "Timespan of transient analysis unspecified, setting the timespan option to [0, %f].",
+        System.out.format(
+            "Timespan of transient analysis unspecified, setting the timespan option to [0, %f].\n",
             options.timespan[1]);
       } else if (Double.isInfinite(options.timespan[0])) {
         options.timespan[0] = 0;
-        System.err.format(
-            "Start time of transient analysis unspecified, setting the timespan option to [0, %f].",
+        System.out.format(
+            "Start time of transient analysis unspecified, setting the timespan option to [0, %f].\n",
             options.timespan[1]);
       } else if (Double.isInfinite(options.timespan[1])) {
         options.timespan[1] = 30 / minRate;
-        System.err.format(
-            "End time of transient analysis unspecified, setting the timespan option to [%f, %f].",
+        System.out.format(
+            "End time of transient analysis unspecified, setting the timespan option to [%f, %f].\n",
             options.timespan[0], options.timespan[1]);
       }
       // TODO: remove init_sol re-initialising
-      options.init_sol = new JLineMatrix(0, 0);
+      options.init_sol = new Matrix(0, 0);
 	  try {
 		runAnalyzer();
 	  } catch (IllegalAccessException e) {

@@ -1,7 +1,9 @@
 package jline.lang.distributions;
 
+import jline.api.UTIL;
 import jline.util.Interval;
-import jline.util.Numerics;
+import org.apache.commons.math3.distribution.LogNormalDistribution;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +12,9 @@ import java.util.Random;
 public class LogNormal extends ContinuousDistribution implements Serializable {
     public LogNormal(double mu, double sigma) {
         super("LogNormal", 2, new Interval(0, Double.POSITIVE_INFINITY));
+        if (sigma < 0){
+            System.err.println("sigma parameter must be >= 0.0");
+        }
         this.setParam(1, "mu", mu);
         this.setParam(2, "sigma", sigma);
     }
@@ -41,7 +46,7 @@ public class LogNormal extends ContinuousDistribution implements Serializable {
     public double getMean() {
         double mu = (double) this.getParam(1).getValue();
         double sigma = (double) this.getParam(2).getValue();
-        return Math.exp(mu + sigma * sigma / 2.0);
+        return Math.exp(mu + Math.pow(sigma, 2) / 2.0);
     }
 
     @Override
@@ -53,33 +58,43 @@ public class LogNormal extends ContinuousDistribution implements Serializable {
     public double getSCV() {
         double mu = (double) this.getParam(1).getValue();
         double sigma = (double) this.getParam(2).getValue();
-        return (Math.exp(sigma * sigma) - 1) * Math.exp(2 * mu + sigma * sigma);
+        double ex = Math.exp(mu + Math.pow(sigma, 2) / 2);
+        double var = (Math.exp(Math.pow(sigma, 2)) - 1) * Math.exp(2 * mu + Math.pow(sigma, 2));
+        return var / Math.pow(ex, 2);
     }
 
     @Override
     public double getVar() {
         double mu = (double) this.getParam(1).getValue();
         double sigma = (double) this.getParam(2).getValue();
-        return (Math.exp(sigma * sigma) - 1) * Math.exp(2 * mu + sigma * sigma);
+        return (Math.exp(Math.pow(sigma, 2)) - 1) * Math.exp(2 * mu + Math.pow(sigma, 2));
     }
 
     @Override
     public double getSkew() {
         double sigma = (double) this.getParam(2).getValue();
-        return (Math.exp(sigma * sigma) + 2) * Math.sqrt(Math.exp(sigma * sigma) - 1);
+        return (Math.exp(Math.pow(sigma, 2)) + 2) * Math.sqrt(Math.exp(Math.pow(sigma, 2)) - 1);
     }
 
     @Override
     public double evalCDF(double t) {
         double mu = (double) this.getParam(1).getValue();
         double sigma = (double) this.getParam(2).getValue();
-        return 0.5 + 0.5 * Numerics.erf((Math.log(t) - mu) / (Math.sqrt(2) * sigma));
+        LogNormalDistribution logNormalDistribution = new LogNormalDistribution(mu, sigma);
+        return logNormalDistribution.cumulativeProbability(t);
+//        return 0.5 + 0.5 * UTIL.erf((Math.log(t) - mu) / (Math.sqrt(2) * sigma));
     }
 
     @Override
     public double evalLST(double s) {
-        throw new RuntimeException("Not implemented");
+        throw new RuntimeException("Laplace-Stieltjes transform of the Lognormal distribution not available yet.");
     }
 
+    public static LogNormal fitMeanAndSCV(double mean, double scv) {
+        double c = Math.sqrt(scv);
+        double mu = Math.log(mean / Math.sqrt(Math.pow(c, 2) + 1));
+        double sigma = Math.sqrt(Math.log(Math.pow(c, 2) + 1));
+        return new LogNormal(mu, sigma);
+    }
 }
 

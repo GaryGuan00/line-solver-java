@@ -9,6 +9,7 @@ import jline.solvers.mva.SolverMVAResult;
 import jline.util.Matrix;
 import jline.util.NodeParam;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -21,6 +22,18 @@ import static jline.api.DTMC.dtmc_stochcomp;
 public class SolverMVACacheQNAnalyzer implements MVAAnalyzer{
     @Override
     public void analyze(NetworkStruct sn, SolverOptions options, SolverMVAResult res) {
+        NetworkStruct snorig = sn;
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ObjectOutputStream out = new ObjectOutputStream(bos);
+            out.writeObject(sn);
+            ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
+            ObjectInputStream in = new ObjectInputStream(bis);
+            snorig = (NetworkStruct) in.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Could not create a copy of the NetworkStruct in SolverMVACacheQNAnalyzer");
+        }
+        sn = snorig;
         Random random = new Random(options.seed);
         int I = sn.nnodes;
         int K = sn.nclasses;

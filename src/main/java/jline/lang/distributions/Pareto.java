@@ -1,6 +1,8 @@
 package jline.lang.distributions;
 
 import jline.util.Interval;
+import org.apache.commons.math3.analysis.UnivariateFunction;
+import org.apache.commons.math3.analysis.integration.RombergIntegrator;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -11,8 +13,11 @@ public class Pareto extends ContinuousDistribution implements Serializable {
 
     public Pareto(double shape, double scale) {
         super("Pareto", 2, new Interval(0, Double.POSITIVE_INFINITY));
-        this.setParam(1, "shape", shape);
-        this.setParam(2, "scale", scale);
+        if (shape < 2){
+            System.err.println("shape parameter must be >= 2.0");
+        }
+        this.setParam(1, "alpha", shape);
+        this.setParam(2, "k", scale);
     }
 
     /**
@@ -63,7 +68,10 @@ public class Pareto extends ContinuousDistribution implements Serializable {
         if (shape <= 2) {
             return Double.POSITIVE_INFINITY;
         } else {
-            return shape / (shape - 2);
+            double scale = (double)this.getParam(2).getValue();
+            double var = Math.pow(scale, 2) * shape / Math.pow(shape - 1, 2) / (shape - 2);
+            double ex = shape * scale / (shape - 1);
+            return var / Math.pow(ex, 2);
         }
     }
 
@@ -93,24 +101,64 @@ public class Pareto extends ContinuousDistribution implements Serializable {
     public double evalCDF(double t) {
         double shape = (double)this.getParam(1).getValue();
         double scale = (double)this.getParam(2).getValue();
+        double k = 1/shape;
+        double sigma = scale * k;
+        return gpcdf(t, k, sigma, sigma/k);
+    }
 
-        if (t < scale) {
-            return 0;
-        } else {
-            return 1 - Math.pow(scale / t, shape);
+    public static double gpcdf(double x, double k, double sigma, double theta) {
+        // Check for invalid sigma
+        if (sigma <= 0) {
+            return Double.NaN;
         }
+
+        // Calculate the (x - theta) / sigma term
+        double z = (x - theta) / sigma;
+
+        // Return 0 for out-of-range values
+        if (z < 0) {
+            return 0.0;
+        }
+
+        // Handle the k == 0 case
+        if (Math.abs(k) < Math.ulp(1.0)) {
+            return -Math.expm1(-z);
+        }
+
+        // Compute the CDF value for k != 0
+        double t = z * k;
+
+        // When k < 0, the support is 0 <= x/sigma <= -1/k.
+        if (t <= -1 && k < -Math.ulp(1.0)) {
+            return 1.0;
+        }
+
+        return -Math.expm1((-1.0 / k) * Math.log1p(t));
     }
 
     @Override
     public double evalLST(double s) {
-        double shape = (double)this.getParam(1).getValue();
-        double scale = (double)this.getParam(2).getValue();
+        double alpha = (double)this.getParam(1).getValue();
+        double k = (double)this.getParam(2).getValue();
+        RombergIntegrator integrator = new RombergIntegrator();
+        UnivariateFunction function = new UnivariateFunction() {
+            public double value(double t) {
+                return Math.pow(t, -alpha - 1) * Math.exp(-t);
+            }
+        };
 
-        if (s < 0) {
-            return Double.POSITIVE_INFINITY;
-        } else {
-            return Math.pow(1 - s * scale, -shape);
+        double IL = integrator.integrate(10000, function, s * k, Double.POSITIVE_INFINITY);
+        return alpha * Math.pow(k, alpha) * IL * Math.pow(s, 1 + alpha) / s;
+    }
+
+    public static Pareto fitMeanAndSCV(double mean, double scv){
+        // Fit distribution with given mean and squared coefficient of variation (SCV=variance/mean^2)
+        if (mean <= 0 || scv <= 0) {
+            throw new RuntimeException("Mean and SCV should be positive.");
         }
+        double shape = (scv * mean + mean * Math.sqrt(scv * (scv + 1))) / (scv * mean);
+        double scale = mean + scv * mean - mean * Math.sqrt(scv * (scv + 1));
+        return new Pareto(shape, scale);
     }
 }
 

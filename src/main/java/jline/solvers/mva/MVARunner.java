@@ -314,6 +314,13 @@ public class MVARunner {
 								if(joinIdx == -1){
 									forkLambda.set(s, (forkLambda.get(s) + TNfork.get(r)) / 2.0);
 								} else {
+									double tnSum = 0;
+									for(int i = 0; i < fjclassmap.length(); i++){
+										if(fjclassmap.get(i) == r){
+											tnSum += ret.TN.get((int) sn.nodeToStation.get(joinIdx), i);
+										}
+									}
+									ret.TN.set((int) sn.nodeToStation.get(joinIdx), r, ret.TN.get((int) sn.nodeToStation.get(joinIdx), r) + tnSum - ret.TN.get((int) sn.nodeToStation.get(joinIdx), s));
 									forkLambda.set(s, (forkLambda.get(s) + ret.TN.get((int) sn.nodeToStation.get(joinIdx), r)) / 2.0);
 								}
 								if(joinIdx == -1 || outerForks.get(f, r) == 0){
@@ -582,7 +589,7 @@ public class MVARunner {
 		this.res.CN = ret.CN;
 		this.res.AN = AN;
 		this.res.WN = new Matrix(0,0);
-		this.res.runtime = ret.iter;
+		this.res.runtime = ret.runtime;
 		this.res.iter = iter;
 		this.res.logNormConstAggr = ret.logNormConstAggr;
 		return this.res;

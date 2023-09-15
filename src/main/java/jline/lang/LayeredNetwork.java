@@ -6,6 +6,7 @@ import jline.lang.distributions.DiscreteDistribution;
 import jline.lang.distributions.Distribution;
 import jline.lang.distributions.Geometric;
 import jline.lang.distributions.Immediate;
+import jline.solvers.ln.SolverLN;
 import jline.util.Matrix;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -31,8 +32,6 @@ public class LayeredNetwork extends Ensemble {
     private Matrix lqnGraph;
     private Matrix taskGraph;
     private Param param;
-
-
 
     protected Map<Integer, Host> hosts;
     protected Map<Integer, Task> tasks;
@@ -780,9 +779,18 @@ public class LayeredNetwork extends Ensemble {
 
     public int getNumberOfModels(){
         if(this.ensemble.isEmpty()){
-            this.ensemble = getEnsemble();
+            getEnsemble();
         }
         return this.ensemble.size();
+    }
+
+    @Override
+    public List<Network> getEnsemble() {
+        if(this.ensemble.isEmpty()){
+            SolverLN solver = new SolverLN(this);
+            this.ensemble = solver.getEnsemble();
+        }
+        return this.ensemble;
     }
 
     public List<Network> getLayers(){

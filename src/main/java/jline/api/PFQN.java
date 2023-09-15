@@ -3,11 +3,10 @@ package jline.api;
 import jline.lang.constant.GlobalConstants;
 import jline.lang.constant.SchedStrategy;
 import jline.lang.nodes.Station;
-import jline.util.JFunction;
+import jline.util.SerializableFunction;
 import jline.solvers.SolverOptions;
 import jline.solvers.nc.SolverNC;
 import jline.util.Matrix;
-import jline.util.Numerics;
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 
@@ -35,7 +34,7 @@ public class PFQN {
 		for (int r = 0; r < R; r++) {
 			if (Z.get(r) > 0) {
 				f += Math.log(Z.get(r)) * n.get(r);
-				f -= Numerics.factln(n.get(r));
+				f -= UTIL.factln(n.get(r));
 			} else if (n.get(r) > 0) {
 				return 0.0;
 			}
@@ -51,7 +50,7 @@ public class PFQN {
 			// Calculate the logarithm of the factorial of every element in N
 			Matrix tmp = new Matrix(1, N.length());
 			for (int i = 0; i < N.length(); i++) {
-				tmp.set(0, i, -Numerics.factln(N.get(i)));
+				tmp.set(0, i, -UTIL.factln(N.get(i)));
 			}
 			double lGn = tmp.sumRows().sumCols().get(0, 0);
 
@@ -96,7 +95,7 @@ public class PFQN {
 		G.fill(1.0);
 		Matrix n = pprod(N);
 
-		while (n.sumRows().sumCols().get(0) != -1) {
+		while (Math.abs(n.sumRows().sumCols().get(0)+1) > 1e-6) {
 			int idxn = hashpop(n, N);
 			G.set(0, idxn, Fz(Z, n));
 			for (int m = 1; m < M+1; m++) {
@@ -188,9 +187,9 @@ public class PFQN {
 
 		double coeff = 0;
 		for (int i = 0; i < N.length(); i++) {
-			coeff -= Numerics.factln(N.get(i));
+			coeff -= UTIL.factln(N.get(i));
 		}
-		coeff -= Numerics.factln(m-1);
+		coeff -= UTIL.factln(m-1);
 		coeff += (m-1) * logNodes.elementSum();
 
 		double lG = 0.0;
@@ -199,7 +198,7 @@ public class PFQN {
 		}
 		lG = Math.log(lG) + coeff;
 		if (!Double.isFinite(lG)) {
-			lG = Numerics.logsumexp(g) + coeff;
+			lG = UTIL.logsumexp(g) + coeff;
 		}
 		double G = Math.exp(lG);
 		return new pfqnMmint2GausslegendreReturn(G, lG);
@@ -432,7 +431,7 @@ public class PFQN {
 			for (int i = 0; i < tmp.length(); i++) {
 				tmp.set(i, Math.log(Z.sumCols(i)));
 			}
-			lGn = - Numerics.factln(N).elementSum()
+			lGn = - UTIL.factln(N).elementSum()
 							+ N.elementMult(tmp, null).elementSum();
 			Gn = Math.exp(lGn);
 		} else if (Z == null || Z.isEmpty()) {
@@ -453,7 +452,7 @@ public class PFQN {
 			for (int i = 0; i < log_umax.length(); i++) {
 				log_umax.set(i, Math.log(log_umax.get(i)));
 			}
-			lGn = Numerics.multinomialln(tmp) + Numerics.factln(M-1) + (M-1)*Math.log(Math.sqrt(2*Math.PI))
+			lGn = UTIL.multinomialln(tmp) + UTIL.factln(M-1) + (M-1)*Math.log(Math.sqrt(2*Math.PI))
 							- Math.log(Math.sqrt(A.det()))
 							+ log_umax.elementSum() + S;
 			Gn = Math.exp(lGn);
@@ -472,7 +471,7 @@ public class PFQN {
 			for (int i = 0; i < log_umax.length(); i++) {
 				log_umax.set(i, Math.log(log_umax.get(i)));
 			}
-			lGn = -Numerics.factln(N).elementSum() -vmax + M*Math.log(vmax) + M*Math.log(Math.sqrt(2*Math.PI))
+			lGn = -UTIL.factln(N).elementSum() -vmax + M*Math.log(vmax) + M*Math.log(Math.sqrt(2*Math.PI))
 							- Math.log(Math.sqrt(A.det()))
 							+ log_umax.elementSum() + S;
 			Gn = Math.exp(lGn);
@@ -507,7 +506,7 @@ public class PFQN {
 			for (int i = 0; i < tmp.length(); i++) {
 				tmp.set(i, Math.log(Z.sumCols(i)));
 			}
-			lGn = - Numerics.factln(N).elementSum()
+			lGn = - UTIL.factln(N).elementSum()
 							+ N.elementMult(tmp, null).elementSum();
 		} else if (Z == null || Z.isEmpty()) {
 			pfqnLeFpiReturn ret = pfqn_le_fpi(L_new,N);
@@ -558,7 +557,7 @@ public class PFQN {
 			for (int i = 0; i < I; i++) {
 				div_sum += T.get(i)/dpdf.get(i);
 			}
-			lGn = Numerics.multinomialln(tmp) + Numerics.factln(M-1) + Math.log(div_sum/I);
+			lGn = UTIL.multinomialln(tmp) + UTIL.factln(M-1) + Math.log(div_sum/I);
 		} else {
 			pfqnLeFpiZReturn ret = pfqn_le_fpiZ(L_new, N, Z);
 			Matrix umax = ret.u;
@@ -612,7 +611,7 @@ public class PFQN {
 			for (int i = 0; i < I; i++) {
 				div_sum += T.get(i)/dpdf.get(i);
 			}
-			lGn = Math.log(Math.exp(-Numerics.factln(N).elementSum())*div_sum/I);
+			lGn = Math.log(Math.exp(-UTIL.factln(N).elementSum())*div_sum/I);
 		}
 		Gn = Math.exp(lGn);
 		return new pfqnLsReturn(Gn, lGn);
@@ -828,21 +827,21 @@ public class PFQN {
 			}
 			lh = new Matrix(0, 1);
 			Matrix tmp = new Matrix(1, 1);
-			tmp.set(0, Numerics.factln(nvec.elementSum()+m)- Numerics.factln(nvec).elementSum());
+			tmp.set(0, UTIL.factln(nvec.elementSum()+m)- UTIL.factln(nvec).elementSum());
 			lh = Matrix.concatRows(lh, tmp, null);
 
 			for (int i = 0; i < zerothinktimes.size(); i++) {
 				Matrix nvec_s = nvec.clone();
 				nvec_s.set(i, nvec_s.get(i)-1);
-				tmp.set(0, Numerics.factln(nvec_s.elementSum()+m)- Numerics.factln(nvec_s).elementSum());
+				tmp.set(0, UTIL.factln(nvec_s.elementSum()+m)- UTIL.factln(nvec_s).elementSum());
 				lh = Matrix.concatRows(lh, tmp, null);
 			}
-			tmp.set(0, Numerics.factln(nvec.elementSum()+m-1)- Numerics.factln(nvec).elementSum());
+			tmp.set(0, UTIL.factln(nvec.elementSum()+m-1)- UTIL.factln(nvec).elementSum());
 			lh = Matrix.concatRows(lh, tmp, null);
 			for (int i = 0; i < zerothinktimes.size(); i++) {
 				Matrix nvec_s = nvec.clone();
 				nvec_s.set(i, nvec_s.get(i)-1);
-				tmp.set(0, Numerics.factln(nvec_s.elementSum()+m-1)- Numerics.factln(nvec_s).elementSum());
+				tmp.set(0, UTIL.factln(nvec_s.elementSum()+m-1)- UTIL.factln(nvec_s).elementSum());
 				lh = Matrix.concatRows(lh, tmp, null);
 			}
 		} else {
@@ -1206,7 +1205,7 @@ public class PFQN {
           tmp1.set(i, Math.log(tmp1.get(i)));
           tmp2.set(i, Math.log(tmp2.get(i)));
         }
-        lG = -Numerics.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum() + N_new.mult(tmp2.transpose()).get(0);
+        lG = -UTIL.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum() + N_new.mult(tmp2.transpose()).get(0);
       }
       return new pfqnNcReturn(lG, X, Q, method);
     }
@@ -1224,7 +1223,7 @@ public class PFQN {
           tmp1.set(i, Math.log(tmp1.get(i)));
           tmp2.set(i, Math.log(tmp2.get(i)));
         }
-        lG = lGopen - Numerics.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum()
+        lG = lGopen - UTIL.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum()
                 + N_new.mult(tmp2.transpose()).get(0);
       }
       return new pfqnNcReturn(lG, X, Q, method);
@@ -1235,7 +1234,7 @@ public class PFQN {
         tmp1.set(i, Math.log(tmp1.get(i)));
         tmp2.set(i, Math.log(tmp2.get(i)));
       }
-      lG = Numerics.factln(N_new.elementSum()) - Numerics.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum()
+      lG = UTIL.factln(N_new.elementSum()) - UTIL.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum()
               + N_new.mult(tmp2.transpose()).get(0);
       return new pfqnNcReturn(lG, X, Q, method);
     }
@@ -1297,7 +1296,7 @@ public class PFQN {
 
         }
 
-        lGzdem = -Numerics.factln(Nz).elementSum() + Nz.elementMult(tmp1, null).elementSum()
+        lGzdem = -UTIL.factln(Nz).elementSum() + Nz.elementMult(tmp1, null).elementSum()
                 + Nz.mult(tmp2.transpose()).get(0);
       }
     }
@@ -1375,7 +1374,7 @@ public class PFQN {
 			}
 		}
 
-		int R = N_new.length();
+		int R = N_new.numCols;
 		Matrix scalevec = new Matrix(1,R);
 		scalevec.fill(1.0);
 		for (int r = 0; r < R; r++) {
@@ -1390,7 +1389,7 @@ public class PFQN {
 			}
 		}
 
-		for (int j = 0; j < Z_new.length(); j++) {
+		for (int j = 0; j < Z_new.numCols; j++) {
 			Z_new.set(j, Z_new.get(j)/scalevec.get(j));
 		}
 
@@ -1422,7 +1421,7 @@ public class PFQN {
 		mu_new = mu_tmp.clone();
 
 		boolean flag = false;
-		for (int i = 0; i < N_new.length(); i++) {
+		for (int i = 0; i < N_new.numCols; i++) {
 			if (Math.abs(L_new.sumCols(i)+Z_new.sumCols(i))<1e-6 && N_new.get(i) > 1e-6) {
 				flag = true;
 				break;
@@ -1440,7 +1439,7 @@ public class PFQN {
 					tmp1.set(i, Math.log(tmp1.get(i)));
 					tmp2.set(i, Math.log(tmp2.get(i)));
 				}
-				lG = -Numerics.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum() + N_new.mult(tmp2.transpose()).get(0);
+				lG = -UTIL.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum() + N_new.mult(tmp2.transpose()).get(0);
 			}
 			G = Double.NaN;
 			return new pfqnNcldReturn(lG, G, method);
@@ -1459,7 +1458,7 @@ public class PFQN {
 					tmp1.set(i, Math.log(tmp1.get(i)));
 					tmp2.set(i, Math.log(tmp2.get(i)));
 				}
-				lG = -Numerics.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum()
+				lG = -UTIL.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum()
 								+ N_new.mult(tmp2.transpose()).get(0);
 			}
 			return new pfqnNcldReturn(lG, G, method);
@@ -1474,7 +1473,7 @@ public class PFQN {
 			for (int i = 0; i < tmp3.length(); i++) {
 				tmp3.set(i, Math.log(tmp3.get(i)));
 			}
-			lG = Numerics.factln(N_new.elementSum()) - Numerics.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum()
+			lG = UTIL.factln(N_new.elementSum()) - UTIL.factln(N_new).elementSum() + N_new.elementMult(tmp1, null).elementSum()
 							+ N_new.mult(tmp2.transpose()).get(0) - tmp3.elementSum();
 			return new pfqnNcldReturn(lG, G, method);
 		}
@@ -1536,7 +1535,7 @@ public class PFQN {
 
 				}
 
-				lGzdem = -Numerics.factln(Nz).elementSum() + Nz.elementMult(tmp1, null).elementSum()
+				lGzdem = -UTIL.factln(Nz).elementSum() + Nz.elementMult(tmp1, null).elementSum()
 								+ Nz.mult(tmp2.transpose()).get(0);
 			}
 		}
@@ -1650,7 +1649,7 @@ public class PFQN {
 				mu_new.set(i, Math.log(mu_new.get(i)));
 			}
 
-			lG = Numerics.factln(N.elementSum()) - Numerics.factln(N).elementSum()
+			lG = UTIL.factln(N.elementSum()) - UTIL.factln(N).elementSum()
 							+ N_tmp.mult(L_tmp.transpose()).get(0) - mu_new.elementSum();
 			G = Math.exp(lG);
 			return new pfqnGldReturn(G, lG);
@@ -1893,7 +1892,7 @@ public class PFQN {
 	 * @param stations Station objects
 	 * @return 
 	 */
-	public static Matrix pfqn_cdfun(Matrix nvec, Map<Station, JFunction<Matrix, Double>> cdscaling, List<Station> stations) {
+	public static Matrix pfqn_cdfun(Matrix nvec, Map<Station, SerializableFunction<Matrix, Double>> cdscaling, List<Station> stations) {
 		int M = nvec.getNumRows();
 		Matrix r = new Matrix(M, 1);
 		r.fill(1.0);
@@ -2235,7 +2234,7 @@ public class PFQN {
 				}
 			} else {
 				pfqnMVALDReturn retMVALD = pfqn_mvald(L,N,Z,mu);
-				double lG = retMVALD.lGN.getLast();
+				double lG = retMVALD.lGN.get(retMVALD.lGN.size()-1);
 				returnObject = new pfqnMVAMSReturn(retMVALD.XN, retMVALD.QN, retMVALD.UN, retMVALD.CN, lG);
 			}
 		}
@@ -2785,7 +2784,7 @@ public class PFQN {
 		}
 		Matrix WN = new Matrix(M, R);
 		Matrix n = pprod(N);
-		LinkedList<Double> lGN = new LinkedList<>();
+		List<Double> lGN = new ArrayList<>();
 		lGN.add(0.0);
 		while(!(n.getNumRows() == 1 && n.getNumCols() == 1 && n.get(0,0) == -1)){
 			WN = new Matrix(WN.getNumRows(), WN.getNumCols());
@@ -2858,7 +2857,7 @@ public class PFQN {
 				}
 				if(sumn == sumN && sumnp == 0){
 					double logX = Math.log(Xs.get(last_nnz, hashpop(n, N)));
-					lGN.add(lGN.getLast() - logX);
+					lGN.add(lGN.get(lGN.size()-1) - logX);
 				}
 			}
 			n = pprod(n, N); // get the next population
@@ -3307,14 +3306,14 @@ public class PFQN {
 	}
 
 	public static pfqnLinearizerReturn pfqn_linearizer(Matrix L, Matrix N, Matrix Z, SchedStrategy[] type, double tol, int maxiter){
-		return pfqn_gflinearizer(L, N, Z, type, tol, maxiter, 1, 0);
+		return pfqn_gflinearizer(L, N, Z, type, tol, maxiter, 1);
 	}
 
 	public static pfqnLinearizerReturn pfqn_gflinearizer(Matrix L, Matrix N, Matrix Z, SchedStrategy[] type, double tol,
-														 int maxiter, double alpha, double beta){
+														 int maxiter, double alpha){
 		Matrix alphaM = new Matrix(1, N.getNumCols());
 		alphaM.fill(alpha);
-		return pfqn_egflinearizer(L, N, Z, type, tol, maxiter, alphaM, beta);
+		return pfqn_egflinearizer(L, N, Z, type, tol, maxiter, alphaM);
 	}
 
 	/**
@@ -3326,11 +3325,10 @@ public class PFQN {
 	 * @param tol - max tolerance admitted between successive iterations
 	 * @param maxiter - maximum number of iterations
 	 * @param alpha - matrix of alphas. There is one alpha for each class
-	 * @param beta
 	 * @return - the performance measures for the given network
 	 */
 	public static pfqnLinearizerReturn pfqn_egflinearizer(Matrix L, Matrix N, Matrix Z, SchedStrategy[] type, double tol,
-														 int maxiter, Matrix alpha, double beta){
+														 int maxiter, Matrix alpha){
 		int M = L.getNumRows();
 		int R = L.getNumCols();
 
@@ -3627,8 +3625,8 @@ public class PFQN {
 			if(method.equals("lin")){
 				res = pfqn_linearizer(Dc, Nclosed, Zclosed, type, tol, maxiter);
 			} else if(method.equals("gflin")){
-				double linAlpha = 2;
-				res = pfqn_gflinearizer(Dc, Nclosed, Zclosed, type, tol, maxiter, linAlpha, 0);
+				double linAlpha = 2.0;
+				res = pfqn_gflinearizer(Dc, Nclosed, Zclosed, type, tol, maxiter, linAlpha);
 			} else {
 				// Extended General Form Linearizer
 				Matrix alphaM = new Matrix(1, Nclosed.getNumCols());
@@ -3638,7 +3636,7 @@ public class PFQN {
 				for(int i = 0; i < Nclosed.getNumCols(); i++){
 					alphaM.set(i, 0.6 + 1.4 * Math.exp(-8 * Math.exp(-0.8 * Nclosed.get(i))));
 				}
-				res = pfqn_egflinearizer(Dc, Nclosed, Zclosed, type, tol, maxiter, alphaM, 0);
+				res = pfqn_egflinearizer(Dc, Nclosed, Zclosed, type, tol, maxiter, alphaM);
 			}
 			QNc = res.Q;
 			UNc = res.U;
@@ -3814,11 +3812,11 @@ public class PFQN {
 		public Matrix QN;
 		public Matrix UN;
 		public Matrix CN;
-		public LinkedList<Double> lGN;
+		public List<Double> lGN;
 		public boolean isNumStable;
 		public Matrix pi;
 
-		public pfqnMVALDReturn(Matrix XN, Matrix QN, Matrix UN, Matrix CN, LinkedList<Double> lGN, boolean isNumStable, Matrix pi) {
+		public pfqnMVALDReturn(Matrix XN, Matrix QN, Matrix UN, Matrix CN, List<Double> lGN, boolean isNumStable, Matrix pi) {
 			this.XN = XN;
 			this.QN = QN;
 			this.UN = UN;
@@ -3968,8 +3966,8 @@ public class PFQN {
 	}
 
 	private static class pfqnLeFpiReturn {
-		private Matrix u;
-		private Matrix d;
+		private final Matrix u;
+		private final Matrix d;
 
 		private pfqnLeFpiReturn(Matrix u, Matrix d) {
 			this.u = u;
@@ -3978,9 +3976,9 @@ public class PFQN {
 	}
 
 	private static class pfqnLeFpiZReturn {
-		private Matrix u;
-		private double v;
-		private Matrix d;
+		private final Matrix u;
+		private final double v;
+		private final Matrix d;
 
 		private pfqnLeFpiZReturn(Matrix u, double v, Matrix d) {
 			this.u = u;

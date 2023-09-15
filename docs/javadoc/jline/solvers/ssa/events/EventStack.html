@@ -88,7 +88,7 @@ loadScripts(document, 'script');</script>
 <h1 title="Class EventStack" class="title">Class EventStack</h1>
 </div>
 <div class="inheritance" title="Inheritance Tree"><a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">java.lang.Object</a>
-<div class="inheritance">jline.solvers.ssa.events.EventStack</div>
+<div class="inheritance">jline.solvers.ssa.EventStack</div>
 </div>
 <section class="class-description" id="class-description">
 <hr>
@@ -162,19 +162,19 @@ loadScripts(document, 'script');</script>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>double</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#tauLeapUpdate(jline.solvers.ssa.state.SSAStateMatrix,jline.solvers.ssa.Timeline,double,java.util.Random)" class="member-name-link">tauLeapUpdate</a><wbr>(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline,
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline,
  double&nbsp;t,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random)</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>double</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#tauLeapUpdateMultistep(jline.solvers.ssa.state.SSAStateMatrix,jline.solvers.ssa.Timeline,double,java.util.Random)" class="member-name-link">tauLeapUpdateMultistep</a><wbr>(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline,
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline,
  double&nbsp;t,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random)</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>double</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#tauLeapUpdateOnestep(jline.solvers.ssa.state.SSAStateMatrix,jline.solvers.ssa.Timeline,double,java.util.Random)" class="member-name-link">tauLeapUpdateOnestep</a><wbr>(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline,
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline,
  double&nbsp;t,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random)</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
@@ -185,7 +185,7 @@ loadScripts(document, 'script');</script>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>double</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#updateState(jline.solvers.ssa.state.SSAStateMatrix,jline.solvers.ssa.Timeline,double,java.util.Random)" class="member-name-link">updateState</a><wbr>(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline,
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline,
  double&nbsp;t,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random)</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
@@ -291,7 +291,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="tauLeapUpdateMultistep(jline.solvers.ssa.state.SSAStateMatrix,jline.solvers.ssa.Timeline,double,java.util.Random)">
 <h3>tauLeapUpdateMultistep</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">double</span>&nbsp;<span class="element-name">tauLeapUpdateMultistep</span><wbr><span class="parameters">(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline,
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline,
  double&nbsp;t,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random)</span></div>
 </section>
@@ -300,7 +300,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="tauLeapUpdateOnestep(jline.solvers.ssa.state.SSAStateMatrix,jline.solvers.ssa.Timeline,double,java.util.Random)">
 <h3>tauLeapUpdateOnestep</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">double</span>&nbsp;<span class="element-name">tauLeapUpdateOnestep</span><wbr><span class="parameters">(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline,
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline,
  double&nbsp;t,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random)</span></div>
 </section>
@@ -309,7 +309,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="tauLeapUpdate(jline.solvers.ssa.state.SSAStateMatrix,jline.solvers.ssa.Timeline,double,java.util.Random)">
 <h3>tauLeapUpdate</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">double</span>&nbsp;<span class="element-name">tauLeapUpdate</span><wbr><span class="parameters">(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline,
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline,
  double&nbsp;t,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random)</span></div>
 </section>
@@ -318,7 +318,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="updateState(jline.solvers.ssa.state.SSAStateMatrix,jline.solvers.ssa.Timeline,double,java.util.Random)">
 <h3>updateState</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">double</span>&nbsp;<span class="element-name">updateState</span><wbr><span class="parameters">(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline,
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline,
  double&nbsp;t,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random)</span></div>
 </section>

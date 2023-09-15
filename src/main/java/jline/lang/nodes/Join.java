@@ -21,14 +21,18 @@ public class Join extends Station implements Serializable {
 
     public Join(Network model, String name, Node fork) {
         super(name);
-        List<JobClass> classes = model.getClasses();
-        this.input = new Joiner(classes);
-        this.output = new Dispatcher(classes);
         this.server = new ServiceTunnel();
         this.numberOfServers = Integer.MAX_VALUE;
         this.model = model;
         this.joinOf = fork;
+        initJoinJobClasses();
         model.addNode(this);
+    }
+
+    public void initJoinJobClasses() {
+        List<JobClass> classes = this.model.getClasses();
+        this.input = new Joiner(classes);
+        this.output = new Dispatcher(classes);
     }
 
     @Override

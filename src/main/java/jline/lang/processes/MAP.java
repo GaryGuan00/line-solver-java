@@ -3,13 +3,14 @@ package jline.lang.processes;
 
 import jline.util.Matrix;
 import jline.lang.distributions.MarkovianDistribution;
-import jline.util.CumulativeDistribution;
+import jline.lang.distributions.CumulativeDistribution;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+
 import static jline.lib.KPCToolbox.*;
 
 public class MAP extends MarkovianDistribution implements Serializable {
@@ -21,6 +22,7 @@ public class MAP extends MarkovianDistribution implements Serializable {
     List<Double> totalDepartureRate;
     List<Double> totalPhaseRate;
     private final int nPhases;
+
     public MAP(Matrix D0, Matrix D1) {
         super("jline.MAP", 2);
         int nPhases = D0.getNumCols();
@@ -34,11 +36,11 @@ public class MAP extends MarkovianDistribution implements Serializable {
             double tpr = 0.0;
             double tdr = 0.0;
             for (int j = 0; j < nPhases; j++) {
-                tdr += D1.get(i,j);
+                tdr += D1.get(i, j);
                 if (i == j) {
                     continue;
                 }
-                tpr += D0.get(i,j);
+                tpr += D0.get(i, j);
             }
             this.totalPhaseRate.add(tpr);
             this.totalDepartureRate.add(tdr);
@@ -59,49 +61,63 @@ public class MAP extends MarkovianDistribution implements Serializable {
         Matrix D1 = getD1();
         for (int i = 0; i < nPhases; i++) {
             for (int j = 0; j < nPhases; j++) {
-                if (D0.get(i,j) < 0) {
-                    D0.set(i,j,0.0);
+                if (D0.get(i, j) < 0) {
+                    D0.set(i, j, 0.0);
                 }
-                if (D1.get(i,j) < 0) {
-                    D1.set(i,j,0.0);
+                if (D1.get(i, j) < 0) {
+                    D1.set(i, j, 0.0);
                 }
             }
         }
     }
+
     public long getNumberOfPhases() {
-        return ((Matrix)this.getParam(1).getValue()).getNumCols();
+        return ((Matrix) this.getParam(1).getValue()).getNumCols();
     }
 
     public double getMean() {
-        throw new RuntimeException("Not Implemented!");
+        double E1 = map_moment(getD0(), getD1(), 1);
+        return E1;
     }
 
     @Override
     public List<Double> sample(long n) {
-        return this.sample(n,new Random());
+        return this.sample(n, new Random());
     }
 
     @Override
     public List<Double> sample(long n, Random random) {
         throw new RuntimeException("Not implemented");
     }
-    public List<Double> getMoments()  {
+
+    public List<Double> getMoments() {
         List<Double> moments = new ArrayList<>();
-        for (int i=1; i<=3; i++) {
-            moments.add(map_moment(getD0(),getD1(),i));
+        for (int i = 1; i <= 3; i++) {
+            moments.add(map_moment(getD0(), getD1(), i));
         }
         return moments;
     }
 
     public double getVar() {
-        throw new RuntimeException("Not Implemented!");
+        double E1 = map_moment(getD0(), getD1(), 1);
+        double E2 = map_moment(getD0(), getD1(), 2);
+        return E2 - E1 * E1;
     }
 
     public double getSkew() {
-        throw new RuntimeException("Not Implemented!");
+        double E1 = map_moment(getD0(), getD1(), 1);
+        double E2 = map_moment(getD0(), getD1(), 2);
+        double E3 = map_moment(getD0(), getD1(), 3);
+        double skew = E3 - 3 * E2 * E1 + 2 * E1 * E1 * E1;
+        double scv = (E2 - E1 * E1) / E1 / E1;
+        skew = skew / Math.pow(Math.sqrt(scv) * E1, 3);
+        return skew;
     }
 
-    public double getSCV() { throw new RuntimeException("Not Implemented!"); }
+    public double getSCV() {
+        double mean = this.getMean();
+        return this.getVar() / mean / mean;
+    }
 
     public double getRate() {
         throw new RuntimeException("Not Implemented!");
@@ -116,21 +132,21 @@ public class MAP extends MarkovianDistribution implements Serializable {
     }
 
     public int getNextPhaseAfterDeparture(int curPhase, Random random) {
-        List<List<Double>> phaseRates = ((Matrix)this.getParam(2).getValue()).toDoubleList();
+        List<List<Double>> phaseRates = ((Matrix) this.getParam(2).getValue()).toDoubleList();
         List<Double> phaseTransitions = phaseRates.get(curPhase);
         double tdr = this.totalDepartureRate.get(curPhase);
 
         CumulativeDistribution<Integer> phaseCumulativeDistribution = new CumulativeDistribution<Integer>(random);
 
         for (int i = 0; i < this.nPhases; i++) {
-            phaseCumulativeDistribution.addElement(i, phaseTransitions.get(i)/tdr);
+            phaseCumulativeDistribution.addElement(i, phaseTransitions.get(i) / tdr);
         }
 
-        return phaseCumulativeDistribution.generate();
+        return phaseCumulativeDistribution.sample(random);
     }
 
     public int getNextPhase(int curPhase, Random random) {
-        List<List<Double>> phaseRates = ((Matrix)this.getParam(2).getValue()).toDoubleList();
+        List<List<Double>> phaseRates = ((Matrix) this.getParam(2).getValue()).toDoubleList();
         List<Double> phaseTransitions = phaseRates.get(curPhase);
 
         CumulativeDistribution<Integer> phaseCumulativeDistribution = new CumulativeDistribution<Integer>(random);
@@ -141,19 +157,20 @@ public class MAP extends MarkovianDistribution implements Serializable {
             if (i == curPhase) {
                 continue;
             }
-            phaseCumulativeDistribution.addElement(i, phaseTransitions.get(i)/tpr);
+            phaseCumulativeDistribution.addElement(i, phaseTransitions.get(i) / tpr);
         }
 
-        return phaseCumulativeDistribution.generate();
+        return phaseCumulativeDistribution.sample(random);
     }
 
     public double evalCDF(double t) {
         throw new RuntimeException("Not Implemented!");
     }
 
-    public Map<Integer, Matrix> getPH()  {
+    public Map<Integer, Matrix> getPH() {
         throw new RuntimeException("Not Implemented!");
     }
+
     public double evalLST(double s) {
         throw new RuntimeException("Not Implemented!");
     }

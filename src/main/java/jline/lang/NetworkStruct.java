@@ -25,7 +25,7 @@ public class NetworkStruct implements Serializable, Cloneable {
     public int nchains;
 
     public Map<JobClass, Map<JobClass, Matrix>> rtorig;
-    public Map<Station, Map<JobClass, JFunction<Double, Double>>> lst;
+    public Map<Station, Map<JobClass, SerializableFunction<Double, Double>>> lst;
     public Map<StatefulNode, Matrix> state;
     public Map<StatefulNode, Matrix> stateprior;
     public Map<Station, Matrix> space;
@@ -42,7 +42,7 @@ public class NetworkStruct implements Serializable, Cloneable {
     public Map<Station, Map<JobClass, DropStrategy>> droprule;	//This represents dropid in LINE
 	public Map<Node, NodeParam> nodeparam;
 	public Map<Integer, Sync> sync;
-	public Map<Station, JFunction<Matrix, Double>> cdscaling;
+	public Map<Station, SerializableFunction<Matrix, Double>> cdscaling;
     
     public Matrix refstat;
     public Matrix njobs;
@@ -75,7 +75,7 @@ public class NetworkStruct implements Serializable, Cloneable {
     public Matrix lldscaling;
     public Matrix fj;
     
-    JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Matrix> rtfun;
+    SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Matrix> rtfun;
     
     public List<NodeType> nodetypes;
     public List<String> classnames;

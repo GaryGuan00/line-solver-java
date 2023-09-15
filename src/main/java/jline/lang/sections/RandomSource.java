@@ -13,7 +13,7 @@ import jline.lang.sections.*;
 public class RandomSource extends InputSection implements Serializable {
     protected List<ServiceBinding> serviceProcesses;
     public RandomSource(List<JobClass> jobClasses) {
-        super("jline.RandomSource");
+        super("RandomSource");
         serviceProcesses = new ArrayList<ServiceBinding>();
 
         for (JobClass jobClass : jobClasses) {

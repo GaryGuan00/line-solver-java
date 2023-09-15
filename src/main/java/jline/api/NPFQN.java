@@ -21,7 +21,7 @@ public class NPFQN {
 
         int n = MMAP.size();
         Map<Integer,Matrix> SMMAP = new HashMap<>();
-        //todo
+        //TODO
         return mmap_normalize(SMMAP);
     }
 

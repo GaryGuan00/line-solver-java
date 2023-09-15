@@ -11,7 +11,7 @@ import jline.util.Interval;
 public class Immediate extends Distribution implements Serializable {
 	
     public Immediate() {
-        super("jline.lang.Immediate", 0, new Interval(0,0));
+        super("Immediate", 0, new Interval(0,0));
     }
 
     public boolean isDisabled() {

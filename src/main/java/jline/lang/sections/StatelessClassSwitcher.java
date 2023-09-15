@@ -5,13 +5,12 @@ import java.util.List;
 import java.util.function.Function;
 
 import jline.lang.*;
-import jline.util.CSFunInput;
 import jline.util.Matrix;
 
 
 public class StatelessClassSwitcher extends ClassSwitcher implements Serializable {
     public StatelessClassSwitcher(List<JobClass> jobClasses, Matrix csMatrix) {
-        super(jobClasses, "jline.StatelessClassSwitcher");
+        super(jobClasses, "StatelessClassSwitcher");
         
         this.csFun = (input) -> csMatrix.get(input.r, input.s);
     }

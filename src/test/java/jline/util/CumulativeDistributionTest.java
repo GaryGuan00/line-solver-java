@@ -1,6 +1,6 @@
 package jline.util;
 
-import jline.util.CumulativeDistribution;
+import jline.lang.distributions.CumulativeDistribution;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ class CumulativeDistributionTest {
     @Test
     void addElement() {
         testCumulativeDistribution.addElement(61, 1);
-        assertEquals((int) testCumulativeDistribution.generate(), 61);
+        assertEquals((int) testCumulativeDistribution.sample(new Random()), 61);
     }
 
     @Test
@@ -35,7 +35,7 @@ class CumulativeDistributionTest {
 
         int times_five = 0;
         for (int i = 0; i < 500; i++) {
-            if (testCumulativeDistribution.generate() == 5) {
+            if (testCumulativeDistribution.sample(new Random()) == 5) {
                 times_five++;
             }
         }
@@ -52,7 +52,7 @@ class CumulativeDistributionTest {
 
         Map<Integer, Integer> counts = new HashMap<Integer, Integer>();
         for (int i = 0; i < 500; i++) {
-            int n = testCumulativeDistribution.generate();
+            int n = testCumulativeDistribution.sample(new Random());
             if (counts.containsKey(n)) {
                 counts.put(n, counts.get(n) + 1);
             } else {

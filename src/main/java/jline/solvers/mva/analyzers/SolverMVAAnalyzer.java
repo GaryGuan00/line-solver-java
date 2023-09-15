@@ -42,6 +42,8 @@ public class SolverMVAAnalyzer implements MVAAnalyzer{
         res.TN = ret.TN;
         res.CN = ret.CN;
         res.XN = ret.XN;
+        res.AN = ret.AN;
+        res.WN = ret.WN;
         res.logNormConstAggr = ret.logNormConstAggr;
         res.iter = ret.iter;
         res.runtime = (endTime - startTime) / 1000.0;

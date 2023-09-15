@@ -11,7 +11,7 @@ import jline.lang.sections.*;
 
 public class Dispatcher extends OutputSection implements Serializable {
     public Dispatcher(List<JobClass> customerClasses) {
-        super("jline.Dispatcher");
+        super("Dispatcher");
     }
 
     public void initDispatcherJobClasses(List<JobClass> customerClasses){

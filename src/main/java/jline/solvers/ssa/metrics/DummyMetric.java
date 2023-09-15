@@ -9,7 +9,6 @@ public class DummyMetric extends Metric<Double, Double>{
     }
 
     protected void addSample(double currentTime, Double metric) {
-
     }
 
     public void fromStateMatrix(double t, SSAStateMatrix networkState) {

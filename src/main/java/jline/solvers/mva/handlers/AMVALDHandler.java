@@ -9,7 +9,7 @@ import jline.lang.constant.SolverType;
 import jline.lang.nodes.Station;
 import jline.solvers.SolverOptions;
 import jline.solvers.mva.SolverMVAResult;
-import jline.util.JFunction;
+import jline.util.SerializableFunction;
 import jline.util.Matrix;
 import jline.util.Pair;
 
@@ -443,7 +443,7 @@ public class AMVALDHandler implements MVASolverHandler {
         Matrix nservers = sn.nservers;
         Matrix schedparam = sn.schedparam;
         Matrix lldscaling = null;
-        Map<Station, JFunction<Matrix, Double>> cdscaling = sn.cdscaling;
+        Map<Station, SerializableFunction<Matrix, Double>> cdscaling = sn.cdscaling;
 
         if (gamma == null || gamma.size() == 0) {
             gamma = new ArrayList<Matrix>();

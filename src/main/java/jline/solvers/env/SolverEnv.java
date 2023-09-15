@@ -4,12 +4,14 @@
 package jline.solvers.env;
 
 
+import jline.api.UTIL;
 import jline.lang.*;
+import jline.lang.constant.SolverType;
 import jline.solvers.EnsembleSolver;
 import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
+import jline.solvers.SolverResult;
 import jline.solvers.fluid.smoothing.PStarSearcher;
-import jline.util.MAPE;
 import jline.util.Matrix;
 import org.apache.commons.math3.optim.PointValuePair;
 
@@ -69,7 +71,7 @@ public class SolverEnv extends EnsembleSolver {
               e,
               Math.max(
                   mapes.get(0, e),
-                  MAPE.mape(
+                  UTIL.mape(
                       Matrix.extractRows(results.get(it).get(e).QNt[i][j], 0, 1, null),
                       Matrix.extractRows(results.get(it - 1).get(e).QNt[i][j], 0, 1, null))));
         }
@@ -102,7 +104,7 @@ public class SolverEnv extends EnsembleSolver {
 
   // Solves model in stage e
   @Override
-  protected void analyze(int e) {
+  protected SolverResult analyze(int it, int e) {
     // TODO: [Qt,Ut,Tt] = self.ensemble{e}.getTranHandles;
     this.solvers[e].resetResults();
     // If pStar values exist, implement p-norm smoothing
@@ -117,6 +119,7 @@ public class SolverEnv extends EnsembleSolver {
       }
     }
     this.solvers[e].getTranAvg();
+    return this.solvers[e].result;
   }
 
   @Override
@@ -421,5 +424,9 @@ public class SolverEnv extends EnsembleSolver {
   @Override
   public void runAnalyzer() {
     iterate();
+  }
+
+  public static SolverOptions defaultOptions() {
+    return new SolverOptions(SolverType.Env);
   }
 }

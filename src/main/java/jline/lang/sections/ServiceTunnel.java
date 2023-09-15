@@ -10,6 +10,6 @@ public class ServiceTunnel extends ServiceSection implements Serializable {
     }
 
     public ServiceTunnel() {
-        this("Service Tunnel");
+        this("ServiceTunnel");
     }
 }

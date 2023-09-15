@@ -1,5 +1,7 @@
 package jline.solvers.ssa.events;
 
+import jline.solvers.SolverOptions;
+
 public class PhaseEvent extends Event{
     public PhaseEvent() {
         super();

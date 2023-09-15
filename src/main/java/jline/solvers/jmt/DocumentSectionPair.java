@@ -1,19 +1,22 @@
 package jline.solvers.jmt;
 
-public class DocumentSectionPair {
-    public Object simDoc;  // Replace Object with the actual type
-    public Object section;  // Replace Object with the actual type
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
-    public DocumentSectionPair(Object simDoc, Object section){
+public class DocumentSectionPair {
+    public Document simDoc;
+    public Element section;
+
+    public DocumentSectionPair(Document simDoc, Element section){
         this.simDoc = simDoc;
         this.section = section;
     }
 
-    public Object getSimDoc() {
+    public Document getSimDoc() {
         return simDoc;
     }
 
-    public Object getSection() {
+    public Element getSection() {
         return section;
     }
 }

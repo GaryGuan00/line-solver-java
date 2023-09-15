@@ -62,7 +62,7 @@ public class SSAStateMatrix {
             if (sn.sched.get(sn.stations.get(i)) == SchedStrategy.FCFS) {
                 this.buffers[i] = new FCFSBuffer(sn.nclasses, (int) sn.nservers.get(i), phaseList);
             } else if(sn.sched.get(sn.stations.get(i)) == SchedStrategy.INF) {
-                this.buffers[i] = new INFBuffer(this.random, sn.nclasses, phaseList);
+                this.buffers[i] = new INFBuffer(sn.nclasses, phaseList);
             } else if (sn.sched.get(sn.stations.get(i)) == SchedStrategy.EXT) {
                 this.buffers[i] = new SourceBuffer(sn.nclasses, phaseList);
             } else if (sn.sched.get(sn.stations.get(i)) == SchedStrategy.LCFS) {

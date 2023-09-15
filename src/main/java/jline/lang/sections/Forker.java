@@ -1,11 +1,10 @@
 package jline.lang.sections;
 
 import jline.lang.JobClass;
-import jline.lang.Network;
 import jline.lang.OutputStrategy;
 import jline.lang.constant.RoutingStrategy;
 import jline.lang.nodes.Node;
-import jline.solvers.ssa.events.ForkOutputEvent;
+import jline.solvers.ssa.events.ForkEvent;
 
 import java.util.List;
 
@@ -42,7 +41,7 @@ public class Forker extends OutputSection {
 
         OutputStrategy outputStrategy = new OutputStrategy(jobClass, routingStrategy, destination, probability);
         outputStrategies.add(outputStrategy);
-        outputEvents.put(outputStrategy, new ForkOutputEvent(this, destination, jobClass));
+        outputEvents.put(outputStrategy, new ForkEvent(this, destination, jobClass));
         this.probabilityUpdate();
     }
 }

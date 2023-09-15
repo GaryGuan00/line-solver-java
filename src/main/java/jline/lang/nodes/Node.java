@@ -8,7 +8,7 @@ import jline.lang.sections.OutputSection;
 import jline.lang.sections.ServiceSection;
 import jline.solvers.ssa.events.ArrivalEvent;
 import jline.solvers.ssa.events.NodeArrivalEvent;
-import jline.solvers.ssa.events.OutputEvent;
+import jline.solvers.ssa.events.SynchedEvent;
 import jline.util.Pair;
 
 import java.io.Serializable;
@@ -98,11 +98,11 @@ public class Node extends NetworkElement implements Serializable {
         return this.arrivalEvents.get(jobClass);
     }
 
-    public OutputEvent getOutputEvent(JobClass jobClass, Random random) {
+    public SynchedEvent getOutputEvent(JobClass jobClass, Random random) {
         return this.output.getOutputEvent(jobClass, random);
     }
 
-    public ArrayList<Pair<OutputEvent,Double>>  getOutputEvents(JobClass jobClass, Random random) {
+    public ArrayList<Pair<SynchedEvent,Double>>  getOutputEvents(JobClass jobClass, Random random) {
         return this.output.getOutputEvents(jobClass, random);
     }
 

@@ -12,6 +12,6 @@ public class InfiniteServer extends Server implements Serializable {
     public InfiniteServer(List<JobClass> jobClasses) {
         super(jobClasses);
         this.numberOfServers = Double.POSITIVE_INFINITY;
-        this.className = "jline.InfiniteServer";
+        this.className = "InfiniteServer";
     }
 }

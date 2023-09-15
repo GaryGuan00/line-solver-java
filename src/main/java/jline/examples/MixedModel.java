@@ -8,7 +8,7 @@ import jline.lang.nodes.*;
 import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
 import jline.solvers.mva.SolverMVA;
-import jline.util.NetworkAvgTable;
+import jline.solvers.NetworkAvgTable;
 
 import java.util.Arrays;
 
@@ -54,6 +54,41 @@ public class MixedModel {
         routingMatrix.set(jobclass2, jobclass2, node3, node6, 1.000000); // (Queue3,OpenClass) -> (Sink,OpenClass)
         routingMatrix.set(jobclass2, jobclass2, node4, node1, 1.000000); // (Queue4,OpenClass) -> (Queue1,OpenClass)
         routingMatrix.set(jobclass2, jobclass2, node5, node1, 1.000000); // (Source,OpenClass) -> (Queue1,OpenClass)
+
+        model.link(routingMatrix);
+
+        return model;
+    }
+
+    public static Network ex1_line() {
+        Network model = new Network("model");
+
+        // Block 1: nodes
+        Delay node1 = new Delay(model, "Delay");
+        Queue node2 = new Queue(model, "Queue1", SchedStrategy.PS);
+        Source node3 = new Source(model, "Source");
+        Sink node4 = new Sink(model, "Sink");
+
+        // Block 2: classes
+        ClosedClass jobclass1 = new ClosedClass(model, "ClosedClass", 2, node1, 0);
+        OpenClass jobclass2 = new OpenClass(model, "OpenClass", 0);
+
+        node1.setService(jobclass1, new Erlang(3, 2)); // (Delay,ClosedClass)
+        node1.setService(jobclass2, new HyperExp(0.5,3.0,10.0)); // (Delay,OpenClass)
+        node2.setService(jobclass1, new HyperExp(0.1,1.0,10.0)); // (Queue1,ClosedClass)
+        node2.setService(jobclass2, new Exp(1)); // (Queue1,OpenClass)
+        node3.setArrival(jobclass2, new Exp(0.1)); // (Source,OpenClass)
+
+        // Block 3: topology
+        RoutingMatrix routingMatrix = new RoutingMatrix(model,
+                Arrays.asList(jobclass1, jobclass2),
+                Arrays.asList(node1, node2, node3, node4));
+
+        routingMatrix.set(jobclass1, jobclass1, node1, node2, 1.000000); // (Delay,ClosedClass) -> (Queue1,ClosedClass)
+        routingMatrix.set(jobclass1, jobclass1, node2, node1, 1.000000); // (Queue1,ClosedClass) -> (Delay,ClosedClass)
+        routingMatrix.set(jobclass2, jobclass2, node1, node2, 1.000000); // (Delay,OpenClass) -> (Queue1,OpenClass)
+        routingMatrix.set(jobclass2, jobclass2, node2, node4, 1.000000); // (Queue1,OpenClass) -> (Sink,OpenClass)
+        routingMatrix.set(jobclass2, jobclass2, node3, node1, 1.000000); // (Source,OpenClass) -> (Delay,OpenClass)
 
         model.link(routingMatrix);
 

@@ -10,13 +10,13 @@ import jline.solvers.SolverOptions;
 public class SolverMVA extends NetworkSolver {
 	
 	public SolverMVA(Network model, SolverOptions options) {
-		super(model, "MVA", options);
+		super(model, "SolverMVA", options);
 		this.sn = model.getStruct(false);
 		this.result = new SolverMVAResult();
 	}
 	
 	public SolverMVA(Network model) {
-		super(model, "MVA");
+		super(model, "SolverMVA", SolverMVA.defaultOptions());
 		this.sn = model.getStruct(false);
 		this.result = new SolverMVAResult();
 	}
@@ -77,5 +77,9 @@ public class SolverMVA extends NetworkSolver {
 		FeatureSet featUsed = model.getUsedLangFeatures();
 		FeatureSet featSupported = SolverMVA.getFeatureSet();
 		return FeatureSet.supports(featSupported, featUsed);
+	}
+
+	public static SolverOptions defaultOptions() {
+		return new SolverOptions(SolverType.MVA);
 	}
 }

@@ -7,7 +7,7 @@ import jline.lang.distributions.*;
 import jline.lang.nodes.Queue;
 
 import jline.solvers.SolverOptions;
-import jline.util.NetworkAvgTable;
+import jline.solvers.NetworkAvgTable;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
@@ -42,29 +42,31 @@ public class SolverMVAClosedExamplesTest {
 
 		model.link(routingMatrix);
 
-		SolverMVA solver = new SolverMVA(model);
+		SolverOptions options = new SolverOptions(SolverType.MVA);
+		options.seed = 23000;
+		SolverMVA solver = new SolverMVA(model, options);
 
 		NetworkAvgTable avgTable = solver.getAvgTable();
 
 		List<Double> QLen = avgTable.get(0);
-		assertEquals(2.2178051199232454, QLen.get(0), 1e-13);
-		assertEquals(7.782194880076755, QLen.get(1), 1e-13);
+		assertEquals(2.22607864269366, QLen.get(0), 1e-13);
+		assertEquals(7.77392135730634, QLen.get(1), 1e-13);
 
 		List<Double> Util = avgTable.get(1);
-		assertEquals(2.2178051199232454, Util.get(0), 1e-13);
-		assertEquals(0.9980123039654604, Util.get(1), 1e-13);
+		assertEquals(2.22607864269366, Util.get(0), 1e-13);
+		assertEquals(1.00173538921215, Util.get(1), 1e-13);
 
 		List<Double> RespT = avgTable.get(2);
 		assertEquals(1.0000000000000000, RespT.get(0), 1e-13);
-		assertEquals(11.696541489251146, RespT.get(1), 1e-13);
+		assertEquals(11.6406809238622, RespT.get(1), 1e-13);
 
 		List<Double> ResidT = avgTable.get(3);
 		assertEquals(1.0000000000000000, ResidT.get(0), 1e-13);
-		assertEquals(3.5089624467753437, ResidT.get(1), 1e-13);
+		assertEquals(3.49220427715866, ResidT.get(1), 1e-13);
 
 		List<Double> Tput = avgTable.get(4);
-		assertEquals(2.2178051199232454, Tput.get(0), 1e-13);
-		assertEquals(0.6653415359769735, Tput.get(1), 1e-13);
+		assertEquals(2.22607864269366, Tput.get(0), 1e-13);
+		assertEquals(0.667823592808098, Tput.get(1), 1e-13);
 	}
 
 	@Test
@@ -105,39 +107,41 @@ public class SolverMVAClosedExamplesTest {
 
 		model.link(routingMatrix);
 
-		SolverMVA solver = new SolverMVA(model);
+		SolverOptions options = new SolverOptions(SolverType.MVA);
+		options.seed = 23000;
+		SolverMVA solver = new SolverMVA(model, options);
 
 		NetworkAvgTable avgTable = solver.getAvgTable();
 
 		List<Double> QLen = avgTable.get(0);
-		assertEquals(0.9268084538085989, QLen.get(0), 1e-13);
-		assertEquals(0.20482497135805217, QLen.get(1), 1e-13);
-		assertEquals(0.07796701220562233, QLen.get(2), 1e-13);
-		assertEquals(2.790399562627727, QLen.get(3), 1e-13);
+		assertEquals(0.934910646348408, QLen.get(0), 1e-13);
+		assertEquals(0.2066155585587669, QLen.get(1), 1e-13);
+		assertEquals(0.0776981098674259, QLen.get(2), 1e-13);
+		assertEquals(2.780775685225399, QLen.get(3), 1e-13);
 
 		List<Double> Util = avgTable.get(1);
-		assertEquals(0.926808453808599, Util.get(0), 1e-13);
-		assertEquals(0.20482497135805217, Util.get(1), 1e-13);
-		assertEquals(0.026414027726531224, Util.get(2), 1e-13);
-		assertEquals(0.9453445672762913, Util.get(3), 1e-13);
+		assertEquals(0.934910646348408, Util.get(0), 1e-13);
+		assertEquals(0.20661555855876695, Util.get(1), 1e-13);
+		assertEquals(0.026644940098459576, Util.get(2), 1e-13);
+		assertEquals(0.9536088031807657, Util.get(3), 1e-13);
 
 		List<Double> RespT = avgTable.get(2);
-		assertEquals(0.666667, RespT.get(0), 1e-13);
-		assertEquals(0.21666700000000003, RespT.get(1), 1e-13);
-		assertEquals(0.5608282262908652, RespT.get(2), 1e-13);
-		assertEquals(2.951727506794028, RespT.get(3), 1e-13);
+		assertEquals(0.6666669999999999, RespT.get(0), 1e-13);
+		assertEquals(0.21666699999999994, RespT.get(1), 1e-13);
+		assertEquals(0.5540504433584517, RespT.get(2), 1e-13);
+		assertEquals(2.916054965044483, RespT.get(3), 1e-13);
 
 		List<Double> ResidT = avgTable.get(3);
-		assertEquals(0.3968255243763945, ResidT.get(0), 1e-13);
-		assertEquals(0.08769857064912426, ResidT.get(1), 1e-13);
-		assertEquals(0.03338262655613012, ResidT.get(2), 1e-13);
-		assertEquals(1.194747161734549, ResidT.get(3), 1e-13);
+		assertEquals(0.3968255243763944, ResidT.get(0), 1e-13);
+		assertEquals(0.08769857064912427, ResidT.get(1), 1e-13);
+		assertEquals(0.03297918716791013, ResidT.get(2), 1e-13);
+		assertEquals(1.1803082719965812, ResidT.get(3), 1e-13);
 
 		List<Double> Tput = avgTable.get(4);
-		assertEquals(1.3902119856069057, Tput.get(0), 1e-13);
-		assertEquals(0.945344567276291, Tput.get(1), 1e-13);
-		assertEquals(0.13902119856069067, Tput.get(2), 1e-13);
-		assertEquals(0.9453445672762913, Tput.get(3), 1e-13);
+		assertEquals(1.402365268339978, Tput.get(0), 1e-13);
+		assertEquals(0.9536088031807657, Tput.get(1), 1e-13);
+		assertEquals(0.14023652683399782, Tput.get(2), 1e-13);
+		assertEquals(0.9536088031807657, Tput.get(3), 1e-13);
 	}
 
 	@Test
@@ -193,7 +197,7 @@ public class SolverMVAClosedExamplesTest {
 		NetworkAvgTable avgTable = solver.getAvgTable();
 
 		List<Double> QLen = avgTable.get(0);
-		//avgTable.print(options);
+		avgTable.print(options);
 
 		assertEquals(1.1367305068825366, QLen.get(0), 1e-13);
 		assertEquals(0.2512178137319010, QLen.get(1), 1e-13);

@@ -3,19 +3,19 @@ package jline.lang.sections;
 import java.io.Serializable;
 import java.util.*;
 
-import jline.util.CumulativeDistribution;
+import jline.solvers.ssa.events.SynchedEvent;
+import jline.lang.distributions.CumulativeDistribution;
 import jline.lang.*;
 import jline.lang.constant.RoutingStrategy;
 import jline.lang.constant.SchedStrategyType;
 import jline.lang.nodes.*;
-import jline.solvers.ssa.events.OutputEvent;
 import jline.util.Pair;
 
 
 public class OutputSection extends Section implements Serializable {
     protected SchedStrategyType schedPolicy;
     protected List<OutputStrategy> outputStrategies;
-    protected Map<OutputStrategy, OutputEvent> outputEvents;
+    protected Map<OutputStrategy, SynchedEvent> outputEvents;
     protected boolean isClassSwitch;
 
     protected void probabilityUpdate() {
@@ -59,7 +59,7 @@ public class OutputSection extends Section implements Serializable {
         super(className);
         this.isClassSwitch = false;
         outputStrategies = new ArrayList<OutputStrategy>();
-        outputEvents = new HashMap<OutputStrategy, OutputEvent>();
+        outputEvents = new HashMap<OutputStrategy, SynchedEvent>();
     }
 
     public void setOutputStrategy(JobClass jobClass, RoutingStrategy routingStrategy) {
@@ -76,9 +76,12 @@ public class OutputSection extends Section implements Serializable {
 
     public void setOutputStrategy(JobClass jobClass, RoutingStrategy routingStrategy, Node destination, double probability) {
         for (OutputStrategy outputStrategy : this.outputStrategies) {
-            if ((outputStrategy.getJobClass() == jobClass) && (outputStrategy.getDestination() == destination)) {
+            if ((outputStrategy.getJobClass() == jobClass) && (outputStrategy.getDestination() == null || outputStrategy.getDestination() == destination))  {
                 outputStrategy.setRoutingStrategy(routingStrategy);
                 outputStrategy.setProbability(probability);
+                if(outputStrategy.getDestination() == null){
+                    outputStrategy.setDestination(destination);
+                }
                 this.probabilityUpdate();
                 return;
             }
@@ -86,7 +89,7 @@ public class OutputSection extends Section implements Serializable {
 
         OutputStrategy outputStrategy = new OutputStrategy(jobClass, routingStrategy, destination, probability);
         outputStrategies.add(outputStrategy);
-        outputEvents.put(outputStrategy, new OutputEvent(this, destination, jobClass, this.isClassSwitch));
+        outputEvents.put(outputStrategy, new SynchedEvent(this, destination, jobClass, this.isClassSwitch));
         this.probabilityUpdate();
     }
 
@@ -114,7 +117,7 @@ public class OutputSection extends Section implements Serializable {
         return this.outputStrategies;
     }
 
-    public OutputEvent getOutputEvent(JobClass jobClass, Random random) {
+    public SynchedEvent getOutputEvent(JobClass jobClass, Random random) {
         CumulativeDistribution<OutputStrategy> outputStrategyCumulativeDistribution = new CumulativeDistribution<OutputStrategy>(random);
 
         if (this.outputStrategies.size() == 0) {
@@ -131,11 +134,11 @@ public class OutputSection extends Section implements Serializable {
             outputStrategyCumulativeDistribution.addElement(outputStrategy, outputStrategy.getProbability());
         }
 
-        return this.outputEvents.get(outputStrategyCumulativeDistribution.generate());
+        return this.outputEvents.get(outputStrategyCumulativeDistribution.sample(random));
     }
 
     @SuppressWarnings("unchecked")
-    public ArrayList<Pair<OutputEvent,Double>>  getOutputEvents(JobClass jobClass, Random random) {
+    public ArrayList<Pair<SynchedEvent,Double>>  getOutputEvents(JobClass jobClass, Random random) {
         CumulativeDistribution<OutputStrategy> outputStrategyCumulativeDistribution = new CumulativeDistribution<OutputStrategy>(random);
 
         if (this.outputStrategies.size() == 0) {
@@ -152,7 +155,7 @@ public class OutputSection extends Section implements Serializable {
             outputStrategyCumulativeDistribution.addElement(outputStrategy, outputStrategy.getProbability());
         }
         ArrayList<Pair<Double,OutputStrategy>> outputStrategies = outputStrategyCumulativeDistribution.getPossibleEventProbability();
-        ArrayList<Pair<OutputEvent,Double>> outputEvents = new ArrayList<>();
+        ArrayList<Pair<SynchedEvent,Double>> outputEvents = new ArrayList<>();
         for(Pair<Double,OutputStrategy> pair : outputStrategies){
             outputEvents.add(new Pair(this.outputEvents.get(pair.getRight()),pair.getLeft()));
         }
@@ -160,7 +163,7 @@ public class OutputSection extends Section implements Serializable {
     }
 
     @SuppressWarnings("unchecked")
-    public OutputEvent getOutputEvent(JobClass jobClass) {
+    public SynchedEvent getOutputEvent(JobClass jobClass) {
         return this.getOutputEvent(jobClass, new Random());
     }
 

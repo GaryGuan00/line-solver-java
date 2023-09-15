@@ -34,6 +34,8 @@ public class SolverMVALDAnalyzer implements MVAAnalyzer{
         res.TN = ret.TN;
         res.CN = ret.CN;
         res.XN = ret.XN;
+        res.AN = ret.AN;
+        res.WN = ret.WN;
         res.logNormConstAggr = ret.logNormConstAggr;
         res.runtime = (endTime - startTime) / 1000.0;
         res.iter = ret.iter;

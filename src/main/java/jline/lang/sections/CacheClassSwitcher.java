@@ -5,6 +5,7 @@ import jline.lang.constant.DropStrategy;
 import jline.lang.constant.SchedStrategyType;
 import jline.util.Matrix;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,7 +13,7 @@ import java.util.Map;
 /**
  * A class switcher section based on cache hits and misses
  */
-public class CacheClassSwitcher extends StatefulClassSwitcher{
+public class CacheClassSwitcher extends StatefulClassSwitcher implements Serializable {
     private final List<JobClass> jobClasses;
     private final int items;
     private final Matrix cap;
@@ -74,7 +75,7 @@ public class CacheClassSwitcher extends StatefulClassSwitcher{
         return 0;
     }
 
-    public static class InputJobClassesObj {
+    public static class InputJobClassesObj implements Serializable{
         public JobClass jobClass;
         public SchedStrategyType schedPolicy;
         public DropStrategy dropStrategy;

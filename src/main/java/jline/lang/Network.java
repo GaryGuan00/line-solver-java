@@ -25,7 +25,7 @@ import static jline.lib.KPCToolbox.*;
 public class Network extends Model implements Serializable {
     private boolean doChecks;
     private boolean hasState;
-    private boolean logPath;
+    private String logPath;
     private boolean usedFeatures;
 
     private List<Node> nodes;
@@ -38,6 +38,7 @@ public class Network extends Model implements Serializable {
     private Matrix connections;
 
     private List<Matrix> handles;
+    private List<FiniteCapacityRegion> regions;
 
     // caches
     private Map<Node, Map<JobClass, List<Node>>> classLinks;
@@ -57,6 +58,7 @@ public class Network extends Model implements Serializable {
 
         this.classLinks = new HashMap<Node, Map<JobClass, List<Node>>>();
         this.items = new ArrayList<>();
+        this.regions = new ArrayList<>();
 
         this.hasStruct = false;
         this.csMatrix = null;
@@ -84,6 +86,10 @@ public class Network extends Model implements Serializable {
         }
 
         return false;
+    }
+
+    public boolean hasProductFormSolution() {
+        return SN.snHasProductForm(this.getStruct(false));
     }
 
     public int getJobClassIndex (JobClass jobClass) {
@@ -426,7 +432,7 @@ public class Network extends Model implements Serializable {
                                 if (sn.proctype.get(sn.nodes.get(i)).get(sn.jobclasses.get(r)) == ProcessType.MAP) {
                                     Matrix one = new Matrix(1, 1,1);
                                     one.set(0, 0, 1);
-                                    state_i = State.decorate(state_i, one);
+                                    state_i = UTIL.decorate(state_i, one);
                                 }
                             }
                         }
@@ -661,10 +667,6 @@ public class Network extends Model implements Serializable {
         this.sn = sn;
     }
 
-    public NetworkStruct getStructWithoutRecompute() {
-        return this.sn;
-    }
-
     public NetworkStruct getStruct(boolean wantInitialState) {
         if (!this.hasStruct)
             refreshStruct(true);
@@ -687,7 +689,7 @@ public class Network extends Model implements Serializable {
         Matrix njobs;
         Matrix numservers;
         Matrix lldscaling;
-        Map<Station, JFunction<Matrix, Double>> cdscaling;
+        Map<Station, SerializableFunction<Matrix, Double>> cdscaling;
         Map<Node, Map<JobClass, RoutingStrategy>> routing;
 
 
@@ -715,6 +717,7 @@ public class Network extends Model implements Serializable {
         sn.nnodes = nodenames.size();
         sn.nclasses = classnames.size();
         sn.stations = this.stations;
+        sn.stateful = new ArrayList<>();
         sn.jobclasses = this.jobClasses;
         sn.nodes = this.nodes;
 
@@ -809,23 +812,14 @@ public class Network extends Model implements Serializable {
         for(int c = 0; c < sn.nchains; c++) {
             Matrix inchain_c = sn.inchain.get(c);
             Matrix find_refclasses = refclasses.find();
-            //The following works since inchain_c is sorted and find always return a sorted matrix
-            double isect = -1;
-            int left = 0, right = 0;
-            while (left < inchain_c.getNumCols() && right < find_refclasses.getNumRows()) {
-                double left_val = inchain_c.get(left);
-                double right_val = find_refclasses.get(right);
-                if (left_val == right_val) {
-                    isect = left_val;
-                    break;
-                } else if (left_val < right_val) {
-                    left++;
-                } else {
-                    right++;
-                }
+            List<Double> isect = Matrix.intersect(inchain_c,find_refclasses); // can have a single element
+            if (!isect.isEmpty()) {
+                refclass.set(0,c,isect.get(0));
+            } else{
+                refclass.set(0,c,-1);
             }
-            refclass.set(0, c, isect);
         }
+
         this.sn.refclass = refclass;
         this.sn.fj = this.getForkJoins();
 
@@ -1172,8 +1166,8 @@ public class Network extends Model implements Serializable {
         return alpha;
     }
 
-    public Map<Station, JFunction<Matrix, Double>> getLimitedClassDependence() {
-        Map<Station, JFunction<Matrix, Double>> gamma = new HashMap<Station, JFunction<Matrix, Double>>();
+    public Map<Station, SerializableFunction<Matrix, Double>> getLimitedClassDependence() {
+        Map<Station, SerializableFunction<Matrix, Double>> gamma = new HashMap<Station, SerializableFunction<Matrix, Double>>();
 
         for(Station station : this.stations) {
             if (station.getLimitedClassDependence() != null)
@@ -1555,7 +1549,7 @@ public class Network extends Model implements Serializable {
     public void refreshLST(List<Integer> statSet, List<Integer> classSet) {
         int M = this.stations.size();
         int K = this.jobClasses.size();
-        Map<Station, Map<JobClass, JFunction<Double, Double>>> lst;
+        Map<Station, Map<JobClass, SerializableFunction<Double, Double>>> lst;
 
         if (statSet == null) {
             statSet = new ArrayList<Integer>();
@@ -1571,16 +1565,16 @@ public class Network extends Model implements Serializable {
         if (this.sn.lst != null) {
             lst = this.sn.lst;
         } else {
-            lst = new HashMap<Station, Map<JobClass, JFunction<Double, Double>>>();
+            lst = new HashMap<Station, Map<JobClass, SerializableFunction<Double, Double>>>();
             for(Station station : stations) {
-                lst.put(station, new HashMap<JobClass, JFunction<Double, Double>>());
+                lst.put(station, new HashMap<JobClass, SerializableFunction<Double, Double>>());
             }
         }
         int sourceIdx = this.getIndexSourceNode();
 
         for(Integer i : statSet) {
             Station station = this.stations.get(i);
-            Map<JobClass, JFunction<Double, Double>> map = new HashMap<JobClass, JFunction<Double, Double>>();
+            Map<JobClass, SerializableFunction<Double, Double>> map = new HashMap<JobClass, SerializableFunction<Double, Double>>();
             for(Integer r : classSet) {
                 JobClass jobclass = this.jobClasses.get(r);
                 if (i == sourceIdx) {
@@ -1815,7 +1809,7 @@ public class Network extends Model implements Serializable {
             arvRates.set(0, i, rates.get(indSourceStation, i));
         }
 
-        jline.util.RoutingMatrix res = getRoutingMatrix(arvRates, 4);
+        routingMatrixReturn res = getRoutingMatrix(arvRates, 4);
         Matrix rt = res.rt;
         Matrix rtnodes = res.rtnodes;
         Matrix linksmat = res.linksmat;
@@ -1833,8 +1827,8 @@ public class Network extends Model implements Serializable {
         }
 
         boolean isStateDep = (Matrix.extractColumn(this.sn.isstatedep, 2, null).getNonZeroLength() > 0);
-        Map<Integer, Map<Integer, JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double>>> rtnodefuncell =
-                new HashMap<Integer, Map<Integer, JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double>>>();
+        Map<Integer, Map<Integer, SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double>>> rtnodefuncell =
+                new HashMap<Integer, Map<Integer, SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double>>>();
 
         if(isStateDep) {
             for(int ind = 0; ind < M; ind++) {
@@ -1845,8 +1839,8 @@ public class Network extends Model implements Serializable {
                         final int r_final = r;
                         for(int s = 0; s < K; s++) {
                             final int s_final = s;
-                            Map<Integer, JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double>> map =
-                                    rtnodefuncell.getOrDefault(ind*K+r, new HashMap<Integer, JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double>>());
+                            Map<Integer, SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double>> map =
+                                    rtnodefuncell.getOrDefault(ind*K+r, new HashMap<Integer, SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double>>());
                             if (this.sn.isstatedep.get(ind,2) > 0) {
                                 switch (this.sn.routing.get(this.nodes.get(ind)).get(this.jobClasses.get(r))) {
                                     case RROBIN:
@@ -1878,7 +1872,7 @@ public class Network extends Model implements Serializable {
             }
         }
 
-        JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Matrix> rtfun = null;
+        SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Matrix> rtfun = null;
         if (isStateDep) {
             rtfun = (pair) -> {
                 Matrix cellfunnodes = new Matrix(M*K, M*K);
@@ -1926,7 +1920,7 @@ public class Network extends Model implements Serializable {
         }
     }
 
-    public jline.util.RoutingMatrix getRoutingMatrix(Matrix arvRates, int returnVal) {
+    public routingMatrixReturn getRoutingMatrix(Matrix arvRates, int returnVal) {
 
         int idxSource, idxSink, I, K;
         List<Integer> idxOpenClasses;
@@ -2393,7 +2387,7 @@ public class Network extends Model implements Serializable {
         }
 
         //Return
-        return new jline.util.RoutingMatrix(rt, rtnodes, this.sn.connmatrix, chains, rtNodesByClass, rtNodesByStation);
+        return new routingMatrixReturn(rt, rtnodes, this.sn.connmatrix, chains, rtNodesByClass, rtNodesByStation);
     }
 
     public void refreshCapacity() {
@@ -2504,7 +2498,7 @@ public class Network extends Model implements Serializable {
                     }
                     break;
                 case Fork:
-                    param.fanout = ((Forker) node.getOutput()).taskPerLink;
+                    param.fanOut = ((Forker) node.getOutput()).taskPerLink;
                     break;
                 case Join:
                     Joiner joiner = (Joiner)node.getInput();
@@ -2887,113 +2881,12 @@ public class Network extends Model implements Serializable {
         return attribute;
     }
 
-    /**
-     * Returns the language features used by the given network
-     * @return - the language features used by the given network
-     */
-    public FeatureSet getUsedLangFeatures(){
-        FeatureSet s = new FeatureSet();
-        HashMap<String, Boolean> f = new HashMap<>();
-        if(!this.getIndexClosedClasses().isEmpty()){
-            f.put("ClosedClass", true);
-        }
-        if(!this.getIndexOpenClasses().isEmpty()){
-            f.put("OpenClass", true);
-        }
-        for(int i = 0; i < getNumberOfNodes(); i++){
-            for(int r = 0; r < getNumberOfClasses(); r++){
-                Node n = this.nodes.get(i);
-                if(n instanceof Queue || n instanceof Delay){
-                    ServiceBinding serviceProcess = n.getServer().getServiceProcess(this.getClassByIndex(r));
-                    if(serviceProcess != null){
-                        if(!(serviceProcess.getDistribution() instanceof Disabled) && !(serviceProcess.getDistribution() instanceof Immediate)){
-                            f.put(serviceProcess.getDistribution().getName(), true);
-                        }
-                        String sched = "";
-                        if(n instanceof Delay) {
-                            f.put("Delay", true);
-                            sched = SchedStrategy.toFeature(((Delay) n).getSchedStrategy());
-                        } else {
-                            f.put("Queue", true);
-                            sched = SchedStrategy.toFeature(((Queue) n).getSchedStrategy());
-                        }
-                        if(sched.length() > 0){
-                            f.put(sched, true);
-                        }
-                        if(r < n.getOutput().getOutputStrategies().size()){
-                            String routing = RoutingStrategy.toFeature(n.getOutput().getOutputStrategies().get(r).getRoutingStrategy());
-                            if(routing.length() > 0){
-                                f.put(routing, true);
-                            }
-                        }
-                    }
-                } else if(n instanceof Router){
-                    if(r < n.getOutput().getOutputStrategies().size()){
-                        String routing = RoutingStrategy.toFeature(n.getOutput().getOutputStrategies().get(r).getRoutingStrategy());
-                        if(routing.length() > 0){
-                            f.put(routing, true);
-                        }
-                    }
-                } else if(n instanceof Source){
-                    f.put(((Source) n).getServiceProcess(this.getClassByIndex(r)).getName(), true);
-                    f.put("Source", true);
-                } else if(n instanceof ClassSwitch){
-                    f.put("StatelessClassSwitcher", true);
-                    f.put("ClassSwitch", true);
-                } else if(n instanceof Fork){
-                    f.put("Fork", true);
-                    f.put("Forker", true);
-                } else if(n instanceof Join){
-                    f.put("Join", true);
-                    f.put("Joiner", true);
-                } else if(n instanceof Sink){
-                    f.put("Sink", true);
-                } else if(n instanceof Cache){
-                    f.put("CacheClassSwitcher", true);
-                    f.put("Cache", true);
-                } /*else if(n instanceof Transition){
-                TODO: implement transition
-                } else if(n instanceof Place){
-                TODO: implement place
-                }*/
-            }
-        }
-        s.setTrue(f.keySet().toArray(new String[0]));
-        return s;
+    public String getLogPath() {
+        return logPath;
     }
 
-    /**
-     * Checks whether the current network supports a product-form solution
-     * @return - true if the current model has a product-form solution, false otherwise
-     */
-    public boolean hasProductFormSolution(){
-        FeatureSet featUsed = getUsedLangFeatures();
-        return !featUsed.inspectFeature("Fork") &&
-                !featUsed.inspectFeature("Join") &&
-                !featUsed.inspectFeature("MMPP2") &&
-                !featUsed.inspectFeature("Normal") &&
-                !featUsed.inspectFeature("Pareto") &&
-                !featUsed.inspectFeature("Weibull") &&
-                !featUsed.inspectFeature("Lognormal") &&
-                !featUsed.inspectFeature("Replayer") &&
-                !featUsed.inspectFeature("Uniform") &&
-                !featUsed.inspectFeature("SchedStrategy_LCFS") &&
-                !featUsed.inspectFeature("SchedStrategy_SJF") &&
-                !featUsed.inspectFeature("SchedStrategy_LJF") &&
-                !featUsed.inspectFeature("SchedStrategy_DPS") &&
-                !featUsed.inspectFeature("SchedStrategy_GPS") &&
-                !featUsed.inspectFeature("SchedStrategy_SEPT") &&
-                !featUsed.inspectFeature("SchedStrategy_LEPT") &&
-                !featUsed.inspectFeature("SchedStrategy_HOL") &&
-                !this.hasMultiClassHeterFCFS();
-    }
-
-    /**
-     * Checks whether the current model has multi-class heterogeneous FCFS stations
-     * @return - true if the model has multi-class heterogeneous FCFS stations, false otherwise.
-     */
-    public boolean hasMultiClassHeterFCFS(){
-        return snHasMultiClassHeterFCFS(sn);
+    public List<FiniteCapacityRegion> getRegions() {
+        return regions;
     }
 
 
@@ -3096,6 +2989,106 @@ public class Network extends Model implements Serializable {
         }
         return -1;
     }
+
+    public static class routingMatrixReturn {
+
+        public Matrix rt;
+        public Matrix rtnodes;
+        public Matrix linksmat;
+        public Matrix chains;
+        public Map<JobClass, Map<JobClass, Matrix>> rtNodesByClass;
+        public Map<Node, Map<Node, Matrix>> rtNodesByStation;
+
+        public routingMatrixReturn(Matrix rt, Matrix rtnodes, Matrix linksmat,
+                                   Matrix chains, Map<JobClass, Map<JobClass, Matrix>> rtNodesByClass, Map<Node, Map<Node, Matrix>> rtNodesByStation) {
+            this.rt = rt;
+            this.rtnodes = rtnodes;
+            this.linksmat = linksmat;
+            this.chains = chains;
+            this.rtNodesByClass = rtNodesByClass;
+            this.rtNodesByStation = rtNodesByStation;
+        }
+    }
+
+/**
+     * Returns the language features used by the given network
+     * @return - the language features used by the given network
+     */
+    public FeatureSet getUsedLangFeatures(){
+        FeatureSet s = new FeatureSet();
+        HashMap<String, Boolean> f = new HashMap<>();
+        if(!this.getIndexClosedClasses().isEmpty()){
+            f.put("ClosedClass", true);
+        }
+        if(!this.getIndexOpenClasses().isEmpty()){
+            f.put("OpenClass", true);
+        }
+        for(int i = 0; i < getNumberOfNodes(); i++){
+            for(int r = 0; r < getNumberOfClasses(); r++){
+                Node n = this.nodes.get(i);
+                if(n instanceof Queue || n instanceof Delay){
+                    ServiceBinding serviceProcess = n.getServer().getServiceProcess(this.getClassByIndex(r));
+                    if(serviceProcess != null){
+                        if(!(serviceProcess.getDistribution() instanceof Disabled) && !(serviceProcess.getDistribution() instanceof Immediate)){
+                            f.put(serviceProcess.getDistribution().getName(), true);
+                        }
+                        String sched = "";
+                        if(n instanceof Delay) {
+                            f.put("Delay", true);
+                            sched = SchedStrategy.toFeature(((Delay) n).getSchedStrategy());
+                        } else {
+                            f.put("Queue", true);
+                            sched = SchedStrategy.toFeature(((Queue) n).getSchedStrategy());
+                        }
+                        if(sched.length() > 0){
+                            f.put(sched, true);
+                        }
+                        if(r < n.getOutput().getOutputStrategies().size()){
+                            String routing = RoutingStrategy.toFeature(n.getOutput().getOutputStrategies().get(r).getRoutingStrategy());
+                            if(routing.length() > 0){
+                                f.put(routing, true);
+                            }
+                        }
+                    }
+                } else if(n instanceof Router){
+                    if(r < n.getOutput().getOutputStrategies().size()){
+                        String routing = RoutingStrategy.toFeature(n.getOutput().getOutputStrategies().get(r).getRoutingStrategy());
+                        if(routing.length() > 0){
+                            f.put(routing, true);
+                        }
+                    }
+                } else if(n instanceof Source){
+                    Distribution serviceProcess = ((Source) n).getServiceProcess(this.getClassByIndex(r));
+                    if(!(serviceProcess instanceof Disabled) && !(serviceProcess instanceof Immediate)){
+                        f.put(serviceProcess.getName(), true);
+                    }
+                    f.put("Source", true);
+                } else if(n instanceof ClassSwitch){
+                    f.put("StatelessClassSwitcher", true);
+                    f.put("ClassSwitch", true);
+                } else if(n instanceof Fork){
+                    f.put("Fork", true);
+                    f.put("Forker", true);
+                } else if(n instanceof Join){
+                    f.put("Join", true);
+                    f.put("Joiner", true);
+                } else if(n instanceof Sink){
+                    f.put("Sink", true);
+                } else if(n instanceof Cache){
+                    f.put("CacheClassSwitcher", true);
+                    f.put("Cache", true);
+                } /*else if(n instanceof Transition){
+                TODO: implement transition
+                } else if(n instaneof Place){
+                TODO: implement place
+                }*/
+            }
+        }
+        s.setTrue(f.keySet().toArray(new String[0]));
+        return s;
+    }
+
+
 }
 
 

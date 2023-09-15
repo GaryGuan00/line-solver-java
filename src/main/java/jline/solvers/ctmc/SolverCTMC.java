@@ -11,6 +11,8 @@ import jline.lang.nodes.StatefulNode;
 import jline.lang.state.State;
 import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
+import jline.solvers.mva.SolverMVA;
+import jline.solvers.ssa.EventStack;
 import jline.solvers.ssa.events.*;
 import jline.solvers.ssa.state.SSAStateMatrix;
 
@@ -34,7 +36,7 @@ public class  SolverCTMC extends NetworkSolver {
     }
 
     public SolverCTMC(Network model, SolverOptions options) {
-        super(model, "CTMC", options);
+        super(model, "SolverCTMC", options);
         this.ctmcResult = new SolverCTMCResult();
         computeInitialStateMatrix();
 
@@ -229,15 +231,12 @@ public class  SolverCTMC extends NetworkSolver {
                 SSAStateMatrix depState = eventData.getValue2();
                 double rate = eventData.getValue1().getRight();
                 double prob = ctmcResult.piVector.get(indexMap.get(depState));
-                if(!(eventData.getValue0() instanceof ErlangPhaseEvent) && !(eventData.getValue0() instanceof APHPhaseEvent)) {
+                if(!(eventData.getValue0() instanceof ErlangPhaseEvent)) {
                     rate *= eventData.getValue0().getRate(eventData.getValue2());
                 }
                 else if(!eventData.getValue1().getLeft().isDummy()) {
                     if(eventData.getValue0() instanceof ErlangPhaseEvent) {
                         rate *= ((ErlangPhaseEvent) eventData.getValue0()).getDepartureRate(eventData.getValue2());
-                    }
-                    else if(eventData.getValue0() instanceof APHPhaseEvent) {
-                        rate *= ((APHPhaseEvent) eventData.getValue0()).getDepartureRate(eventData.getValue2());
                     }
                 }
                 if(eventData.getValue1().getLeft().getNode().isStateful()) {
@@ -383,17 +382,13 @@ public class  SolverCTMC extends NetworkSolver {
         }
         for(EventData eventData : eventSpace){
             double rate = eventData.getValue1().getRight();
-            if(!(eventData.getValue0() instanceof ErlangPhaseEvent) && !(eventData.getValue0() instanceof APHPhaseEvent)) {
+            if(!(eventData.getValue0() instanceof ErlangPhaseEvent)) {
                 rate *= eventData.getValue0().getRate(eventData.getValue2());
             }
             else{
                 if(!eventData.getValue1().getLeft().isDummy()) {
                     if(eventData.getValue0() instanceof ErlangPhaseEvent) {
                         rate *= ((ErlangPhaseEvent) eventData.getValue0()).getDepartureRate(eventData.getValue2());
-                    }
-                    else if(eventData.getValue0() instanceof APHPhaseEvent) {
-                        rate *= ((APHPhaseEvent) eventData.getValue0()).getDepartureRate(eventData.getValue2());
-
                     }
                 }
             }
@@ -411,4 +406,8 @@ public class  SolverCTMC extends NetworkSolver {
         }
         ctmcResult.infGen = infGen;
     }
+    public static SolverOptions defaultOptions() {
+        return new SolverOptions(SolverType.CTMC);
+    }
+
 }

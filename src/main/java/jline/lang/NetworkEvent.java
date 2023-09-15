@@ -2,11 +2,10 @@ package jline.lang;
 
 import java.io.Serializable;
 import java.util.Map;
-import java.util.function.Function;
 
 import jline.lang.constant.EventType;
 import jline.lang.nodes.Node;
-import jline.util.JFunction;
+import jline.util.SerializableFunction;
 import jline.util.Matrix;
 import jline.util.Pair;
 
@@ -16,7 +15,7 @@ public class NetworkEvent implements Serializable {
 	protected EventType event;
 	protected int jobclassIdx;
 	protected double prob;
-	protected JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> probFun;
+	protected SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> probFun;
 	protected Matrix state;
 	protected double t;
 	protected double job;
@@ -41,7 +40,7 @@ public class NetworkEvent implements Serializable {
 	/*
 	 * The input probability might be a function
 	 */
-	public NetworkEvent(EventType event, int nodeIdx, int jobclassIdx, JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> probFun, Matrix state, double t, double job) {
+	public NetworkEvent(EventType event, int nodeIdx, int jobclassIdx, SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> probFun, Matrix state, double t, double job) {
 		this.event = event;
 		this.nodeIdx = nodeIdx;
 		this.jobclassIdx = jobclassIdx;
@@ -88,11 +87,11 @@ public class NetworkEvent implements Serializable {
 		this.prob = prob;
 	}
 
-	public JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> getProbFun() {
+	public SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> getProbFun() {
 		return probFun;
 	}
 
-	public void setProbFun(JFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> probFun) {
+	public void setProbFun(SerializableFunction<Pair<Map<Node, Matrix>, Map<Node, Matrix>>, Double> probFun) {
 		this.probFun = probFun;
 	}
 

@@ -10,13 +10,14 @@ import jline.util.Matrix;
 public class SolverResult {
 
   public String method;
-  public Matrix QN;
-  public Matrix UN;
-  public Matrix RN;
-  public Matrix TN;
-  public Matrix CN;
-  public Matrix XN;
-  public Matrix AN;
+  public Matrix QN; // mean queue-lengths (nstations x nclasses)
+  public Matrix UN; // mean utilizations (nstations x nclasses)
+  public Matrix RN; // mean response times (nstations x nclasses)
+  public Matrix TN; // mean throughputs (nstations x nclasses)
+  public Matrix AN; // mean arrival rates (nstations x nclasses)
+  public Matrix WN; // mean residence times (nstations x nclasses)
+  public Matrix CN; // mean system response time (1 x nclasses)
+  public Matrix XN; // mean throughput (1 x nclasses)
 
   // Note: for transient metrics, the time steps are stored separately in 't' - this differs from
   // LINE where they are stored in adjacent columns to the performance metrics QNt, UNt and TNt.
@@ -41,7 +42,9 @@ public class SolverResult {
     clone.QN = this.QN.clone();
     clone.UN = this.UN.clone();
     clone.RN = this.RN.clone();
+    clone.WN = this.WN.clone();
     clone.TN = this.TN.clone();
+    clone.AN = this.AN.clone();
     clone.CN = this.CN.clone();
     clone.XN = this.XN.clone();
 

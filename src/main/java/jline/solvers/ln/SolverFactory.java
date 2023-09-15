@@ -1,8 +1,8 @@
 package jline.solvers.ln;
 
-public enum SolverFactory {
+import jline.lang.Network;
+import jline.solvers.NetworkSolver;
 
-    SolverMVA,
-
-    SolverFluid
+public interface SolverFactory {
+    NetworkSolver at(Network model);     // return solver associated to model
 }

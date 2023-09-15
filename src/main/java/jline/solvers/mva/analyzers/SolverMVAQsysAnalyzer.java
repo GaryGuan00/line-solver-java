@@ -19,6 +19,8 @@ public class SolverMVAQsysAnalyzer implements MVAAnalyzer{
         Matrix RN = new Matrix(3,1);
         Matrix TN = new Matrix(3,1);
         Matrix CN = new Matrix(3,1);
+        Matrix AN = new Matrix(3,1);
+        Matrix WN = new Matrix(3,1);
         Matrix XN = new Matrix(3,1);
         double lG = Double.NaN;
         int it = 1;
@@ -117,6 +119,8 @@ public class SolverMVAQsysAnalyzer implements MVAAnalyzer{
         res.TN = TN;
         res.CN = CN;
         res.XN = XN;
+        res.AN = AN;
+        res.WN = WN;
         res.logNormConstAggr = lG;
         res.runtime = (endTime - startTime) / 1000.0;
         res.iter = it;

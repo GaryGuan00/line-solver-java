@@ -3,6 +3,8 @@
 
 package jline.solvers;
 
+import jline.lang.constant.VerboseLevel;
+import jline.solvers.ssa.strategies.TauLeapingConfig;
 import jline.util.Matrix;
 import jline.lang.constant.SolverType;
 import org.apache.commons.math3.ode.FirstOrderIntegrator;
@@ -17,12 +19,6 @@ import odesolver.LSODA;
 
 public class SolverOptions {
 
-  public enum VerboseLevel {
-    SILENT,
-    STD,
-    DEBUG
-  }
-
   public static class Config {
 
     public String highvar; // TODO: enum?
@@ -30,9 +26,11 @@ public class SolverOptions {
     public String np_priority; // TODO: enum?
     public List<Double> pstar; // For p-norm smoothing in SolverFluid
     public String fork_join;
+    public TauLeapingConfig tau_leaping;
     public String merge;
     public String compress;
     public int space_max;
+    public boolean interlocking;
   }
 
   public static class ODESolvers {
@@ -72,6 +70,7 @@ public class SolverOptions {
     this.cache = true;
     this.cutoff = POSITIVE_INFINITY;
     this.config = new Config();
+    this.config.tau_leaping = null;
     this.config.pstar = new ArrayList<>();
     this.config.fork_join = "default";
     this.force = false;
@@ -108,21 +107,25 @@ public class SolverOptions {
   }
 
   public SolverOptions(SolverType solverType) {
-
     this();
+    if (solverType==null) {
+      return;
+    }
 
     // Solver-specific Defaults
     switch (solverType) {
-      case ENV:
+      case Env:
         this.iter_max = 100;
         this.verbose = VerboseLevel.SILENT;
         break;
-      case FLUID:
+      case Fluid:
         this.config.highvar = "none";
         this.iter_max = 5;
         this.timespan[0] = 0;
         break;
       case LN:
+        this.config.interlocking = true;
+        this.config.multiserver = "default";
         this.iter_tol = 0.05;
         this.iter_max = 100;
         break;
@@ -145,6 +148,8 @@ public class SolverOptions {
         break;
       case SSA:
         this.timespan[0] = 0;
+        this.timespan[1] = POSITIVE_INFINITY;
+        this.config.tau_leaping = null; // null stands for disabled
         break;
       case JMT:
         //TODO add configs

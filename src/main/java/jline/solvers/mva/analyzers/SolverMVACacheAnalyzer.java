@@ -21,6 +21,8 @@ public class SolverMVACacheAnalyzer implements MVAAnalyzer{
         Matrix RN = new Matrix(0,0);
         Matrix TN = new Matrix(0,0);
         Matrix CN = new Matrix(0,0);
+        Matrix AN = new Matrix(0,0);
+        Matrix WN = new Matrix(0,0);
         Matrix XN = new Matrix(1, sn.nclasses);
         double lG = Double.NaN;
         int iter = 1;
@@ -132,6 +134,8 @@ public class SolverMVACacheAnalyzer implements MVAAnalyzer{
         res.TN = TN;
         res.CN = CN;
         res.XN = XN;
+        res.AN = AN;
+        res.WN = WN;
         res.logNormConstAggr = lG;
         res.runtime = (endTime - startTime) / 1000.0;
         res.iter = iter;

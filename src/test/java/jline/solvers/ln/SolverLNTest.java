@@ -126,7 +126,7 @@ class SolverLNTest {
     @org.junit.jupiter.api.Test
     public void testSingleLayerResult() throws Exception {
         SolverLN solverLN = new SolverLN(buildModel1());
-        Network network = solverLN.getEnsemble()[0];
+        Network network = solverLN.getEnsemble().get(0);
         SolverMVA layersolver = new SolverMVA(network);
         layersolver.runAnalyzer();
 
@@ -161,17 +161,17 @@ class SolverLNTest {
         SolverLN solverLN = new SolverLN(buildModel2());
 
         //Layer 1
-        Network network1 = solverLN.getEnsemble()[0];
+        Network network1 = solverLN.getEnsemble().get(0);
         SolverMVA layersolver1 = new SolverMVA(network1);
         layersolver1.runAnalyzer();
 
         //Layer 2
-        Network network2 = solverLN.getEnsemble()[1];
+        Network network2 = solverLN.getEnsemble().get(1);
         SolverMVA layersolver2 = new SolverMVA(network2);
         layersolver2.runAnalyzer();
 
         //Layer 3
-        Network network3 = solverLN.getEnsemble()[2];
+        Network network3 = solverLN.getEnsemble().get(2);
         SolverMVA layersolver3 = new SolverMVA(network3);
         layersolver3.runAnalyzer();
 
@@ -500,8 +500,8 @@ class SolverLNTest {
         // this test is to test the network's job classes, stations and connections
 
         SolverLN solverLN = new SolverLN(buildModel3());
-        Network network1 = solverLN.getEnsemble()[0];
-        Network network2 = solverLN.getEnsemble()[1];
+        Network network1 = solverLN.getEnsemble().get(0);
+        Network network2 = solverLN.getEnsemble().get(1);
 
         // test layer 1
         // test numbers of nodes, classes, stations

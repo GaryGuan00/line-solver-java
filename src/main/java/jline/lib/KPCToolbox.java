@@ -57,8 +57,7 @@ public class KPCToolbox {
      * @return CTMC infinitesimal generator Q
      */
     public static Matrix map_infgen(Matrix D0, Matrix D1) {
-        Matrix Q = D0.add(1.0, D1);
-        return Q;
+        return D0.add(1.0, D1);
     }
 
     /**

@@ -10,6 +10,6 @@ public class StatefulClassSwitcher extends ClassSwitcher implements Serializable
         super(jobClasses, name);
     }
 	public StatefulClassSwitcher(List<JobClass> jobClasses) {
-        this(jobClasses, "jline.StatelessClassSwitcher");
+        this(jobClasses, "StatelessClassSwitcher");
     }
 }

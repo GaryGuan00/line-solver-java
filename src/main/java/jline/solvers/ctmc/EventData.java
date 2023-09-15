@@ -1,7 +1,7 @@
 package jline.solvers.ctmc;
 
 import jline.solvers.ssa.events.Event;
-import jline.solvers.ssa.events.OutputEvent;
+import jline.solvers.ssa.events.SynchedEvent;
 import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.util.Pair;
 
@@ -9,11 +9,11 @@ import java.util.Arrays;
 
 public class EventData {
     private final Event event;
-    private final Pair<OutputEvent, Double> outputEventData;
+    private final Pair<SynchedEvent, Double> outputEventData;
     private final SSAStateMatrix initialNetworkState;
     private final SSAStateMatrix afterEventNetworkState;
 
-    public EventData(Event event, Pair<OutputEvent, Double> outputEventData, SSAStateMatrix initialNetworkState, SSAStateMatrix afterEventNetworkState) {
+    public EventData(Event event, Pair<SynchedEvent, Double> outputEventData, SSAStateMatrix initialNetworkState, SSAStateMatrix afterEventNetworkState) {
         this.event = event;
         this.outputEventData = outputEventData;
         this.initialNetworkState = initialNetworkState;
@@ -24,7 +24,7 @@ public class EventData {
         return this.event;
     }
 
-    public Pair<OutputEvent, Double> getValue1() {
+    public Pair<SynchedEvent, Double> getValue1() {
         return this.outputEventData;
     }
 

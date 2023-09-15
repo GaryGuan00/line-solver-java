@@ -9,8 +9,8 @@ import jline.lang.nodes.Station;
 import jline.util.Matrix;
 import jline.lang.Network;
 import jline.lang.NetworkStruct;
-import jline.util.NetworkAvgTable;
 
+import javax.xml.parsers.ParserConfigurationException;
 import java.text.NumberFormat;
 import java.util.*;
 
@@ -25,7 +25,6 @@ public abstract class NetworkSolver extends Solver {
   // Construct a NetworkSolver with given model, name and options data structure
   protected NetworkSolver(Network model, String name, SolverOptions options) {
     super(name, options);
-    // TODO: self.setOptions(options); Instead of passing as constructor parameter?
     this.model = model;
     if (model.getNumberOfNodes() == 0) {
       throw new RuntimeException("The model supplied in input is empty.");
@@ -34,6 +33,7 @@ public abstract class NetworkSolver extends Solver {
     // TODO: get and set transient handles
     // [Qt,Ut,Tt] = model.getTranHandles;
     // self.setTranHandles(Qt,Ut,Tt);
+    // this.setTranHandles();
     this.sn = model.getStruct(true); // Force model to refresh
   }
 
@@ -59,24 +59,23 @@ public abstract class NetworkSolver extends Solver {
     return this.handles;
   }
 
-  protected void getAvgQLenHandles() {
-    // TODO: implementation - note return type should likely not be void
-    throw new RuntimeException("getAvgQLenHandles() has not yet been implemented in JLINE.");
+  protected Map<Station, Map<JobClass, SolverHandles.Metric>> getAvgQLenHandles() {
+    return this.handles.Q;
   }
 
-  protected void getAvgRespTHandles() {
+  protected Map<Station, Map<JobClass, SolverHandles.Metric>>  getAvgRespTHandles() {
     // TODO: implementation - note return type should likely not be void
-    throw new RuntimeException("getAvgRespTHandles() has not yet been implemented in JLINE.");
+    return this.handles.R;
   }
 
-  protected void getAvgUtilHandles() {
+  protected Map<Station, Map<JobClass, SolverHandles.Metric>>  getAvgUtilHandles() {
     // TODO: implementation - note return type should likely not be void
-    throw new RuntimeException("getAvgUtilHandles() has not yet been implemented in JLINE.");
+    return this.handles.U;
   }
 
-  protected void getAvgTputHandles() {
+  protected Map<Station, Map<JobClass, SolverHandles.Metric>>  getAvgTputHandles() {
     // TODO: implementation - note return type should likely not be void
-    throw new RuntimeException("getAvgTputHandles() has not yet been implemented in JLINE.");
+    return this.handles.T;
   }
 
   // Returns true if the solver has computed steady-state average metrics.
@@ -101,12 +100,6 @@ public abstract class NetworkSolver extends Solver {
   protected boolean hasDistribResults() {
     // TODO: implementation
     throw new RuntimeException("hasDistribResults() has not yet been implemented in JLINE.");
-  }
-
-  // Assign the solver options
-  protected final void setOptions(SolverOptions options) {
-    // TODO: implementation
-    throw new RuntimeException("setOptions() has not yet been implemented in JLINE.");
   }
 
   // Get agent representation
@@ -176,7 +169,9 @@ public abstract class NetworkSolver extends Solver {
 		runAnalyzer();
 	  } catch (IllegalAccessException e) {
 		System.out.println("IllegalAccessException upon running runAnalyzer()");
-	  }
+	  } catch (ParserConfigurationException e) {
+        System.err.println("ParserConfigurationException upon running runAnalyzer()");
+      }
       // TODO: provide more granular error messaging (if useful) (Lines 33-49)
       if (!this.hasAvgResults()) {
         throw new RuntimeException("Line is unable to return results for this model.");
@@ -465,6 +460,7 @@ public abstract class NetworkSolver extends Solver {
         }
       }
       NetworkAvgTable avgTable = new NetworkAvgTable(Qval, Uval, Rval, Residval, Tval);
+      avgTable.setOptions(this.options);
       avgTable.setClassNames(className);
       avgTable.setStationNames(stationName);
       return avgTable;
@@ -591,7 +587,7 @@ public abstract class NetworkSolver extends Solver {
           int r = (int) inchain.get(i);
           for (int j = 0; j < sn.nstations; j++) {
             // Not empty and not a source
-            if (!this.result.RN.isEmpty() && 
+            if (!this.result.RN.isEmpty() &&
             		(!(Double.isInfinite(this.sn.njobs.get(r)) && j == sn.refstat.get(r)))) {
               CNclass.set(
                   0,
@@ -823,7 +819,9 @@ public abstract class NetworkSolver extends Solver {
 		runAnalyzer();
 	  } catch (IllegalAccessException e) {
 		System.err.println("IllegalAccessException upon running runAnalyzer()");
-	  }
+	  } catch (ParserConfigurationException e) {
+        System.err.println("ParserConfigurationException upon running runAnalyzer()");
+      }
     }
 
     // TODO: store in Metrics (Lines 52-102)
@@ -869,4 +867,6 @@ public abstract class NetworkSolver extends Solver {
   // a) updateModel() - model is public and therefore no need for setter
   // b) all methods that are "not supported by this solver" - lack of existing method will suffice
   // rather than dedicated warning that method is not applicable
+
+
 }

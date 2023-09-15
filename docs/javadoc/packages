@@ -19,9 +19,9 @@ jline.solvers.fluid
 jline.solvers.fluid.smoothing
 jline.solvers.ln
 jline.solvers.ssa.state
+jline.solvers.ssa
 jline.solvers.ssa.metrics
 jline.solvers.ssa.strategies
-jline.solvers.ssa
 jline.solvers.ssa.events
 jline.solvers.jmt
 jline.lang

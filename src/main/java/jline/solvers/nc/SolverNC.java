@@ -2,6 +2,7 @@ package jline.solvers.nc;
 
 import jline.api.PFQN;
 import jline.api.SN;
+import jline.api.UTIL;
 import jline.lang.Network;
 import jline.lang.NetworkStruct;
 import jline.lang.constant.GlobalConstants;
@@ -14,7 +15,6 @@ import jline.lang.state.State;
 import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
 import jline.util.Matrix;
-import jline.util.Numerics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,13 +31,13 @@ import static jline.lang.state.State.toMarginal;
 public class SolverNC extends NetworkSolver {
 
   public SolverNC(Network model, SolverOptions options) {
-    super(model, "NC", options);
+    super(model, "SolverNC", options);
     this.sn = model.getStruct(false);
     this.result = new SolverNCResult();
   }
 
   public SolverNC(Network model) {
-    super(model, "NC");
+    super(model, "SolverNC");
     this.sn = model.getStruct(false);
     this.result = new SolverNCResult();
   }
@@ -85,6 +85,7 @@ public class SolverNC extends NetworkSolver {
     NetworkStruct sn = getStruct();
     int ist = (int) sn.nodeToStation.get(node.getNodeIdx());
     sn.state.put((StatefulNode) sn.nodes.get(ist), state_new);
+    resetRandomGeneratorSeed(options.seed);
 
     Matrix Pnir;
 
@@ -100,7 +101,7 @@ public class SolverNC extends NetworkSolver {
     ((SolverNCResult) this.result).solver = this.name;
     ((SolverNCResult) this.result).prob.marginal = Pnir;
     long endTimeMillis = System.currentTimeMillis();
-    double runtime = (endTimeMillis-startTimeMillis) / 1000;
+    double runtime = (endTimeMillis-startTimeMillis) / 1000.0;
     this.result.runtime = runtime;
 
     return Pnir.get(ist);
@@ -124,10 +125,12 @@ public class SolverNC extends NetworkSolver {
       }
     }
     ST.removeNaN();
+
     SN.snGetDemandsChainReturn ret = snGetDemandsChain(sn);
     Matrix Lchain = ret.Lchain;
     Matrix STchain = ret.STchain;
     Matrix Nchain = ret.Nchain;
+
     long startTimeMillis = System.currentTimeMillis();
     M = STchain.numRows;
     K = STchain.numCols;
@@ -166,6 +169,7 @@ public class SolverNC extends NetworkSolver {
       Matrix nirvec = ret1.nir;
       Matrix sivec = ret1.sir;
       List<Matrix> kirvec = ret1.kir;
+
       if (nirvec.elementMin() < -1e-6) {
         lPr.set(M-1, Double.NaN);
       } else {
@@ -188,6 +192,7 @@ public class SolverNC extends NetworkSolver {
         }
         Matrix Zchain_tmp = Nchain.clone();
         Zchain_tmp.fill(0.0);
+
         double lG_minus_i = PFQN.pfqn_ncld(Lchain_tmp, Nchain_tmp, Zchain_tmp, mu_tmp, options).lG;
         double lF_i = 0.0;
 
@@ -204,7 +209,8 @@ public class SolverNC extends NetworkSolver {
                   throw new RuntimeException("solver_nc_marg: Cannot return state probability " +
                           "because the product-form solution requires exponential service times at FCFS nodes.");
                 }
-                if (Math.abs(ST.get(ist, r)-Matrix.extractRows(ST,ist,ist+1,null).elementMax())<1e-6) {
+
+                if (Math.abs(ST.get(ist, r)-Matrix.extractRows(ST,ist,ist+1,null).elementMax())>1e-6) {
                   throw new RuntimeException("solver_nc_marg: Cannot return state probability " +
                           "because the product-form solution requires identical service times at FCFS nodes.");
                 }
@@ -250,6 +256,7 @@ public class SolverNC extends NetworkSolver {
                 for (int i = 0; i < kir.length(); i++) {
                   kir.set(i, kirvec.get(i).get(0, r));
                 }
+
                 Matrix PHr_tmp = PHr.get(0);
                 for (int i = 0; i < PHr_tmp.numRows; i++) {
                   for (int j = 0; j < PHr_tmp.numCols; j++) {
@@ -258,8 +265,15 @@ public class SolverNC extends NetworkSolver {
                 }
                 PHr_tmp = PHr_tmp.inv();
                 Matrix Ar = map_pie(PHr.get(0), PHr.get(1)).mult(PHr_tmp);
-                lF_i += (Math.log(V.get(ist, r))*kir.mult(Ar).elementSum()
-                        - Numerics.factln(kir).elementSum());
+
+                Matrix kir_tmp = Ar.clone();
+                for (int i = 0; i < kir_tmp.numRows; i++) {
+                  for (int j = 0; j < kir_tmp.numCols; j++) {
+                    kir_tmp.set(i, j, kir.get(i, j) * Math.log(V.get(ist, r)*kir_tmp.get(i, j)));
+                  }
+                }
+
+                lF_i += (kir_tmp.elementSum() - UTIL.factln(kir).elementSum());
               }
             }
 
@@ -269,10 +283,10 @@ public class SolverNC extends NetworkSolver {
             }
             Matrix mu_row_ist = new Matrix(1, (int) sum_kirvec);
             Matrix.extract(mu, ist, ist+1, 0, (int) sum_kirvec, mu_row_ist, 0, 0);
-            for (int i = 0; i < mu_row_ist.length(); i++) {
+            for (int i = 0; i < mu_row_ist.numCols; i++) {
               mu_row_ist.set(i, Math.log(mu_row_ist.get(i)));
             }
-            lF_i += (Numerics.factln(sum_kirvec) - mu_row_ist.elementSum());
+            lF_i += (UTIL.factln(sum_kirvec) - mu_row_ist.elementSum());
             break;
           case INF:
             for (int r = 0; r < K; r++) {
@@ -290,8 +304,15 @@ public class SolverNC extends NetworkSolver {
                 }
                 PHr_tmp = PHr_tmp.inv();
                 Matrix Ar = map_pie(PHr.get(0), PHr.get(1)).mult(PHr_tmp);
-                lF_i += (Math.log(V.get(ist, r))*kir.mult(Ar).elementSum()
-                        - Numerics.factln(kir).elementSum());
+
+                Matrix kir_tmp = Ar.clone();
+                for (int i = 0; i < kir_tmp.numRows; i++) {
+                  for (int j = 0; j < kir_tmp.numCols; j++) {
+                    kir_tmp.set(i, j, kir.get(i, j) * Math.log(V.get(ist, r)*kir_tmp.get(i, j)));
+                  }
+                }
+
+                lF_i += (kir_tmp.elementSum() - UTIL.factln(kir).elementSum());
               }
             }
             break;
@@ -300,7 +321,7 @@ public class SolverNC extends NetworkSolver {
       }
     }
     long endTimeMillis = System.currentTimeMillis();
-    double runtime = (endTimeMillis-startTimeMillis) / 1000;
+    double runtime = (endTimeMillis-startTimeMillis) / 1000.0;
     lPr.removeNaN();
     return new SolverNCMargReturn(lPr, G, runtime);
   }
@@ -373,7 +394,7 @@ public class SolverNC extends NetworkSolver {
     }
     double Pr = Math.exp(lPr - lG);
     long endTimeMillis = System.currentTimeMillis();
-    double runtime = (endTimeMillis-startTimeMillis) / 1000;
+    double runtime = (endTimeMillis-startTimeMillis) / 1000.0;
     double G = Math.exp(lG);
     return new SolverNCJointReturn(Pr, G, lG, runtime);
   }

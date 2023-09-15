@@ -262,7 +262,7 @@ public class Cache extends StatefulNode implements Serializable {
         return (int) UTIL.max(this.popularityRows, this.popularityColumns);
     }
 
-    public static class PopularityKey {
+    public static class PopularityKey implements Serializable{
 
         private final int x;
         private final int y;

@@ -19,8 +19,8 @@ public class Joiner extends InputSection implements Serializable {
         super("Joiner");
         this.joinJobClasses = new HashMap<>();
         this.jobClasses = customerClasses;
-        this.joinStrategy = new HashMap<JobClass, JoinStrategy>();
-        this.joinRequired = new HashMap<JobClass, Double>();
+        this.joinStrategy = new HashMap<>();
+        this.joinRequired = new HashMap<>();
         
         for(JobClass jobclass : this.jobClasses) {
         	this.joinStrategy.put(jobclass, JoinStrategy.STD);

@@ -4,7 +4,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.function.Function;
 
 import jline.lang.*;
 import jline.lang.constant.DropStrategy;
@@ -13,7 +12,7 @@ import jline.lang.constant.SchedStrategyType;
 import jline.lang.constant.ServiceStrategy;
 import jline.lang.distributions.*;
 import jline.lang.sections.*;
-import jline.util.JFunction;
+import jline.util.SerializableFunction;
 import jline.util.Matrix;
 
 public class Queue extends Station implements HasSchedStrategy, Serializable {
@@ -60,13 +59,11 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
             case DPS:
             case GPS:
                 this.schedPolicy = SchedStrategyType.PR;
-                this.server = new Server(model.getClasses());
-                //this.server = new SharedServer(model.getClasses);
+                this.server = new SharedServer(model.getClasses());
                 break;
             case LCFSPR:
                 this.schedPolicy = SchedStrategyType.PR;
-                this.server = new Server(model.getClasses());
-                //this.server = new PreemptiveServer(model.getClasses);
+                this.server = new PreemptiveServer(model.getClasses());
                 break;
             default:
             	throw new RuntimeException("Routing Strategy is not supported in JLINE");
@@ -189,7 +186,7 @@ public class Queue extends Station implements HasSchedStrategy, Serializable {
     	}			
     }
     
-    public void setClassDependence(JFunction<Matrix, Double> beta) {
+    public void setClassDependence(SerializableFunction<Matrix, Double> beta) {
     	switch (this.schedStrategy) {
 	    	case PS:
 	    	case FCFS:

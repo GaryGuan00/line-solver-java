@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import jline.api.UTIL;
 import jline.lang.Network;
 import jline.lang.nodes.StatefulNode;
 import jline.util.Matrix;
@@ -302,9 +303,9 @@ public class State implements Serializable {
                 init.set(0, 0, 1);
               }
             }
-            state = State.decorate(state, init);
+            state = UTIL.decorate(state, init);
           }
-          space = State.decorate(space, state);
+          space = UTIL.decorate(space, state);
           // TODO: check here, line 65
           Matrix infinities = new Matrix(space.getNumRows(), 1);
           for (int i = 0; i < infinities.getNumRows(); i++) {
@@ -333,9 +334,9 @@ public class State implements Serializable {
           for (int r = 0; r < R; r++) {
             Matrix init = State.spaceClosedSingle(K.get(0, r), 0);
             init.set(0, 0, n.get(0, r));
-            state = State.decorate(state, init);
+            state = UTIL.decorate(state, init);
           }
-          space = State.decorate(space, state);
+          space = UTIL.decorate(space, state);
           break;
 
         case SIRO:
@@ -442,7 +443,7 @@ public class State implements Serializable {
               for (int r = 0; r < R; r++) {
                 Matrix init = State.spaceClosedSingle(K.get(0, r), 0);
                 init.set(0, 0, si.get(k, r));
-                kState = State.decorate(kState, init);
+                kState = UTIL.decorate(kState, init);
               }
               Matrix newState =
                   new Matrix(
@@ -528,92 +529,12 @@ public class State implements Serializable {
     return newSpace;
   }
 
-  public static Matrix decorate(Matrix inSpace1, Matrix inSpace2) {
-
-    // TODO: upfront if clause for 1 parameter, lines 7 to 14
-
-    if (inSpace1.isEmpty()) {
-      inSpace1 = inSpace2.clone();
-      return inSpace1;
-    }
-
-    if (inSpace2.isEmpty()) {
-      return inSpace1;
-    }
-
-    int n1 = inSpace1.getNumRows();
-    int m1 = inSpace1.getNumCols();
-    int n2 = inSpace2.getNumRows();
-    int m2 = inSpace2.getNumCols();
-
-    inSpace1.repmat(n2, 1);
-    int curStatesStart = 0;
-    int curStatesEnd = n1;
-
-    for (int s = 0; s < n2; s++) {
-      Matrix tmp = new Matrix(1, inSpace2.getNumCols());
-      Matrix.extractRows(inSpace2, s, s + 1, tmp);
-      tmp.repmat(curStatesEnd - 1, 1);
-
-      inSpace1.expandMatrix(
-          inSpace1.getNumRows() + curStatesEnd - 1,
-          inSpace1.getNumCols() + m2,
-          (inSpace1.getNumRows() + curStatesEnd - 1) * (inSpace1.getNumCols() + m2));
-      for (int i = curStatesStart; i < curStatesEnd; i++) {
-        for (int j = m1; j < m1 + m2; j++) {
-          inSpace1.set(i, j, tmp.get(i - curStatesStart, j - m1));
-        }
-      }
-      curStatesStart += n1;
-      curStatesEnd += n1;
-    }
-
-    return inSpace1;
-  }
-
   private static Matrix spaceClosedSingle(double M, double N) {
 
     if (M != 0) {
-      return multiChoose(M, N);
+      return UTIL.multiChoose(M, N);
     }
     return new Matrix(0, 0);
-  }
-
-  private static Matrix multiChoose(double n, double k) {
-
-    Matrix v = new Matrix(1, (int) n);
-    v.zero();
-
-    if (n == 1) {
-      v = new Matrix(1, 1);
-      v.set(0, 0, k);
-    } else if (k != 0) {
-      List<Matrix> tmpSSRows = new ArrayList<>();
-      for (int i = 0; i <= k; i++) {
-        Matrix w = multiChoose(n - 1, k - i);
-        Matrix tmpSSRow = new Matrix(w.getNumRows(), w.getNumCols() + 1);
-        for (int j = 0; j < w.getNumRows(); j++) {
-          tmpSSRow.set(j, 0, i);
-          for (int l = 1; l < w.getNumCols() + 1; l++) {
-            tmpSSRow.set(j, l, w.get(j, l - 1));
-          }
-        }
-        tmpSSRows.add(tmpSSRow);
-      }
-      int rowForV = 0;
-      for (int i = 0; i < tmpSSRows.size(); i++) {
-        int rowForTmpSSRows = 0;
-        for (int j = rowForV; j < tmpSSRows.get(i).getNumRows(); j++) {
-          for (int l = 0; l < tmpSSRows.get(i).getNumCols(); l++) {
-            v.set(j, l, tmpSSRows.get(i).get(rowForTmpSSRows, l));
-          }
-          rowForV++;
-          rowForTmpSSRows++;
-        }
-      }
-    }
-
-    return v;
   }
 
   public static boolean isValid(Network sn, Matrix n, Matrix s) {
@@ -751,9 +672,9 @@ public class State implements Serializable {
     if (sn.isstateful.get(ind, 0) == 1 && sn.isstation.get(ind, 0) == 0) {
       for (int r = 0; r < R; r++) {
         Matrix init_r = spaceClosedSingle(1, n.get(r));
-        state = decorate(state, init_r);
+        state = UTIL.decorate(state, init_r);
       }
-      return decorate(space, state);
+      return UTIL.decorate(space, state);
     }
 
     Matrix phases = new Matrix(1, R);
@@ -792,9 +713,9 @@ public class State implements Serializable {
             // In these policies we only track the jobs in the servers
             for (int r = 0; r < R; r++) {
               Matrix init_r = spaceClosedSingle(phases.get(r), n.get(r));
-              state = decorate(state, init_r);
+              state = UTIL.decorate(state, init_r);
             }
-            space = decorate(space, state);
+            space = UTIL.decorate(space, state);
             break;
           case SIRO:
           case LEPT:

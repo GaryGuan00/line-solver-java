@@ -12,7 +12,7 @@ import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
 import jline.solvers.mam.SolverMAM;
 import jline.solvers.mva.SolverMVA;
-import jline.util.NetworkAvgTable;
+import jline.solvers.NetworkAvgTable;
 
 import java.util.Arrays;
 

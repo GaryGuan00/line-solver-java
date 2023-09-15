@@ -23,13 +23,28 @@ public class GettingStarted {
          */
         Network model = new Network("MM1LowU");
         OpenClass openClass = new OpenClass(model, "Open Class");
-        Source source = new Source(model,"Source");
+        Source source = new Source(model, "Source");
         source.setArrival(openClass, new Exp(2));
         Queue queue = new Queue(model, "Queue", SchedStrategy.FCFS);
         queue.setService(openClass, new Exp(10));
         Sink sink = new Sink(model, "Sink");
 
-        model.link(model.serialRouting(source,queue,sink));
+        model.link(model.serialRouting(source, queue, sink));
+
+        return model;
+    }
+
+    public static Network ex1_line() {
+        Network model = new Network("M/M/1");
+        Source source = new Source(model, "Source");
+        Queue queue = new Queue(model, "Queue", SchedStrategy.FCFS);
+        Sink sink = new Sink(model, "Sink");
+
+        OpenClass openClass = new OpenClass(model, "myClass");
+        source.setArrival(openClass, new Exp(1));
+        queue.setService(openClass, new Exp(2));
+
+        model.link(model.serialRouting(source, queue, sink));
 
         return model;
     }
@@ -39,14 +54,14 @@ public class GettingStarted {
          */
         Network model = new Network("MM2HighU");
         OpenClass openClass = new OpenClass(model, "Open Class");
-        Source source = new Source(model,"Source");
+        Source source = new Source(model, "Source");
         source.setArrival(openClass, new Exp(8));
         Queue queue = new Queue(model, "Queue", SchedStrategy.FCFS);
         queue.setService(openClass, new Exp(10));
         queue.setNumberOfServers(1);
         Sink sink = new Sink(model, "Sink");
 
-        model.link(model.serialRouting(source,queue,sink));
+        model.link(model.serialRouting(source, queue, sink));
 
         return model;
     }
@@ -56,7 +71,7 @@ public class GettingStarted {
          */
         Network model = new Network("3 Series");
         OpenClass openClass = new OpenClass(model, "Open Class");
-        Source source = new Source(model,"Source");
+        Source source = new Source(model, "Source");
         source.setArrival(openClass, new Exp(8));
         Queue queue1 = new Queue(model, "Queue1", SchedStrategy.FCFS);
         queue1.setService(openClass, new Exp(12));
@@ -66,7 +81,7 @@ public class GettingStarted {
         queue3.setService(openClass, new Exp(10));
         Sink sink = new Sink(model, "Sink");
 
-        model.link(model.serialRouting(source,queue1,queue2,queue3,sink));
+        model.link(model.serialRouting(source, queue1, queue2, queue3, sink));
 
         return model;
     }
@@ -76,20 +91,20 @@ public class GettingStarted {
          */
         Network model = new Network("Parallel Erlang");
         OpenClass openClass = new OpenClass(model, "Open Class");
-        Source source = new Source(model,"Source");
+        Source source = new Source(model, "Source");
         source.setArrival(openClass, new Exp(30));
         Queue queue1 = new Queue(model, "Queue1", SchedStrategy.FCFS);
         queue1.setService(openClass, new Erlang(12, 3));
         queue1.setNumberOfServers(3);
         Queue queue2 = new Queue(model, "Queue2", SchedStrategy.LCFS);
-        queue2.setService(openClass, new Erlang(12,3));
+        queue2.setService(openClass, new Erlang(12, 3));
         queue2.setNumberOfServers(3);
         Queue queue3 = new Queue(model, "Queue3", SchedStrategy.SIRO);
-        queue3.setService(openClass, new Erlang(12,3));
+        queue3.setService(openClass, new Erlang(12, 3));
         queue3.setNumberOfServers(3);
         Sink sink = new Sink(model, "Sink");
-        
-        
+
+
         RoutingMatrix routingMatrix = new RoutingMatrix(model, Collections.singletonList(openClass),
                 Arrays.asList(source, queue1, queue2, queue3, sink));
         routingMatrix.set(source, queue1);
@@ -127,19 +142,19 @@ public class GettingStarted {
          */
         Network model = new Network("MM1 10");
         OpenClass openClass = new OpenClass(model, "Open Class");
-        Source source = new Source(model,"Source");
+        Source source = new Source(model, "Source");
         source.setArrival(openClass, new Exp(8));
         Queue queue = new Queue(model, "Queue", SchedStrategy.FCFS);
         queue.setService(openClass, new Exp(10));
         queue.setCap(10);
         Sink sink = new Sink(model, "Sink");
 
-        model.link(model.serialRouting(source,queue,sink));
+        model.link(model.serialRouting(source, queue, sink));
 
         return model;
     }
 
-    public static Network matlabExample3(){
+    public static Network matlabExample3() {
         Network model = new Network("MRP");
         Delay delay = new Delay(model, "Working State");
         Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
@@ -152,7 +167,7 @@ public class GettingStarted {
         return model;
     }
 
-    public static Network erlangExample1(){
+    public static Network erlangExample1() {
         Network model = new Network("MRP");
         Delay delay = new Delay(model, "Working State");
         Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
@@ -164,7 +179,8 @@ public class GettingStarted {
         model.link(model.serialRouting(delay, queue));
         return model;
     }
-    public static Network erlangExample2(){
+
+    public static Network erlangExample2() {
         Network model = new Network("MRP");
         Delay delay = new Delay(model, "Working State");
         Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
@@ -177,7 +193,7 @@ public class GettingStarted {
         return model;
     }
 
-    public static Network erlangExample3(){
+    public static Network erlangExample3() {
         Network model = new Network("MRP");
         Delay delay = new Delay(model, "Working State");
         Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
@@ -198,9 +214,9 @@ public class GettingStarted {
         OpenClass oclass = new OpenClass(model, "myClass");
 
         source.setArrival(oclass, new Exp(1));
-        queue.setService(oclass,  new Exp(1));
+        queue.setService(oclass, new Exp(1));
         queue.setNumberOfServers(1);
-        model.link(model.serialRouting(source,queue,sink));
+        model.link(model.serialRouting(source, queue, sink));
         return model;
     }
 
@@ -210,7 +226,7 @@ public class GettingStarted {
         Network model = new Network("2CDSDC");
         OpenClass openClass1 = new OpenClass(model, "Open 1");
         OpenClass openClass2 = new OpenClass(model, "Open 2");
-        Source source = new Source(model,"Source");
+        Source source = new Source(model, "Source");
         source.setArrival(openClass1, new Exp(8));
         source.setArrival(openClass2, new Exp(5));
         Queue queue = new Queue(model, "Queue", SchedStrategy.FCFS);
@@ -220,7 +236,7 @@ public class GettingStarted {
         queue.setClassCap(openClass2, 3);
         Sink sink = new Sink(model, "Sink");
 
-        model.link(model.serialRouting(source,queue,sink));
+        model.link(model.serialRouting(source, queue, sink));
 
         return model;
     }
@@ -229,7 +245,7 @@ public class GettingStarted {
         Network model = new Network("2CDSDC");
         Delay Node1 = new Delay(model, "Delay");
         Queue Node2 = new Queue(model, "Queue1", SchedStrategy.FCFS);
-        ClosedClass closedClass1 = new ClosedClass(model, "Closed 1", 10, Node1,0);
+        ClosedClass closedClass1 = new ClosedClass(model, "Closed 1", 10, Node1, 0);
 
         Node1.setService(closedClass1, new Exp(1));
         Node2.setService(closedClass1, new Exp(0.6666667));
@@ -244,10 +260,10 @@ public class GettingStarted {
         return model;
     }
 
-    public static Network ex9 () {
+    public static Network ex9() {
         Network model = new Network("ForkJoin");
 
-        Source source = new Source(model,"Src");
+        Source source = new Source(model, "Src");
         Fork fork = new Fork(model);
         Queue upper = new Queue(model, "upper Q");
         Queue lower = new Queue(model, "Lower Q");
@@ -279,7 +295,7 @@ public class GettingStarted {
         Network model = new Network("closed net");
         Queue Node1 = new Queue(model, "Queue1", SchedStrategy.FCFS);
         Queue Node2 = new Queue(model, "Queue2", SchedStrategy.FCFS);
-        ClosedClass closedClass1 = new ClosedClass(model, "Closed 1", 6, Node1,0);
+        ClosedClass closedClass1 = new ClosedClass(model, "Closed 1", 6, Node1, 0);
 
         Node1.setService(closedClass1, new Exp(3));
         Node2.setService(closedClass1, new Exp(5));
@@ -294,7 +310,7 @@ public class GettingStarted {
         Network model = new Network("Parallel Erlang");
         OpenClass openClass = new OpenClass(model, "Open Class 1");
         OpenClass oClass2 = new OpenClass(model, "Open Class 2");
-        Source source = new Source(model,"Source");
+        Source source = new Source(model, "Source");
         source.setArrival(openClass, new Exp(30));
         source.setArrival(oClass2, new Exp(10));
         Queue queue1 = new Queue(model, "Queue1", SchedStrategy.FCFS);
@@ -302,11 +318,11 @@ public class GettingStarted {
         queue1.setService(oClass2, new Erlang(15, 2));
         queue1.setNumberOfServers(3);
         Queue queue2 = new Queue(model, "Queue2", SchedStrategy.PS);
-        queue2.setService(openClass, new Erlang(12,3));
+        queue2.setService(openClass, new Erlang(12, 3));
         queue2.setService(oClass2, new Erlang(15, 2));
         queue2.setNumberOfServers(3);
         Queue queue3 = new Queue(model, "Queue3", SchedStrategy.SIRO);
-        queue3.setService(openClass, new Erlang(12,3));
+        queue3.setService(openClass, new Erlang(12, 3));
         queue3.setService(oClass2, new Erlang(15, 2));
         queue3.setNumberOfServers(3);
         Sink sink = new Sink(model, "Sink");
@@ -325,7 +341,7 @@ public class GettingStarted {
         return model;
     }
 
-    public static Network   aphExample1() {
+    public static Network aphExample1() {
         Network model = new Network("MRP");
         Delay delay = new Delay(model, "Working State");
         Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
@@ -338,7 +354,7 @@ public class GettingStarted {
         return model;
     }
 
-    public static Network   aphExample2() {
+    public static Network aphExample2() {
         Network model = new Network("M/APH/1");
         Delay delay = new Delay(model, "Working State");
         Queue queue = new Queue(model, "RepairQueue", SchedStrategy.FCFS);
@@ -346,10 +362,10 @@ public class GettingStarted {
         ClosedClass closedClass1 = new ClosedClass(model, "Machines", 1, delay);
         ClosedClass closedClass2 = new ClosedClass(model, "Machines2", 1, delay);
 
-        delay.setService(closedClass1, APH.fitMeanAndSCV(16.0000,16.0000));
-        delay.setService(closedClass2, APH.fitMeanAndSCV(8.0000,16.0000));
-        queue.setService(closedClass1,  new Exp(0.1));
-        queue.setService(closedClass2,  new Exp(0.1));
+        delay.setService(closedClass1, APH.fitMeanAndSCV(16.0000, 16.0000));
+        delay.setService(closedClass2, APH.fitMeanAndSCV(8.0000, 16.0000));
+        queue.setService(closedClass1, new Exp(0.1));
+        queue.setService(closedClass2, new Exp(0.1));
         // Block 3: topology
         RoutingMatrix routingMatrix = new RoutingMatrix(model,
                 Arrays.asList(closedClass1, closedClass2),
@@ -402,16 +418,16 @@ public class GettingStarted {
 
         node1.setService(jobclass1, Exp.fitMean(64.000000)); // (queue1,CClass1)
         node2.setService(jobclass1, Exp.fitMean(0.015625)); // (queue2,CClass1)
-        node3.setService(jobclass1, APH.fitMeanAndSCV(1.000000,16.000000)); // (delay1,CClass1)
-        node4.setService(jobclass1, APH.fitMeanAndSCV(2.000000,32.000000)); // (delay2,CClass1)
-        node5.setService(jobclass1, APH.fitMeanAndSCV(0.015625,2.000000)); // (delay3,CClass1)
-        node6.setService(jobclass1, APH.fitMeanAndSCV(1.000000,0.500000)); // (delay4,CClass1)
-        node7.setService(jobclass1, new Erlang(128.000000,64)); // (delay5,CClass1)
-        node8.setService(jobclass1, APH.fitMeanAndSCV(0.125000,4.000000)); // (delay6,CClass1)
+        node3.setService(jobclass1, APH.fitMeanAndSCV(1.000000, 16.000000)); // (delay1,CClass1)
+        node4.setService(jobclass1, APH.fitMeanAndSCV(2.000000, 32.000000)); // (delay2,CClass1)
+        node5.setService(jobclass1, APH.fitMeanAndSCV(0.015625, 2.000000)); // (delay3,CClass1)
+        node6.setService(jobclass1, APH.fitMeanAndSCV(1.000000, 0.500000)); // (delay4,CClass1)
+        node7.setService(jobclass1, new Erlang(128.000000, 64)); // (delay5,CClass1)
+        node8.setService(jobclass1, APH.fitMeanAndSCV(0.125000, 4.000000)); // (delay6,CClass1)
         node9.setService(jobclass1, Exp.fitMean(0.031250)); // (delay7,CClass1)
         node10.setService(jobclass1, Exp.fitMean(0.250000)); // (delay8,CClass1)
-        node11.setService(jobclass1, APH.fitMeanAndSCV(0.031250,4.000000)); // (delay9,CClass1)
-        node12.setService(jobclass1, APH.fitMeanAndSCV(16.000000,16.000000)); // (delay10,CClass1)
+        node11.setService(jobclass1, APH.fitMeanAndSCV(0.031250, 4.000000)); // (delay9,CClass1)
+        node12.setService(jobclass1, APH.fitMeanAndSCV(16.000000, 16.000000)); // (delay10,CClass1)
         // Initialise class switch matrix
         for (ClassSwitch switchNode : switchNodes) {
             Matrix csMatrix = switchNode.initClassSwitchMatrix();
@@ -461,8 +477,8 @@ public class GettingStarted {
         Network model = new Network("MRP");
         Delay delay = new Delay(model, "Delay");
         Queue queue = new Queue(model, "Queue1", SchedStrategy.FCFS);
-        ClosedClass closedClass = new ClosedClass(model, "Machines", 1, delay,0);
-        ClosedClass closedClass2 = new ClosedClass(model, "Machines2", 1, delay,0);
+        ClosedClass closedClass = new ClosedClass(model, "Machines", 1, delay, 0);
+        ClosedClass closedClass2 = new ClosedClass(model, "Machines2", 1, delay, 0);
         delay.setService(closedClass, new Exp(1));
         delay.setService(closedClass2, new Exp(1));
 
@@ -471,25 +487,26 @@ public class GettingStarted {
         RoutingMatrix routingMatrix = new RoutingMatrix(model,
                 Arrays.asList(closedClass, closedClass2),
                 Arrays.asList(delay, queue));
-        routingMatrix.set(closedClass,closedClass,delay,delay,0.3);
-        routingMatrix.set(closedClass,closedClass,delay,queue,0.1);
-        routingMatrix.set(closedClass,closedClass,queue,delay,0.2);
-        routingMatrix.set(closedClass,closedClass,queue,queue,0);
-        routingMatrix.set(closedClass,closedClass2,delay,delay,0.6);
-        routingMatrix.set(closedClass,closedClass2,delay,queue,0.0);
-        routingMatrix.set(closedClass,closedClass2,queue,delay,0.8);
-        routingMatrix.set(closedClass,closedClass2,queue,queue,0.0);
-        routingMatrix.set(closedClass2,closedClass2,delay,delay,0.0);
-        routingMatrix.set(closedClass2,closedClass2,delay,queue,1.0);
-        routingMatrix.set(closedClass2,closedClass2,queue,delay,0.0);
-        routingMatrix.set(closedClass2,closedClass2,queue,queue,0.0);
-        routingMatrix.set(closedClass2,closedClass,delay,delay,0.0);
-        routingMatrix.set(closedClass2,closedClass,delay,queue,0.0);
-        routingMatrix.set(closedClass2,closedClass,queue,delay,1.0);
-        routingMatrix.set(closedClass2,closedClass,queue,queue,0.0);
+        routingMatrix.set(closedClass, closedClass, delay, delay, 0.3);
+        routingMatrix.set(closedClass, closedClass, delay, queue, 0.1);
+        routingMatrix.set(closedClass, closedClass, queue, delay, 0.2);
+        routingMatrix.set(closedClass, closedClass, queue, queue, 0);
+        routingMatrix.set(closedClass, closedClass2, delay, delay, 0.6);
+        routingMatrix.set(closedClass, closedClass2, delay, queue, 0.0);
+        routingMatrix.set(closedClass, closedClass2, queue, delay, 0.8);
+        routingMatrix.set(closedClass, closedClass2, queue, queue, 0.0);
+        routingMatrix.set(closedClass2, closedClass2, delay, delay, 0.0);
+        routingMatrix.set(closedClass2, closedClass2, delay, queue, 1.0);
+        routingMatrix.set(closedClass2, closedClass2, queue, delay, 0.0);
+        routingMatrix.set(closedClass2, closedClass2, queue, queue, 0.0);
+        routingMatrix.set(closedClass2, closedClass, delay, delay, 0.0);
+        routingMatrix.set(closedClass2, closedClass, delay, queue, 0.0);
+        routingMatrix.set(closedClass2, closedClass, queue, delay, 1.0);
+        routingMatrix.set(closedClass2, closedClass, queue, queue, 0.0);
         model.link(routingMatrix);
         return model;
     }
+
     public static Network mixed1() {
         Network model = new Network("MRP");
         Delay node1 = new Delay(model, "Delay");
@@ -500,7 +517,7 @@ public class GettingStarted {
         OpenClass jobclass2 = new OpenClass(model, "myClass", 0);
         node1.setService(jobclass1, new Exp(1));
         node1.setService(jobclass2, new Exp(1));
-        node2.setService(jobclass1, new Erlang(3,2));
+        node2.setService(jobclass1, new Erlang(3, 2));
         node2.setService(jobclass2, new Exp(1));
 
         node3.setArrival(jobclass2, new Exp(0.1));
@@ -577,7 +594,6 @@ public class GettingStarted {
         model.link(routingMatrix);
         return model;
     }
-
 
 
     public static void main(String[] args) throws IllegalAccessException {

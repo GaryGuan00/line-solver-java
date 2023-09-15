@@ -2,7 +2,7 @@ package jline.util;
 
 import java.util.*;
 
-
+import jline.api.UTIL;
 import jline.lang.constant.GlobalConstants;
 import org.ejml.data.*;
 import org.ejml.dense.row.CommonOps_DDRM;
@@ -11,7 +11,6 @@ import org.ejml.interfaces.decomposition.EigenDecomposition_F64;
 import org.ejml.interfaces.decomposition.QRSparseDecomposition;
 import org.ejml.ops.DConvertMatrixStruct;
 import org.ejml.simple.SimpleMatrix;
-import org.ejml.simple.ops.SimpleOperations_DSCC;
 import org.ejml.sparse.csc.CommonOps_DSCC;
 import org.ejml.data.DMatrixSparseCSC;
 import org.ejml.dense.row.MatrixFeatures_DDRM;
@@ -40,6 +39,12 @@ public class Matrix extends DMatrixSparseCSC {
 
 	public Matrix(DMatrixSparseCSC matrix) {
 		super(matrix);
+	}
+
+	public Matrix(List<Integer> array) {
+		super(array.size(), 1, array.size());
+		for(int i = 0; i < array.size(); i++)
+			this.set(i, 0, (double) array.get(i));
 	}
 
 	public Matrix(SimpleMatrix matrix) {
@@ -253,6 +258,23 @@ public class Matrix extends DMatrixSparseCSC {
 		DConvertMatrixStruct.convert(sumcols, tmp);
 		return new Matrix(tmp);
 	}
+
+	public double sumAbsCols(int col) {
+		double sum = 0;
+		for(int i = 0; i < this.numRows; i++) {
+			sum += Math.abs(this.get(i, col));
+		}
+		return sum;
+	}
+
+	public double sumAbsRows(int row) {
+		double sum = 0;
+		for(int i = 0; i < this.numRows; i++) {
+			sum += Math.abs(this.get(row,i));
+		}
+		return sum;
+	}
+
 	public Matrix repmat(int rows, int cols) {
 		Matrix res = this.clone();
 		for(int i = 1; i < rows; i++) {
@@ -295,6 +317,102 @@ public class Matrix extends DMatrixSparseCSC {
 		Matrix res = new Matrix(array.size(), 1, array.size());
 		for(int i = 0; i < array.size(); i++)
 			res.set(i, 0, array.get(i));
+		return res;
+	}
+
+	// find unique elements in the given row
+	public Matrix uniqueInRow(int rowIdx) {
+		List<Integer> array = new ArrayList<Integer>();
+		for(int colIdx = 0; colIdx < this.numCols; colIdx++) {
+			array.add((int)this.get(rowIdx,colIdx));
+		}
+
+		List<Integer> unique_array = UTIL.unique(array);
+		Matrix res = new Matrix(unique_array.size(), 1, unique_array.size());
+		for(int i = 0; i < unique_array.size(); i++)
+			res.set(i, 0, unique_array.get(i));
+		return res;
+	}
+
+	// find unique elements in the given row
+	public Matrix uniqueNonZerosInRow(int rowIdx) {
+		List<Integer> array = new ArrayList<Integer>();
+		for(int colIdx = 0; colIdx < this.numCols; colIdx++) {
+			int val = (int) this.get(rowIdx,colIdx);
+			if (val != 0) {
+				array.add(val);
+			}
+		}
+
+		List<Integer> unique_array = UTIL.unique(array);
+		Matrix res = new Matrix(unique_array.size(), 1, unique_array.size());
+		for(int i = 0; i < unique_array.size(); i++)
+			res.set(i, 0, unique_array.get(i));
+		return res;
+	}
+
+	// find unique elements in the given row
+	public Matrix uniqueNonNegativeInRow(int rowIdx) {
+		List<Integer> array = new ArrayList<Integer>();
+		for(int colIdx = 0; colIdx < this.numCols; colIdx++) {
+			int val = (int) this.get(rowIdx,colIdx);
+			if (val >0) {
+				array.add(val);
+			}
+		}
+
+		List<Integer> unique_array = UTIL.unique(array);
+		Matrix res = new Matrix(unique_array.size(), 1, unique_array.size());
+		for(int i = 0; i < unique_array.size(); i++)
+			res.set(i, 0, unique_array.get(i));
+		return res;
+	}
+
+	// find unique elements in the given row
+	public Matrix uniqueInCol(int colIdx) {
+		List<Integer> array = new ArrayList<Integer>();
+		for(int rowIdx = 0; rowIdx < this.numRows; rowIdx++) {
+			array.add((int) this.get(rowIdx,colIdx));
+		}
+
+		List<Integer> unique_array = UTIL.unique(array);
+		Matrix res = new Matrix(unique_array.size(), 1, unique_array.size());
+		for(int i = 0; i < unique_array.size(); i++)
+			res.set(i, 0, unique_array.get(i));
+		return res;
+	}
+
+	// find unique elements in the given row
+	public Matrix uniqueNonZerosInCol(int colIdx) {
+		List<Integer> array = new ArrayList<Integer>();
+		for(int rowIdx = 0; rowIdx < this.numRows; rowIdx++) {
+			int val = (int) this.get(rowIdx,colIdx);
+			if (val != 0) {
+				array.add(val);
+			}
+		}
+
+		List<Integer> unique_array = UTIL.unique(array);
+		Matrix res = new Matrix(unique_array.size(), 1, unique_array.size());
+		for(int i = 0; i < unique_array.size(); i++)
+			res.set(i, 0, unique_array.get(i));
+		return res;
+	}
+
+	// find unique elements in the given row
+	public Matrix uniqueNonNegativeInCol(int colIdx) {
+		List<Integer> array = new ArrayList<Integer>();
+		for(int rowIdx = 0; rowIdx < this.numRows; rowIdx++) {
+			int val = (int) this.get(rowIdx,colIdx);
+			if (val >0) {
+				array.add(val);
+			}
+		}
+
+		List<Integer> unique_array = UTIL.unique(array);
+		Matrix res = new Matrix(unique_array.size(), 1, unique_array.size());
+		for(int i = 0; i < unique_array.size(); i++)
+			res.set(i, 0, unique_array.get(i));
 		return res;
 	}
 
@@ -736,6 +854,26 @@ public class Matrix extends DMatrixSparseCSC {
 		for(int i = 0; i < this.getNumRows(); i++){
 			for(int j = 0; j < this.getNumCols(); j++){
 				res.set(i, j, this.get(i, j) / B.get(i, j));
+			}
+		}
+		return res;
+	}
+
+	/**
+	 * Performs element-wise multiplication
+	 * Note that B is a row vector, and the result is
+	 * A_{ij} = \sum_{j=1}^n A_{ij} * B(i)
+	 * @param B - the other row vector
+	 * @return A_i * B
+	 */
+	public Matrix elementMultWithVector(Matrix B){
+		if(this.getNumCols() != B.getNumCols()){
+			throw new IllegalArgumentException("Matrix dimensions should match for element multiplication!");
+		}
+		Matrix res = new Matrix(this.getNumRows(), this.getNumCols());
+		for(int i = 0; i < this.getNumRows(); i++){
+			for(int j = 0; j < this.getNumCols(); j++){
+				res.set(i, j, this.get(i, j) * B.get(i));
 			}
 		}
 		return res;
@@ -1503,7 +1641,7 @@ public class Matrix extends DMatrixSparseCSC {
 	}
 
 	public void print() {
-		System.out.println(this.toString());
+		System.out.println(this);
 	}
 
 	@Override
@@ -1591,5 +1729,31 @@ public class Matrix extends DMatrixSparseCSC {
 			}
 		}
 		return res;
+	}
+
+	/**
+	 * @param row
+	 * @param alpha
+	 * @return sum_{j=0}^n |A{ij}|^alpha
+	 */
+	public double powerSumRows(int row, double alpha){
+		double sum = 0;
+		for(int i = 0; i < this.numCols; i++) {
+			sum += Math.pow(Math.abs(this.get(row, i)),alpha);
+		}
+		return sum;
+	}
+
+	/**
+	 * @param col
+	 * @param alpha
+	 * @return sum_{j=0}^n |A{ji}|^alpha
+	 */
+	public double powerSumCols(int col, double alpha){
+		double sum = 0;
+		for(int i = 0; i < this.numRows; i++) {
+			sum += Math.pow(Math.abs(this.get(i, col)),alpha);
+		}
+		return sum;
 	}
 }

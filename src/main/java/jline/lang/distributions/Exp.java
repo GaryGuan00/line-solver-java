@@ -19,11 +19,14 @@ public class Exp extends MarkovianDistribution  implements Serializable {
 
     @Override
     public List<Double> sample(long n) {
-        throw new RuntimeException("Not implemented");
+        return this.sample(n,null);
     }
 
-    public List<Double> sample(long n, Random random) {
-        return this.sample(n,random);
+    @Override
+    public List<Double> sample(long n, Random rand)  {
+        double lambda = (double)this.getParam(1).getValue();
+        //return exprnd(1/lambda, n, 1);
+        throw new RuntimeException("Not Implemented!");
     }
 
     public long getNumberOfPhases() {

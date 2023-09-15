@@ -9,7 +9,6 @@ import jline.lang.nodes.Source;
 import jline.lang.nodes.StatefulNode;
 import jline.lang.processes.MAP;
 import jline.solvers.ctmc.EventData;
-import jline.solvers.ssa.Timeline;
 import jline.solvers.ssa.state.SSAStateMatrix;
 import jline.util.Pair;
 
@@ -19,18 +18,18 @@ import java.util.Random;
 import java.util.Set;
 
 public class DepartureEvent extends Event implements NodeEvent {
-    protected int statefulIndex;
-    protected int classIndex;
-    protected boolean useBuffer;
-    protected SchedStrategy schedStrategy;
-    protected boolean isSource;
+    public int statefulIndex;
+    public int classIndex;
+    public boolean useBuffer;
+    public SchedStrategy schedStrategy;
+    public boolean isSource;
     public final Distribution serviceProcess;
     public Node node;
-    protected JobClass jobClass;
-    protected PhaseEvent phaseEvent;
-    protected boolean isMAP;
-    protected boolean isReference;
-    protected boolean isProcessorSharing;
+    public JobClass jobClass;
+    public PhaseEvent phaseEvent;
+    public boolean isMAP;
+    public boolean isReference;
+    public boolean isProcessorSharing;
 
     public static Event fromNodeAndClass(Node node, JobClass jobClass) {
         if (node instanceof HasSchedStrategy) {
@@ -43,19 +42,14 @@ public class DepartureEvent extends Event implements NodeEvent {
             } else if (serviceDist instanceof MAP) {
                 MAPPhaseEvent mapPhaseEvent = new MAPPhaseEvent(node, jobClass, (MAP) serviceDist);
                 return new DepartureEvent(node, jobClass, mapPhaseEvent);
-            } else if (serviceDist instanceof  PH) {
+            } else if (serviceDist instanceof Coxian) {
                 DepartureEvent depEvent = new DepartureEvent(node, jobClass);
-                PHPhaseEvent phPhaseEvent = new PHPhaseEvent(node, jobClass, depEvent);
-                depEvent.setPhaseEvent(phPhaseEvent);
-                return phPhaseEvent;
-            } else if (serviceDist instanceof APH) {
-                DepartureEvent depEvent = new DepartureEvent(node, jobClass);
-                APHPhaseEvent aphPhaseEvent = new APHPhaseEvent(node, jobClass, depEvent);
-                depEvent.setPhaseEvent(aphPhaseEvent);
-                return aphPhaseEvent;
+                CoxianPhaseEvent cxPhaseEvent = new CoxianPhaseEvent(node, jobClass, depEvent);
+                depEvent.setPhaseEvent(cxPhaseEvent);
+                return cxPhaseEvent;
             } else if (serviceDist instanceof Exp) {
                 DepartureEvent depEvent = new DepartureEvent(node, jobClass);
-                ExpActiveEvent activeEvent = new ExpActiveEvent(node, jobClass, depEvent);
+                ExpEvent activeEvent = new ExpEvent(node, jobClass, depEvent);
                 depEvent.setPhaseEvent(activeEvent);
                 return activeEvent;
             }
@@ -162,34 +156,6 @@ public class DepartureEvent extends Event implements NodeEvent {
         return Double.NaN;
     }
 
-    @Override
-    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
-        if (this.isMAP) {
-            MAP MAP = (MAP)(this.serviceProcess);
-            int nextPhase = MAP.getNextPhaseAfterDeparture(networkState.getGlobalPhase(this.statefulIndex, this.classIndex), random);
-            networkState.updateGlobalPhase(this.statefulIndex, this.classIndex, nextPhase);
-        }
-
-        if (this.node instanceof Source) {
-            if (this.node.getOutputEvent(this.jobClass, random).stateUpdate(networkState, random, timeline)) {
-                timeline.record(this, networkState);
-                return true;
-            }
-            return false;
-        }
-
-        boolean res = networkState.stateDeparture(this.statefulIndex, classIndex);
-        if (!res) {
-            return false;
-        }
-
-        this.node.getOutputEvent(this.jobClass, random).stateUpdate(networkState, random, timeline);
-
-
-        timeline.record(this, networkState);
-
-        return true;
-    }
 
 
     @Override
@@ -201,9 +167,9 @@ public class DepartureEvent extends Event implements NodeEvent {
         }
 
         if (this.node instanceof Source) {
-            ArrayList<Pair<OutputEvent,Double>> eventArrayList = this.node.getOutputEvents(this.jobClass, random);
+            ArrayList<Pair<SynchedEvent,Double>> eventArrayList = this.node.getOutputEvents(this.jobClass, random);
 
-            for (Pair<OutputEvent,Double> outputEventDoublePair : eventArrayList) {
+            for (Pair<SynchedEvent,Double> outputEventDoublePair : eventArrayList) {
                 outputEventDoublePair.getLeft().getNextState(networkState, stateSpace,queue, stateSet);
             }
             return true;
@@ -214,8 +180,8 @@ public class DepartureEvent extends Event implements NodeEvent {
             return false;
         }
 
-        ArrayList<Pair<OutputEvent,Double>>  eventArrayList = this.node.getOutputEvents(this.jobClass, random);
-        for (Pair<OutputEvent,Double> outputEventDoublePair: eventArrayList) {
+        ArrayList<Pair<SynchedEvent,Double>>  eventArrayList = this.node.getOutputEvents(this.jobClass, random);
+        for (Pair<SynchedEvent,Double> outputEventDoublePair: eventArrayList) {
             if(outputEventDoublePair.getRight() == 0) {
                 continue;
             }
@@ -235,9 +201,9 @@ public class DepartureEvent extends Event implements NodeEvent {
         }
 
         if (this.node instanceof Source) {
-            ArrayList<Pair<OutputEvent,Double>> eventArrayList = this.node.getOutputEvents(this.jobClass, random);
+            ArrayList<Pair<SynchedEvent,Double>> eventArrayList = this.node.getOutputEvents(this.jobClass, random);
 
-            for (Pair<OutputEvent,Double> outputEventDoublePair : eventArrayList) {outputEventDoublePair.getLeft().getNextEventState(networkState, eventSpace,event,queue,copy, eventSet, outputEventDoublePair);
+            for (Pair<SynchedEvent,Double> outputEventDoublePair : eventArrayList) {outputEventDoublePair.getLeft().getNextEventState(networkState, eventSpace,event,queue,copy, eventSet, outputEventDoublePair);
             }
 
             return true;
@@ -248,8 +214,8 @@ public class DepartureEvent extends Event implements NodeEvent {
         if (!res) {
             return false;
         }
-        ArrayList<Pair<OutputEvent, Double>> eventArrayList = this.node.getOutputEvents(this.jobClass, random);
-        for (Pair<OutputEvent, Double> outputEventDoublePair : eventArrayList) {
+        ArrayList<Pair<SynchedEvent, Double>> eventArrayList = this.node.getOutputEvents(this.jobClass, random);
+        for (Pair<SynchedEvent, Double> outputEventDoublePair : eventArrayList) {
             if(outputEventDoublePair.getRight() == 0) {
                 continue;
             }
@@ -265,27 +231,6 @@ public class DepartureEvent extends Event implements NodeEvent {
         System.out.format("Departure event for %s at %s\n", this.jobClass.getName(), this.node.getName());
     }
 
-    @Override
-    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
-        int res = 0;
-
-        if (this.isMAP) {
-            MAP MAP = (MAP)(this.serviceProcess);
-            int nextPhase = MAP.getNextPhaseAfterDeparture(networkState.getGlobalPhase(this.statefulIndex, this.classIndex), random);
-            networkState.updateGlobalPhase(this.statefulIndex, this.classIndex, nextPhase);
-        }
-
-        if (this.node instanceof Source) {
-            res = this.node.getOutputEvent(this.jobClass, random).stateUpdateN(n, networkState, random, timeline);
-        } else {
-            res = networkState.stateDepartureN(n, this.statefulIndex, classIndex);
-            this.node.getOutputEvent(this.jobClass, random).stateUpdateN(n-res, networkState, random, timeline);
-        }
-
-        timeline.preRecord(this, networkState, n-res);
-
-        return res;
-    }
 
     @Override
     public int getMaxRepetitions(SSAStateMatrix networkState) {

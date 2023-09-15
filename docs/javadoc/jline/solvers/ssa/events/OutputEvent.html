@@ -89,7 +89,7 @@ loadScripts(document, 'script');</script>
 </div>
 <div class="inheritance" title="Inheritance Tree"><a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">java.lang.Object</a>
 <div class="inheritance"><a href="Event.html" title="class in jline.solvers.ssa.events">jline.solvers.ssa.events.Event</a>
-<div class="inheritance">jline.solvers.ssa.events.OutputEvent</div>
+<div class="inheritance">jline.solvers.ssa.events.SynchedEvent</div>
 </div>
 </div>
 <section class="class-description" id="class-description">
@@ -108,7 +108,7 @@ loadScripts(document, 'script');</script>
 <dt>See Also:</dt>
 <dd>
 <ul class="see-list">
-<li><a href="../../../../serialized-form.html#jline.solvers.ssa.events.OutputEvent">Serialized Form</a></li>
+<li><a href="../../../../serialized-form.html#jline.solvers.ssa.events.SynchedEvent">Serialized Form</a></li>
 </ul>
 </dd>
 </dl>
@@ -208,13 +208,13 @@ loadScripts(document, 'script');</script>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>boolean</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#stateUpdate(jline.solvers.ssa.state.SSAStateMatrix,java.util.Random,jline.solvers.ssa.Timeline)" class="member-name-link">stateUpdate</a><wbr>(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline)</code></div>
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline)</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>int</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#stateUpdateN(int,jline.solvers.ssa.state.SSAStateMatrix,java.util.Random,jline.solvers.ssa.Timeline)" class="member-name-link">stateUpdateN</a><wbr>(int&nbsp;n,
  <a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline)</code></div>
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline)</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>boolean</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#updateEventSpace(jline.solvers.ssa.state.SSAStateMatrix,java.util.Random,java.util.ArrayList,jline.solvers.ssa.events.Event,java.util.Queue,jline.solvers.ssa.state.SSAStateMatrix,java.util.Set,jline.util.Pair)" class="member-name-link">updateEventSpace</a><wbr>(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
@@ -327,7 +327,7 @@ loadScripts(document, 'script');</script>
 <h3>stateUpdate</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">boolean</span>&nbsp;<span class="element-name">stateUpdate</span><wbr><span class="parameters">(<a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline)</span></div>
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline)</span></div>
 <dl class="notes">
 <dt>Overrides:</dt>
 <dd><code><a href="Event.html#stateUpdate(jline.solvers.ssa.state.SSAStateMatrix,java.util.Random,jline.solvers.ssa.Timeline)">stateUpdate</a></code>&nbsp;in class&nbsp;<code><a href="Event.html" title="class in jline.solvers.ssa.events">Event</a></code></dd>
@@ -367,7 +367,7 @@ loadScripts(document, 'script');</script>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">int</span>&nbsp;<span class="element-name">stateUpdateN</span><wbr><span class="parameters">(int&nbsp;n,
  <a href="../state/SSAStateMatrix.html" title="class in jline.solvers.ssa.state">SSAStateMatrix</a>&nbsp;networkState,
  <a href="https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Random.html" title="class or interface in java.util" class="external-link">Random</a>&nbsp;random,
- <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;timeline)</span></div>
+ <a href="../Timeline.html" title="class in jline.solvers.ssa">Timeline</a>&nbsp;Timeline)</span></div>
 <dl class="notes">
 <dt>Overrides:</dt>
 <dd><code><a href="Event.html#stateUpdateN(int,jline.solvers.ssa.state.SSAStateMatrix,java.util.Random,jline.solvers.ssa.Timeline)">stateUpdateN</a></code>&nbsp;in class&nbsp;<code><a href="Event.html" title="class in jline.solvers.ssa.events">Event</a></code></dd>

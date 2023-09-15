@@ -1,88 +1,114 @@
 package jline.lang.distributions;
 
+import java.util.*;
+
+import jline.lang.constant.GlobalConstants;
 import jline.util.Matrix;
+import static jline.lib.KPCToolbox.*;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+@SuppressWarnings("unchecked")
+public class PH extends MarkovianDistribution {
 
-public class PH extends  MarkovianDistribution  implements Serializable  {
-    private final int nPhases;
     List<Double> totalPhaseRate;
 
-    public PH(int nPhases, List<Double> startingPhaseProbability, List<List<Double>> phMatrix) {
-        super("PH", 1);
-        this.setParam(1, "n", nPhases);
-        this.setParam(2, "starting_phase", startingPhaseProbability);
-        this.setParam(3, "ph_matrix", phMatrix);
+    public PH(List<Double> alpha, Matrix T) {
+        super("PH", 3);
 
+        int nPhases = alpha.size();
+
+        this.setParam(1, "n", nPhases);
+        this.setParam(2, "alpha", alpha);
+        this.setParam(3, "T", T);
         this.totalPhaseRate = new ArrayList<Double>(nPhases);
-        this.nPhases = nPhases;
 
         for (int i = 0; i < nPhases; i++) {
             double tpr = 0.0;
-            tpr -= phMatrix.get(i).get(i);
+            tpr -= T.get(i,i);
             this.totalPhaseRate.add(tpr);
         }
     }
 
-    public double getTotalPhaseRate(int phase) {
-        return this.totalPhaseRate.get(phase);
+    public Matrix getInitProb() {
+        List<Double> param1 = (List<Double>) this.getParam(2).getValue();
+        Matrix alpha = new Matrix(1, param1.size(), param1.size());
+        for(int i = 0; i < param1.size(); i++)
+            alpha.set(0, i, param1.get(i));
+        return alpha;
     }
 
-    public long getNumberOfPhases() {
-        return (long) this.getParam(1).getValue();
-    }
-
-    @Override
-    public boolean isImmediate() {
-        return false;
-    }
-
-    public double getMean() {
-        throw new RuntimeException("Not Implemented!");
-    }
-
-    /**
-     * Gets n samples from the distribution
-     * @param n - the number of samples
-     * @return - n samples from the distribution
-     */
     @Override
     public List<Double> sample(long n) {
-        return this.sample(n,new Random());
+        return this.sample(n,null);
     }
-
     @Override
     public List<Double> sample(long n, Random random) {
         throw new RuntimeException("Not implemented");
     }
 
-
-    public double getVar() {
-        throw new RuntimeException("Not Implemented!");
+    @Override
+    public double getMean() {
+        return super.getMean();
     }
 
-    public double getSkew() {
-        throw new RuntimeException("Not Implemented!");
-    }
-
-    public double getSCV() { throw new RuntimeException("Not Implemented!"); }
-
+    @Override
     public double getRate() {
-        throw new RuntimeException("Not Implemented!");
+        return 1/getMean();
     }
 
+    @Override
+    public double getSCV() {
+        return super.getSCV();
+    }
+
+    @Override
+    public double getVar() {
+        return this.getSCV()*Math.pow(this.getMean(), 2);
+    }
+
+    @Override
+    public double getSkew() {
+        return super.getSkew();
+    }
+
+    @Override
     public double evalCDF(double t) {
-        throw new RuntimeException("Not Implemented!");
+        //Since currently no function to support calculating eigen values, thus calculating expm. This method is now not implemented.
+        throw new RuntimeException("Not implemented");
     }
 
-    public Map<Integer, Matrix> getPH()  {
-        throw new RuntimeException("Not Implemented!");
-    }
+    @Override
     public double evalLST(double s) {
-        throw new RuntimeException("Not Implemented!");
+        return super.evalLST(s);
+    }
+
+    @Override
+    public Map<Integer, Matrix> getPH() {
+        Map<Integer, Matrix> res = new HashMap<Integer, Matrix>();
+        Matrix T = getSubgenerator();
+
+        Matrix ones = new Matrix(T.numCols,1,T.numCols);
+        Matrix Te = new Matrix(0,0,0);
+        Matrix Tepie = new Matrix(0,0,0);
+        ones.fill(1.0);
+        T.mult(ones, Te);
+        Te.mult(this.getInitProb(), Tepie);
+        //Tepie.removeZeros(0);
+        Tepie.changeSign();
+
+        res = map_normalize(T,Tepie);
+        return res;
+    }
+
+    @Override
+    public long getNumberOfPhases() {
+        return (long) this.getParam(1).getValue();
+    }
+
+    public Matrix getSubgenerator() {
+        return (Matrix) this.getParam(3).getValue();
+    }
+
+    public double getTotalPhaseRate(int i) {
+        return totalPhaseRate.get(i);
     }
 }

@@ -15,7 +15,7 @@ import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
 import jline.solvers.mva.SolverMVA;
 import jline.util.Matrix;
-import jline.util.NetworkAvgTable;
+import jline.solvers.NetworkAvgTable;
 
 import java.util.Arrays;
 
@@ -162,7 +162,7 @@ public class CacheModel {
     }
 
     public static void main(String[] args) {
-        Network model = ex1();
+        Network model = ex5();
         SolverOptions options = new SolverOptions(SolverType.MVA);
         options.seed = 1;
         options.iter_max = 100;

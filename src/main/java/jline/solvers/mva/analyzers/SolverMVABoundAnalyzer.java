@@ -24,6 +24,7 @@ public class SolverMVABoundAnalyzer implements MVAAnalyzer{
         Matrix RN = new Matrix(0,0);
         Matrix TN = new Matrix(0,0);
         Matrix CN = new Matrix(0,0);
+        Matrix WN = new Matrix(0,0);
         Matrix XN = new Matrix(0,0);
         double lG = Double.NaN;
         switch(options.method){
@@ -661,6 +662,8 @@ public class SolverMVABoundAnalyzer implements MVAAnalyzer{
         res.TN = TN;
         res.CN = CN;
         res.XN = XN;
+        res.AN = new Matrix(0,0);
+        res.WN = WN;
         res.logNormConstAggr = lG;
         res.runtime = (endTime - startTime) / 1000.0;
         res.iter = iter;

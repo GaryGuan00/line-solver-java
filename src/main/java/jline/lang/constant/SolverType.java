@@ -5,8 +5,8 @@ package jline.lang.constant;
 
 public enum SolverType {
   CTMC,
-  ENV,
-  FLUID,
+  Env,
+  Fluid,
   JMT,
   LN,
   LQNS,

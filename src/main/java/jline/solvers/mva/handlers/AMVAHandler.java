@@ -81,7 +81,13 @@ public class AMVAHandler implements MVASolverHandler {
                 if(NchainSum <= 2 || flag){
                     options.method = "qd"; // changing to bs degrades accuracy
                 } else {
-                    options.method = "lin"; // seems way worse than aql in test_LQN_8.xml
+                    options.method = "egflin";
+                    for (int i=0; i < sn.nstations; i++) {
+                        if (sn.nservers.get(i,0)>1 && sn.nservers.get(i,0)<Integer.MAX_VALUE) {
+                            // if multi-server
+                            options.method = "lin"; // lin seems way worse than aql in test_LQN_8.xml
+                        }
+                    }
                 }
                 break;
         }
@@ -196,7 +202,7 @@ public class AMVAHandler implements MVASolverHandler {
                 case "aql":
                     throw new NotImplementedException("AQL not implemented in AMVAHandler"); // TODO
                 case "lin": case "gflin": case "egflin":
-                    if(sn.nchains == 1 || nservers.elementMax() == 1){
+                    if(nservers.elementMax() == 1){
                         SchedStrategy[] schdi = new SchedStrategy[queueIdx.size() + delayIdx.size()];
                         int idx = 0;
                         for(int i = 0; i < sn.nodetypes.size(); i++){
@@ -206,23 +212,8 @@ public class AMVAHandler implements MVASolverHandler {
                             schdi[idx] = sn.sched.get(sn.stations.get((int) sn.nodeToStation.get(i)));
                             idx++;
                         }
-                        PFQN.pfqnLinearizerReturn res;
-                        if(options.method.equals("lin")){
-                            res = pfqn_linearizermx(lambda, L, N, Z, nservers, schdi, options.tol, options.iter_max, options.method);
-                        } else if(options.method.equals("gflin")){
-                            double linAlpha = 2;
-                            res = pfqn_gflinearizer(L, N, Z, schdi, options.tol, options.iter_max, linAlpha, 0);
-                        } else {
-                            // Extended General Form Linearizer
-                            Matrix alphaM = new Matrix(1, N.getNumCols());
-                            /**
-                             * Gompertz function to approximate alpha as a function of the network population
-                             */
-                            for(int i = 0; i < N.getNumCols(); i++){
-                                alphaM.set(i, 0.6 + 1.4 * Math.exp(-8 * Math.exp(-0.8 * N.get(i))));
-                            }
-                            res = pfqn_egflinearizer(L, N, Z, schdi, options.tol, options.iter_max, alphaM, 0);
-                        }
+
+                        PFQN.pfqnLinearizerReturn res = pfqn_linearizermx(lambda, L, N, Z, nservers, schdi, options.tol, options.iter_max, options.method);
 
                         int iRes = 0;
                         for(int i : queueIdx){

@@ -1,6 +1,6 @@
 package jline.solvers.ssa.state;
 
-import jline.util.CumulativeDistribution;
+import jline.lang.distributions.CumulativeDistribution;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,7 +37,7 @@ public class SIROBuffer extends SSAStateCell {
         nextClassCumulativeDistribution.normalize(totalInWaiting);
 
 
-        int classToAdd = nextClassCumulativeDistribution.generate();
+        int classToAdd = nextClassCumulativeDistribution.sample(random);
         this.phaseList.addToService(classToAdd);
         this.inService[classToAdd] += 1;
         this.inWaiting[classToAdd] -= 1;

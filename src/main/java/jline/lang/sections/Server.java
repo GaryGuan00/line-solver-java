@@ -10,7 +10,7 @@ import jline.lang.sections.*;
 
 public class Server extends ServiceSection implements Serializable {
     public Server(List<JobClass> jobClasses) {
-        super("jline.Server");
+        super("Server");
         this.numberOfServers = 1;
     }
 

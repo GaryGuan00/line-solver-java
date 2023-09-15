@@ -5,7 +5,7 @@ package jline.solvers.fluid.smoothing;
 
 import jline.lang.constant.GlobalConstants;
 import jline.lang.constant.SolverType;
-import jline.solvers.ssa.Timeline;
+import jline.solvers.NetworkAvgTable;
 import jline.util.Matrix;
 import jline.lang.Network;
 import jline.lang.NetworkStruct;
@@ -56,16 +56,16 @@ public class PStarSearcher {
     options.seed = seedSSA;
     SolverSSA solverSSA = new SolverSSA(model, options);
     solverSSA.enableR5(R5kSSA);
-    Timeline resultsSSA = solverSSA.solve();
-    List<Double> QueueLengths = resultsSSA.allQueueLengths();
+    NetworkAvgTable avgTable = solverSSA.getAvgTable();
+    List<Double> QueueLengths = avgTable.getQLen();
 
-    // Note that if SolverSSA cannot be used due to the existence of bugs, comparison queue lengths
-    // need to be manually added using e.g. SolverMVA in LINE
-    // List<Double> QueueLengths = new ArrayList<>();
-    // QueueLengths.add(0, 12.905);
-    // QueueLengths.add(1, 17.083);
-
-    // Mean Queue Length transferred to a JLineMatrix
+//    // Note that if SolverSSA cannot be used due to the existence of bugs, comparison queue lengths
+//    // need to be manually added using e.g. SolverMVA in LINE
+//    // List<Double> QueueLengths = new ArrayList<>();
+//    // QueueLengths.add(0, 12.905);
+//    // QueueLengths.add(1, 17.083);
+//
+//    // Mean Queue Length transferred to a JLineMatrix
     Matrix QNSSA = new Matrix(model.getNumberOfNodes(), model.getNumberOfClasses());
     int numRows = QNSSA.getNumRows();
     for (int row = 0; row < numRows; row++) {

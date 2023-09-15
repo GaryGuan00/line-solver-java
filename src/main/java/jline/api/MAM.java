@@ -31,7 +31,7 @@ public class MAM {
 		}else if(Objects.equals(config.method,"mixture.order2")){
 			//mmap = mmap_mixture_fit_mmap(MMAP).MMAP;
 		}
-		//todo more methods
+		//TODO: more methods
 		return mmap;
 	}
 

@@ -9,7 +9,7 @@ import java.util.Map;
 
 import jline.lang.constant.GlobalConstants;
 import jline.lang.distributions.*;
-import jline.util.JFunction;
+import jline.util.SerializableFunction;
 import jline.util.Matrix;
 
 import jline.lang.*;
@@ -22,7 +22,7 @@ public class Station extends StatefulNode implements Serializable {
     protected Map<JobClass, Double> classCap;
     protected Map<JobClass, DropStrategy> dropRule;
     protected Matrix lldScaling;
-    protected JFunction<Matrix, Double> lcdScaling;
+    protected SerializableFunction<Matrix, Double> lcdScaling;
 
     protected Map<JobClass, DepartureEvent> departureEvents;
 
@@ -40,6 +40,9 @@ public class Station extends StatefulNode implements Serializable {
     }
 
     public void setNumberOfServers(int numberOfServers) {
+        if (numberOfServers == -1) { // may result of a double Inf is casted as input
+            numberOfServers = Integer.MAX_VALUE;
+        }
         this.numberOfServers = numberOfServers;
     }
 
@@ -243,11 +246,11 @@ public class Station extends StatefulNode implements Serializable {
     	return this.lldScaling;
     }
     
-    public void setLimitedClassDependence(JFunction<Matrix, Double> gamma) {
+    public void setLimitedClassDependence(SerializableFunction<Matrix, Double> gamma) {
     	this.lcdScaling = gamma;
     }
     
-    public JFunction<Matrix, Double> getLimitedClassDependence(){
+    public SerializableFunction<Matrix, Double> getLimitedClassDependence(){
     	return this.lcdScaling;
     }
 }

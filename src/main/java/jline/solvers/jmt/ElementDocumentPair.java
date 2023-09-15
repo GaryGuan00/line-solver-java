@@ -1,10 +1,13 @@
 package jline.solvers.jmt;
 
-public class ElementDocumentPair {
-    public Object simElem;  // Replace Object with the actual type
-    public Object simDoc;  // Replace Object with the actual type
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
-    public ElementDocumentPair(Object simElem, Object simDoc) {
+public class ElementDocumentPair {
+    public Element simElem;
+    public Document simDoc;
+
+    public ElementDocumentPair(Element simElem, Document simDoc) {
         this.simElem = simElem;
         this.simDoc = simDoc;
     }

@@ -6,10 +6,8 @@ import jline.api.SN;
 import jline.lang.JobClass;
 import jline.lang.Network;
 import jline.lang.NetworkStruct;
-import jline.lang.constant.GlobalConstants;
-import jline.lang.constant.NodeType;
-import jline.lang.constant.SchedStrategy;
-import jline.lang.constant.SolverType;
+import jline.lang.constant.*;
+import jline.lang.distributions.APH;
 import jline.lang.nodes.Station;
 import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
@@ -29,11 +27,11 @@ import static jline.lib.thirdparty.BUTOOLS.*;
 
 public class SolverMAM extends NetworkSolver {
     public SolverMAM(Network model){
-        super(model,"MAM",new SolverOptions(SolverType.MAM));
+        super(model,"SolverMAM",new SolverOptions(SolverType.MAM));
     }
 
     public SolverMAM(Network model, SolverOptions options){
-        super(model,"MAM",options);
+        super(model,"SolverMAM",options);
     }
 
     public NetworkStruct getStruct(){
@@ -46,7 +44,7 @@ public class SolverMAM extends NetworkSolver {
 
     @Override
     public void runAnalyzer(){
-        long start = System.currentTimeMillis();
+        double start = System.currentTimeMillis();
         NetworkStruct sn = getStruct();
         result = solver_mam_analyser(sn);
         int M = sn.nstations;
@@ -68,25 +66,55 @@ public class SolverMAM extends NetworkSolver {
 
         //setAvgResults();
 
-        long finish = System.currentTimeMillis();
-        result.runtime = finish - start;
+        double finish = System.currentTimeMillis();
+        result.runtime = (finish - start)/1000;
     }
 
-    public SolverResult solver_mam_analyser(NetworkStruct sn) {
-        long start = System.currentTimeMillis();
+    public SolverMAMResult solver_mam_analyser(NetworkStruct sn) {
+        long start = System.nanoTime();
         options.config.merge = "super";
         options.config.compress = "mixture.order1";
         options.config.space_max = 128;
-        SolverResult result = new SolverResult();
+        SolverMAMResult result = new SolverMAMResult();
         if (options.method.equals("dec.mmap")) {
-            result = solver_mam(sn);
+            result = (SolverMAMResult) solver_mam(sn);
         } else if (options.method.equals("default") || options.method.equals("dec.source")) {
-            result = solver_mam_basic(sn);
+            result = (SolverMAMResult) solver_mam_basic(sn);
         } else if (options.method.equals("poisson")) {
             options.config.space_max = 1;
-            result = solver_mam_basic(sn);
+            result = (SolverMAMResult) solver_mam_basic(sn);
+        }else if(options.method.equals("qnamam")){
+            boolean closed = false;
+            boolean open = false;
+            for(int i=0;i<sn.nclasses;i++){
+                if(Double.isInfinite(sn.njobs.get(i))){
+                    open = true;
+                    break;
+                }
+            }
+            for(int i=0;i<sn.nclasses;i++){
+                if(Double.isFinite(sn.njobs.get(i))){
+                    closed = true;
+                    break;
+                }
+            }
+            if(closed&&!open){
+                result = (SolverMAMResult) solver_qna_mam_closed(sn);
+            }else if (open &&!closed) {
+                result = (SolverMAMResult) solver_qna_mam(sn);
+            }else {
+                throw new RuntimeException("Unsupport model for QNAMAM");
+            }
         } else {
             throw new RuntimeException("Unknown method");
+        }
+
+        for(int i=0;i<sn.nstations;i++){
+            if(sn.sched.get(sn.stations.get(i))==SchedStrategy.EXT){
+                for(int j=0;j<result.TN.numCols;j++){
+                    result.TN.set(i,j,sn.rates.get(i,j));
+                }
+            }
         }
 
         result.QN.removeNaN();
@@ -95,9 +123,324 @@ public class SolverMAM extends NetworkSolver {
         result.UN.removeNaN();
         result.XN.removeNaN();
         result.TN.removeNaN();
-        long finish = System.currentTimeMillis();
+        long finish = System.nanoTime();
         result.runtime = finish - start;
         return  result;
+    }
+
+    public SolverResult solver_qna_mam(NetworkStruct sn){
+        SolverOptions.Config config = options.config;
+        config.space_max = 1;
+
+        int K = sn.nclasses;
+        Matrix rt = sn.rt.clone();
+        Matrix S = sn.rates.element_power(-1);
+        Matrix scv = sn.scv.clone();
+        scv.removeNaN();
+        Map<Station, Map<JobClass, Map<Integer, Matrix>>> PH = sn.proc;
+        int I = sn.nnodes;
+        int M = sn.nstations;
+        int C = sn.nchains;
+        Matrix V = Matrix.cellsum(sn.visits);
+        Matrix Q = new Matrix(M,K,M*K);
+        Map<Integer,Map<Integer,Matrix>> pie = new HashMap<>();
+        Map<Integer,Map<Integer,Matrix>> DO = new HashMap<>();
+
+
+        Matrix U = new Matrix(M,K,M*K);
+        Matrix R = new Matrix(M,K,M*K);
+        Matrix T = new Matrix(M,K,M*K);
+        Matrix X = new Matrix(1,K,K);
+        for(int ist=0; ist<M;ist++){
+            if(sn.sched.get(sn.stations.get(ist)) == SchedStrategy.FCFS||sn.sched.get(sn.stations.get(ist))==SchedStrategy.HOL||sn.sched.get(sn.stations.get(ist))==SchedStrategy.PS){
+                pie.put(ist,new HashMap<Integer,Matrix>());
+                DO.put(ist,new HashMap<Integer,Matrix>());
+                for(int k = 0;k<K;k++){
+                    PH.get(sn.stations.get(ist)).put(sn.jobclasses.get(k),map_scale(PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(0),PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(1),S.get(ist,k)/sn.nservers.get(ist)));
+                    pie.get(ist).put(k,map_pie(PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(0),PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(1)));
+                    DO.get(ist).put(k,PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(0));
+                }
+            }
+        }
+
+        Matrix lambda = new Matrix(1,C,C);
+
+        int it = 0;
+
+        Matrix a1 = new Matrix(M,K,M*K);
+        Matrix a2 = new Matrix(M,K,M*K);
+        Matrix a1_1 = a1.elementIncrease(Double.POSITIVE_INFINITY);
+
+        Matrix a2_1 = a2.elementIncrease(Double.POSITIVE_INFINITY);
+
+        Matrix d2 = new Matrix(M,1,M);
+        Matrix f2 = new Matrix(M*K,M*K,(int)Math.pow(M*K,2));
+        for(int i=0;i<M;i++){
+            for(int j=0;j<M;j++){
+                if(sn.nodetypes.get((int)sn.stationToNode.get(j))!= NodeType.Source){
+                    for(int r=0;r<K;r++){
+                        for(int s=0;s<K;s++){
+                            if(rt.get(i*K+r,j*K+s)>0){
+                                f2.set(i*K+r,j*K+s,1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Map<Integer,Matrix> lambdas_inchain = new HashMap<>();
+        Map<Integer,Matrix> scvs_inchain = new HashMap<>();
+        Matrix d2c = new Matrix(1,C,C);
+        int last_source_idx = 0;
+        for(int c=0;c<C;c++){
+            Matrix inchain = sn.inchain.get(c);
+            int sourceIdx = (int)sn.refstat.get((int)inchain.get(0));
+            last_source_idx = sourceIdx;
+            lambdas_inchain.put(c,new Matrix(1, inchain.length(), inchain.length()));
+            for(int i=0;i< inchain.length();i++){
+                lambdas_inchain.get(c).set(0,i,sn.rates.get(sourceIdx,(int)inchain.get(i)));
+            }
+            scvs_inchain.put(c,new Matrix(1, inchain.length(), inchain.length()));
+            for (int i=0;i<inchain.length();i++){
+                scvs_inchain.get(c).set(0,i,scv.get(sourceIdx,(int)inchain.get(i)));
+            }
+            Matrix lambdas_inchain_C = lambdas_inchain.get(c).clone();
+            lambdas_inchain_C.removeINF();
+            lambda.set(c,lambdas_inchain_C.elementSum());
+            d2c.set(c,qna_superpos(lambdas_inchain.get(c),scvs_inchain.get(c)));
+            boolean openChain = false;
+            for(int i=0;i<inchain.length();i++){
+                if(Double.isInfinite(sn.njobs.get((int)inchain.get(i)))){
+                    openChain = true;
+                }
+            }
+
+            for(int i=0;i< inchain.length();i++){
+                T.set(sourceIdx,(int)inchain.get(i),lambdas_inchain.get(c).get(i));
+            }
+        }
+        d2.set(last_source_idx,Matrix.extractRows(d2c,last_source_idx,last_source_idx+1,null).mult(lambda.transpose()).get(0)/lambda.elementSum());
+        Matrix a1_diff = a1.add(-1,a1_1);
+        a1_diff.abs();
+        Matrix a2_diff = a2.add(-1,a2_1);
+        a2_diff.abs();
+
+        while ((a1_diff.elementMax()> options.iter_tol||a2_diff.elementMax()>options.iter_tol)&&it<= options.iter_max){
+            it = it+1;
+            a1_1 = a1.clone();
+            a2_1 = a2.clone();
+
+            if(it==1){
+                for(int c=0;c<C;c++){
+                    Matrix inchain = sn.inchain.get(c);
+                    for(int m=0; m<M;m++){
+                        for(int i=0;i<inchain.length();i++){
+                            T.set(m,(int)inchain.get(i),V.get(m,(int) inchain.get(i))*lambda.get(c));
+                        }
+                    }
+                }
+            }
+            for(int i=0;i<M;i++){
+                for(int j=0;j<K;j++){
+                    a1.set(i,j,0);
+                    a2.set(i,j,0);
+                }
+                double lambda_i = T.sumRows(i);
+                for (int j=0;j<M;j++){
+                    for(int r=0;r<K;r++){
+                        for(int s=0;s<K;s++){
+                            a1.set(i,r,a1.get(i,r)+T.get(j,s)*rt.get(j*K+s,i*K+r));
+                            a2.set(i,r,a2.get(i,r)+(1/lambda_i)*f2.get(j*K+s,i*K+r)*T.get(j,s)*rt.get(j*K+s,i*K+r));
+                        }
+                    }
+                }
+            }
+
+            for(int ind = 0;ind<I;ind++){
+                if(sn.isstation.get(ind)==1){
+                    int ist = (int) sn.nodeToStation.get(ind);
+                    if(sn.nodetypes.get(ind)!=NodeType.Join){
+                        if(sn.sched.get(sn.stations.get(ist))==SchedStrategy.INF){
+                            for(int i=0;i<M;i++){
+                                for(int r=0;r<K;r++){
+                                    for(int s=0;s<K;s++){
+                                        d2.set(ist,s,a2.get(ist,s));
+                                    }
+                                }
+                            }
+                            for(int c=0;c<C;c++){
+                                Matrix inchain = sn.inchain.get(c);
+                                for(int k1=0;k1<inchain.length();k1++){
+                                    int k = (int) inchain.get(k1);
+                                    T.set(ist,k,a1.get(ist,k));
+                                    U.set(ist,k,S.get(ist,k)*T.get(ist,k));
+                                    Q.set(ist,k,T.get(ist,k)*S.get(ist,k)*V.get(ist,k));
+                                    R.set(ist,k,Q.get(ist,k)/T.get(ist,k));
+                                }
+                            }
+                        }else if(sn.sched.get(sn.stations.get(ist))==SchedStrategy.FCFS){
+                            Matrix mu_ist = new Matrix(1,K,K);
+                            for(int i=0;i<K;i++) {
+                                mu_ist.set(i, sn.rates.get(ist, i));
+                            }
+                            mu_ist.removeNaN();
+                            Matrix rho_ist_class = new Matrix(1,K,K);
+                            for(int i=0;i<K;i++){
+                                rho_ist_class.set(i,a1.get(ist,i)/(GlobalConstants.FineTol+sn.rates.get(ist,i)));
+                            }
+                            rho_ist_class.removeNaN();
+                            double lambda_ist = a1.sumRows(ist);
+                            int mi = (int) sn.nservers.get(ist);
+                            double rho_ist = rho_ist_class.elementSum()/mi;
+                            double c2 = 0;
+                            if(rho_ist<1-options.tol){
+                                for (int k=0;k<K;k++){
+
+
+                                    double mubar = lambda_ist/rho_ist;
+                                    c2 = -1;
+                                    for (int r=0;r<K;r++){
+                                        if(mu_ist.get(r)>0){
+                                            c2 = c2+a1.get(ist,r)/lambda_ist*Math.pow(mubar/mi/mu_ist.get(r),2)*(scv.get(ist,r)+1);
+                                        }
+                                    }
+
+
+                                }
+                                d2.set(ist,1+Math.pow(rho_ist,2)*(c2-1)/Math.sqrt(mi)+(1-Math.pow(rho_ist,2))*(a2.sumRows(ist)-1));
+                            }else {
+                                for (int k=0;k<K;k++) {
+                                    Q.set(ist,k,sn.njobs.get(k));
+                                }
+                                d2.set(ist,1);
+                            }
+                            for(int k=0;k<K;k++){
+                                T.set(ist,k,a1.get(ist,k));
+                                U.set(ist,k,T.get(ist,k)*S.get(ist,k)/sn.nservers.get(ist));
+                            }
+                        }
+                    }
+                }else {
+                    if(sn.nodetypes.get(ind)==NodeType.Fork){
+                        throw new RuntimeException("Fork nodes not supported yet by QNA solver.");
+                    }
+                }
+            }
+
+            for(int i=0;i<M;i++){
+                for (int j=0;j<M;j++){
+                    if(sn.nodetypes.get((int) sn.stationToNode.get(j))!=NodeType.Source){
+                        for(int r=0;r<K;r++){
+                            for(int s=0;s<K;s++){
+                                if(rt.get(i*K+r,j*K+s)>0){
+                                    f2.set(i*K+r,j*K+s,1+rt.get(i*K+r,j*K+s)*(d2.get(i)-1));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            a1_diff = a1.add(-1,a1_1);
+            a1_diff.abs();
+            a2_diff = a2.add(-1,a2_1);
+            a2_diff.abs();
+        }
+
+        for(int ind = 0;ind<I;ind++) {
+            if (sn.isstation.get(ind) == 1) {
+                int ist = (int) sn.nodeToStation.get(ind);
+                if(sn.sched.get(sn.stations.get(ist))==SchedStrategy.FCFS){
+                    Matrix mu_ist = new Matrix(1,K,K);
+                    for(int i=0;i<K;i++) {
+                        mu_ist.set(i, sn.rates.get(ist, i));
+                    }
+                    mu_ist.removeNaN();
+                    Matrix rho_ist_class = new Matrix(1,K,K);
+                    for(int i=0;i<K;i++){
+                        rho_ist_class.set(i,a1.get(ist,i)/(GlobalConstants.FineTol+sn.rates.get(ist,i)));
+                    }
+                    rho_ist_class.removeNaN();
+                    double lambda_ist = a1.sumRows(ist);
+                    int mi = (int) sn.nservers.get(ist);
+                    double rho_ist = rho_ist_class.elementSum()/mi;
+                    double c2 = 0;
+                    if(rho_ist<1-options.tol) {
+                        Map<Integer,Matrix> arri_class_anx = new HashMap<>();
+                        Map<Integer,Matrix> arri_class = new HashMap<>();
+                        Map<Integer,Matrix> arri_node = new HashMap<>();
+                        for (int k = 0; k < K; k++) {
+                            if (a1.get(ist, k) == 0) {
+                                arri_class_anx = map_exponential(Double.POSITIVE_INFINITY);
+                            } else {
+                                arri_class_anx = APH.fitMeanAndSCV(1/a1.get(ist,k),a2.get(ist,k)).getRepres();
+                            }
+                            arri_class.put(0,arri_class_anx.get(0));
+                            arri_class.put(1,arri_class_anx.get(1));
+                            arri_class.put(2,arri_class_anx.get(1));
+                            if (k == 0) {
+                                arri_node.put(0,arri_class.get(0));
+                                arri_node.put(1,arri_class.get(1));
+                                arri_node.put(2,arri_class.get(2));
+                            } else {
+                                arri_node = mmap_super(arri_node,arri_class);
+                            }
+
+
+                        }
+                        Map<Integer, Matrix> Qret = new HashMap<>();
+                        Qret = MMAPPH1FCFS(mmap_express_transform(arri_node), pie.get(ist), DO.get(ist), 1, null, null, null, false, false, null, null).get("ncMoms");
+                        for (int i=0;i<Qret.size();i++){
+                            Q.set(ist,i,Qret.get(i).get(0));
+                        }
+                    }else{
+                        for(int k=0;k<K;k++){
+                            Q.set(ist,k,sn.njobs.get(k));
+                        }
+                    }
+                    for(int k=0;k<K;k++){
+                        R.set(ist,k,Q.get(ist,k)/T.get(ist,k));
+                    }
+
+                }
+            }
+        }
+
+        SolverMAMResult result = new SolverMAMResult();
+        Matrix CN = R.sumCols();
+        Q.abs();
+        Q.removeNaN();
+        U.removeNaN();
+        R.removeNaN();
+        CN.removeNaN();
+        X.removeNaN();
+        result.XN = X;
+        result.QN = Q;
+        result.CN = CN;
+        result.UN = U;
+        result.RN = R;
+        result.TN = T;
+        result.iter = it;
+
+        return result;
+
+    }
+
+    public static double qna_superpos(Matrix lambda, Matrix a2){
+        List<Integer> lambda_finite_idx = new ArrayList<>();
+        for(int i=0;i< lambda.length();i++){
+            if(Double.isFinite(lambda.get(i))){
+                lambda_finite_idx.add(i);
+            }
+        }
+        Matrix a2_new = new Matrix(1, lambda_finite_idx.size(), lambda_finite_idx.size());
+        for(int i=0;i<lambda_finite_idx.size();i++){
+            a2_new.set(i,a2.get(lambda_finite_idx.get(i)));
+        }
+        Matrix lambda_new = new Matrix(1, lambda_finite_idx.size(), lambda_finite_idx.size());
+        for(int i=0;i<lambda_finite_idx.size();i++){
+            lambda_new.set(i,lambda.get(lambda_finite_idx.get(i)));
+        }
+        return a2_new.mult(lambda_new.transpose()).get(0)/lambda_new.elementSum();
     }
     public SolverResult solver_mam_basic(NetworkStruct sn){
         SolverOptions.Config conifg = options.config;
@@ -118,6 +461,8 @@ public class SolverMAM extends NetworkSolver {
         Matrix UN = new Matrix(M,K,M*K);
         Matrix RN = new Matrix(M,K,M*K);
         Matrix TN = new Matrix(M,K,M*K);
+        Matrix WN = new Matrix(M,K,M*K);
+        Matrix AN = new Matrix(M,K,M*K);
         Matrix CN = new Matrix(1,K,K);
         Matrix XN = new Matrix(1,K,K);
 
@@ -256,7 +601,7 @@ public class SolverMAM extends NetworkSolver {
             }
 
             double Umax = Umax_matrix.elementMax();
-            if(Umax>1.000001){
+            if(Umax>1+ options.tol){
                 lambda.divide(Umax,lambda,true);
             }else {
                 for(int c=0;c<C;c++){
@@ -564,6 +909,8 @@ public class SolverMAM extends NetworkSolver {
         result.TN = TN;
         result.CN = CN;
         result.XN = XN;
+        result.WN = WN;
+        result.AN = AN;
         return result;
     }
 
@@ -584,6 +931,8 @@ public class SolverMAM extends NetworkSolver {
         Matrix UN = new Matrix(M,K,M*K);
         Matrix RN = new Matrix(M,K,M*K);
         Matrix TN = new Matrix(M,K,M*K);
+        Matrix AN = new Matrix(M,K,M*K);
+        Matrix WN = new Matrix(M,K,M*K);
         Matrix CN = new Matrix(1,K,K);
         Matrix XN = new Matrix(1,K,K);
 
@@ -737,7 +1086,7 @@ public class SolverMAM extends NetworkSolver {
                 }
             }
 
-            if(options.verbose== SolverOptions.VerboseLevel.STD||options.verbose== SolverOptions.VerboseLevel.DEBUG){
+            if(options.verbose== VerboseLevel.STD||options.verbose== VerboseLevel.DEBUG){
                 System.out.println("MAM parametric decomposition completed in "+last_it+" iterations");
             }
         }else {
@@ -748,11 +1097,356 @@ public class SolverMAM extends NetworkSolver {
         result.UN = UN;
         result.RN = RN;
         result.TN = TN;
+        result.WN = WN;
+        result.AN = AN;
         result.CN = CN;
         result.XN = XN;
         return result;
     }
+    public SolverResult solver_qna_mam_closed(NetworkStruct sn){
+        SolverOptions.Config config = options.config;
+        config.space_max = 1;
 
+        int K = sn.nclasses;
+        Matrix rt = sn.rt.clone();
+        Matrix S = sn.rates.element_power(-1);
+        Matrix scv = sn.scv.clone();
+        scv.removeNaN();
+        Map<Station, Map<JobClass, Map<Integer, Matrix>>> PH = sn.proc;
+        int I = sn.nnodes;
+        int M = sn.nstations;
+        int C = sn.nchains;
+        Matrix N = sn.njobs.clone();
+        Matrix V = Matrix.cellsum(sn.visits);
+
+        Map<Integer,Map<Integer,Matrix>> pie = new HashMap<>();
+        Map<Integer,Map<Integer,Matrix>> DO = new HashMap<>();
+        Matrix Q = new Matrix(M,K,M*K);
+        Matrix U = new Matrix(M,K,M*K);
+        Matrix R = new Matrix(M,K,M*K);
+        Matrix T = new Matrix(M,K,M*K);
+        Matrix X = new Matrix(1,K,K);
+
+
+        for(int ist=0; ist<M;ist++){
+            if(sn.sched.get(sn.stations.get(ist)) == SchedStrategy.FCFS){
+                pie.put(ist,new HashMap<Integer,Matrix>());
+                DO.put(ist,new HashMap<Integer,Matrix>());
+                for(int k = 0;k<K;k++){
+                    PH.get(sn.stations.get(ist)).put(sn.jobclasses.get(k),map_scale(PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(0),PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(1),S.get(ist,k)/sn.nservers.get(ist)));
+                    pie.get(ist).put(k,map_pie(PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(0),PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(1)));
+                    DO.get(ist).put(k,PH.get(sn.stations.get(ist)).get(sn.jobclasses.get(k)).get(0));
+                }
+            }
+        }
+
+        Matrix lambda = new Matrix(1,C,C);
+        Matrix QNc = sn.njobs.clone();
+        int it_out = 0;
+        Matrix lambda_lb = new Matrix(1,K,K);
+        Matrix lambda_ub = new Matrix(1,K,K);
+        for (int k=0;k<K;k++){
+            for(int i=0;i<I;i++){
+                if(sn.nservers.get(i)!=Double.POSITIVE_INFINITY){
+                    if(lambda_ub.get(k)==0){
+                        lambda_ub.set(k,sn.rates.get(i,k));
+                    }else {
+                        lambda_ub.set(k,Math.min(lambda_ub.get(k),sn.rates.get(i,k)));
+                    }
+                }
+            }
+        }
+
+
+
+        Map<Integer,Matrix> lambdas_inchain = new HashMap<>();
+        Map<Integer,Matrix> scvs_inchain = new HashMap<>();
+        Matrix d2c = new Matrix(1,C,C);
+
+
+
+        Matrix QN = new Matrix(1,K,K);
+        Matrix QN_diff = QN.add(-1,QNc);
+        QN_diff.abs();
+
+        while(QN_diff.elementMax()>options.iter_tol&&it_out<200) {
+            it_out++;
+            if(it_out==1){
+                lambda = lambda_ub.clone();
+            }else {
+                for(int k=0;k<K;k++){
+                    if(QN.get(k)<QNc.get(k)){
+                        lambda_lb.set(k,lambda.get(k));
+                    }else {
+                        lambda_ub.set(k,lambda.get(k));
+                    }
+                    lambda.set(k,(lambda_ub.get(k)+lambda_lb.get(k))/2);
+                }
+
+            }
+            int it=0;
+            Q = new Matrix(M,K,M*K);
+            U = new Matrix(M,K,M*K);
+            R = new Matrix(M,K,M*K);
+            T = new Matrix(M,K,M*K);
+            X = new Matrix(1,K,K);
+            Matrix a1 = new Matrix(M,K,M*K);
+            Matrix a2 = new Matrix(M,K,M*K);
+            Matrix a1_1 = a1.elementIncrease(Double.POSITIVE_INFINITY);
+
+            Matrix a2_1 = a2.elementIncrease(Double.POSITIVE_INFINITY);
+            Matrix a1_diff = a1.add(-1,a1_1);
+            a1_diff.abs();
+            Matrix a2_diff = a2.add(-1,a2_1);
+            a2_diff.abs();
+            Matrix d2 = new Matrix(M,1,M);
+            Matrix f2 = new Matrix(M*K,M*K,(int)Math.pow(M*K,2));
+            for(int i=0;i<M;i++){
+                for(int j=0;j<M;j++){
+                    if(sn.nodetypes.get((int)sn.stationToNode.get(j))!= NodeType.Source){
+                        for(int r=0;r<K;r++){
+                            for(int s=0;s<K;s++){
+                                if(rt.get(i*K+r,j*K+s)>0){
+                                    f2.set(i*K+r,j*K+s,1);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            while ((a1_diff.elementMax() > options.iter_tol || a2_diff.elementMax() > options.iter_tol) && it <= options.iter_max) {
+                it = it + 1;
+                a1_1 = a1.clone();
+                a2_1 = a2.clone();
+
+                if (it == 1) {
+                    for (int c = 0; c < C; c++) {
+                        Matrix inchain = sn.inchain.get(c);
+                        for (int m = 0; m < M; m++) {
+                            for (int i = 0; i < inchain.length(); i++) {
+                                T.set(m, (int) inchain.get(i), V.get(m, (int) inchain.get(i)) * lambda.get(c));
+                            }
+                        }
+                    }
+                }
+                for (int i = 0; i < M; i++) {
+                    for (int j = 0; j < K; j++) {
+                        a1.set(i, j, 0);
+                        a2.set(i, j, 0);
+                    }
+                    double lambda_i = T.sumRows(i);
+                    for (int j = 0; j < M; j++) {
+                        for (int r = 0; r < K; r++) {
+                            for (int s = 0; s < K; s++) {
+                                a1.set(i, r, a1.get(i, r) + T.get(j, s) * rt.get(j * K + s, i * K + r));
+                                a2.set(i, r, a2.get(i, r) + (1 / lambda_i) * f2.get(j * K + s, i * K + r) * T.get(j, s) * rt.get(j * K + s, i * K + r));
+                            }
+                        }
+                    }
+                }
+
+                for (int ind = 0; ind < I; ind++) {
+                    if (sn.isstation.get(ind) == 1) {
+                        int ist = (int) sn.nodeToStation.get(ind);
+                        if (sn.nodetypes.get(ind) != NodeType.Join) {
+                            if (sn.sched.get(sn.stations.get(ist)) == SchedStrategy.INF) {
+                                for (int i = 0; i < M; i++) {
+                                    for (int r = 0; r < K; r++) {
+                                        for (int s = 0; s < K; s++) {
+                                            d2.set(ist, s, a2.get(ist, s));
+                                        }
+                                    }
+                                }
+                                for (int c = 0; c < C; c++) {
+                                    Matrix inchain = sn.inchain.get(c);
+                                    for (int k1 = 0; k1 < inchain.length(); k1++) {
+                                        int k = (int) inchain.get(k1);
+                                        T.set(ist, k, a1.get(ist, k));
+                                        U.set(ist, k, S.get(ist, k) * T.get(ist, k));
+                                        Q.set(ist, k, T.get(ist, k) * S.get(ist, k) * V.get(ist, k));
+                                        R.set(ist, k, Q.get(ist, k) / T.get(ist, k));
+                                    }
+                                }
+                            } else if (sn.sched.get(sn.stations.get(ist)) == SchedStrategy.FCFS) {
+                                Matrix mu_ist = new Matrix(1, K, K);
+                                for (int i = 0; i < K; i++) {
+                                    mu_ist.set(i, sn.rates.get(ist, i));
+                                }
+                                mu_ist.removeNaN();
+                                Matrix rho_ist_class = new Matrix(1, K, K);
+                                for (int i = 0; i < K; i++) {
+                                    rho_ist_class.set(i, a1.get(ist, i) / (GlobalConstants.FineTol + sn.rates.get(ist, i)));
+                                }
+                                rho_ist_class.removeNaN();
+                                double lambda_ist = a1.sumRows(ist);
+                                int mi = (int) sn.nservers.get(ist);
+                                double rho_ist = rho_ist_class.elementSum() / mi;
+                                double c2 = 0;
+                                if (rho_ist < 1 - options.tol) {
+                                    for (int k = 0; k < K; k++) {
+
+
+                                        double mubar = lambda_ist / rho_ist;
+                                        c2 = -1;
+                                        for (int r = 0; r < K; r++) {
+                                            if (mu_ist.get(r) > 0) {
+                                                c2 = c2 + a1.get(ist, r) / lambda_ist * Math.pow(mubar / mi / mu_ist.get(r), 2) * (scv.get(ist, r) + 1);
+                                            }
+                                        }
+
+
+                                    }
+                                    d2.set(ist, 1 + Math.pow(rho_ist, 2) * (c2 - 1) / Math.sqrt(mi) + (1 - Math.pow(rho_ist, 2)) * (a2.sumRows(ist) - 1));
+                                } else {
+                                    for (int k = 0; k < K; k++) {
+                                        Q.set(ist, k, sn.njobs.get(k));
+                                    }
+                                    d2.set(ist, 1);
+                                }
+                                for (int k = 0; k < K; k++) {
+                                    T.set(ist, k, a1.get(ist, k));
+                                    U.set(ist, k, T.get(ist, k) * S.get(ist, k) / sn.nservers.get(ist));
+                                }
+                            }
+                        }
+                    } else {
+                        if (sn.nodetypes.get(ind) == NodeType.Fork) {
+                            throw new RuntimeException("Fork nodes not supported yet by QNA solver.");
+                        }
+                    }
+                }
+
+                for (int i = 0; i < M; i++) {
+                    for (int j = 0; j < M; j++) {
+                        if (sn.nodetypes.get((int) sn.stationToNode.get(j)) != NodeType.Source) {
+                            for (int r = 0; r < K; r++) {
+                                for (int s = 0; s < K; s++) {
+                                    if (rt.get(i * K + r, j * K + s) > 0) {
+                                        f2.set(i * K + r, j * K + s, 1 + rt.get(i * K + r, j * K + s) * (d2.get(i) - 1));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                a1_diff = a1.add(-1, a1_1);
+                a1_diff.abs();
+                a2_diff = a2.add(-1, a2_1);
+                a2_diff.abs();
+            }
+
+            for (int ind = 0; ind < I; ind++) {
+                if (sn.isstation.get(ind) == 1) {
+                    int ist = (int) sn.nodeToStation.get(ind);
+                    if (sn.sched.get(sn.stations.get(ist)) == SchedStrategy.FCFS) {
+
+                        Matrix rho_ist_class = new Matrix(1, K, K);
+                        for (int i = 0; i < K; i++) {
+                            rho_ist_class.set(i, a1.get(ist, i) / (GlobalConstants.FineTol + sn.rates.get(ist, i)));
+                        }
+                        rho_ist_class.removeNaN();
+
+                        int mi = (int) sn.nservers.get(ist);
+                        double rho_ist = rho_ist_class.elementSum() / mi;
+                        double c2 = 0;
+                        if (rho_ist < 1 - options.tol) {
+                            Map<Integer, Matrix> arri_class_anx = new HashMap<>();
+                            Map<Integer, Matrix> arri_class = new HashMap<>();
+                            Map<Integer, Matrix> arri_node = new HashMap<>();
+                            for (int k = 0; k < K; k++) {
+                                if (a1.get(ist, k) == 0) {
+                                    arri_class_anx = map_exponential(Double.POSITIVE_INFINITY);
+                                } else {
+                                    arri_class_anx = APH.fitMeanAndSCV(1 / a1.get(ist, k), a2.get(ist, k)).getRepres();
+                                }
+                                arri_class.put(0, arri_class_anx.get(0));
+                                arri_class.put(1, arri_class_anx.get(1));
+                                arri_class.put(2, arri_class_anx.get(1));
+                                if (k == 0) {
+                                    arri_node.put(0, arri_class.get(0));
+                                    arri_node.put(1, arri_class.get(1));
+                                    arri_node.put(2, arri_class.get(2));
+                                } else {
+                                    arri_node = mmap_super(arri_node, arri_class);
+                                }
+
+
+                            }
+                            Matrix finite_N = N.clone();
+                            finite_N.removeINF();
+                            double maxLevel = finite_N.elementMax()+1;
+                            Map<Integer, Matrix> D = mmap_express_transform(arri_node);
+                            Map<Integer, Matrix> pdistr = new HashMap<>();
+                            Map<Integer,Matrix> Qret = new HashMap<>();
+                            if (map_lambda(D.get(0), D.get(1)) < GlobalConstants.FineTol) {
+                                for (int k = 0; k < K; k++) {
+                                    Matrix pdistrK = new Matrix(1, 2, 2);
+                                    pdistrK.set(0, 1 - GlobalConstants.FineTol);
+                                    pdistrK.set(1, GlobalConstants.FineTol);
+                                    pdistr.put(k, pdistrK);
+                                    Qret.put(k, new Matrix(GlobalConstants.FineTol / sn.rates.get(ist)));
+                                }
+                            } else {
+                                pdistr = MMAPPH1FCFS(D,pie.get(ist),DO.get(ist),null,(int)maxLevel,null,null,false,false,null,null).get("ncDistr");
+                                for (int k=0;k<K;k++){
+                                    pdistr.put(k,Matrix.extractRows(pdistr.get(k).transpose(),0,(int) N.get(k)+1,null));
+                                    pdistr.get(k).abs();
+                                    double sum = 0;
+                                    for(int i=0;i<pdistr.get(k).length()-1;i++){
+                                        sum = sum+pdistr.get(k).get(i);
+                                    }
+                                    pdistr.get(k).set(pdistr.get(k).length()-1,Math.abs(1-sum));
+                                    pdistr.get(k).scale(1/pdistr.get(k).elementSum());
+                                    Matrix  a = new Matrix(1,(int) N.get(k)+1,(int) N.get(k)+1);
+                                    for(int i=0;i<a.length();i++){
+                                        a.set(i,i);
+                                    }
+                                    Matrix b = new Matrix(1,(int) N.get(k)+1,(int) N.get(k)+1);
+                                    for(int i=0;i<a.length();i++){
+                                        b.set(i,pdistr.get(k).get(i));
+                                    }
+                                    Qret.put(k,new Matrix(Math.max(0,Math.min(N.get(k),a.mult(b.transpose()).get(0)))));
+                                }
+                            }
+                            for (int i=0;i<Qret.size();i++){
+                                Q.set(ist,i,Qret.get(i).get(0));
+                            }
+                        } else {
+                            for (int k = 0; k < K; k++) {
+                                Q.set(ist, k, sn.njobs.get(k));
+                            }
+                        }
+                        for (int k = 0; k < K; k++) {
+                            R.set(ist, k, Q.get(ist, k) / T.get(ist, k));
+                        }
+
+                    }
+                }
+            }
+            QN = Q.sumCols();
+            QN_diff = QN.add(-1,QNc);
+            QN_diff.abs();
+        }
+
+        SolverMAMResult result = new SolverMAMResult();
+        Matrix CN = R.sumCols();
+        Q.abs();
+        Q.removeNaN();
+        U.removeNaN();
+        R.removeNaN();
+        CN.removeNaN();
+        X.removeNaN();
+        result.XN = X;
+        result.QN = Q;
+        result.CN = CN;
+        result.UN = U;
+        result.RN = R;
+        result.TN = T;
+        result.iter = it_out;
+
+        return result;
+
+    }
 
     private Map<Integer,Map<Integer,Matrix>> solver_mam_traffic(NetworkStruct sn, Map<Integer, Map<Integer, Map<Integer, Matrix>>> DEP, SolverOptions.Config config){
         int I = sn.nnodes;
@@ -965,7 +1659,9 @@ public class SolverMAM extends NetworkSolver {
         return RD;
     }
 
-
+    public static SolverOptions defaultOptions() {
+        return new SolverOptions(SolverType.MAM);
+    }
 
 }
 

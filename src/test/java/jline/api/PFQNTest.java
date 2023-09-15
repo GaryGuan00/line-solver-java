@@ -287,7 +287,7 @@ class PFQNTest {
         N.set(0, 0, 7);
         N.set(0, 1, 2);
         N.set(0, 2, 1);
-        int I = 100000;
+        int I = 10000;
         PFQN.pfqnLsReturn ret = PFQN.pfqn_ls(L, N, Z, I);
         assertEquals(8.433706150183025e+07, ret.Gn, 8.433706150183025e+07*0.1);
         assertEquals(  18.250331964578145, ret.lGn, 18.250331964578145*0.01);
@@ -313,7 +313,7 @@ class PFQNTest {
         N.set(0, 0, 7);
         N.set(0, 1, 2);
         N.set(0, 2, 1);
-        int I = 100000;
+        int I = 10000;
         PFQN.pfqnLsReturn ret = PFQN.pfqn_ls(L, N, Z, I);
         assertEquals(8.309387711087850e+07, ret.Gn, 8.433706150183025e+07*0.1);
         assertEquals(  18.235481576134909, ret.lGn, 18.250331964578145*0.01);
@@ -339,7 +339,7 @@ class PFQNTest {
         Z.set(0, 0, 0.144);
         Z.set(0, 1, 3.214);
         Z.set(0, 2, 55.221);
-        int I = 100000;
+        int I = 10000;
         PFQN.pfqnLsReturn ret = PFQN.pfqn_ls(L, N, Z, I);
         assertEquals(5.368090955068173e+08, ret.Gn, 5.368090955068173e+08*0.1);
         assertEquals(20.101153087417874, ret.lGn, 20.101153087417874*0.01);

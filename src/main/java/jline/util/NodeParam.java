@@ -4,6 +4,10 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
+import jline.lang.constant.ProcessType;
+import jline.lang.distributions.Distribution;
+
+import jline.lang.constant.TimingStrategy;
 import jline.lang.JobClass;
 import jline.lang.constant.JoinStrategy;
 import jline.lang.constant.ReplacementStrategy;
@@ -20,7 +24,7 @@ public class NodeParam implements Serializable {
 	public Matrix missclass;
 	
 	//Fork
-	public double fanout = Double.NaN;
+	public double fanOut = Double.NaN;
 	
 	//Join
 	public Map<JobClass, JoinStrategy> joinStrategy = null;
@@ -34,8 +38,31 @@ public class NodeParam implements Serializable {
 
 	//RoutingStrategy KCHOICES:
 	public Map<JobClass, Matrix> withMemory = null;
+	public Map<JobClass, Integer> k;
 
-	public List<String> joinRequired;
+	public List<Matrix> enabling = null;
+
+	public List<Matrix> inhibiting = null;
+
+	public Map<JobClass, Double> joinRequired;
+
+	public List<String> modenames;
+
+	public Matrix nmodeservers;
+
+	public Map<JobClass, TimingStrategy> firingid;
+
+	public List<Matrix> firing = null;
+
+	public Map<JobClass, ProcessType> firingprocid;
+
+	public Map<JobClass, Map<Integer, Matrix>> firingproc;
+
+	public List<Integer> firingphases;
+
+	public Matrix firingprio;
+
+	public Matrix fireweight;
 
 	public String fileName = null;
 
@@ -54,7 +81,9 @@ public class NodeParam implements Serializable {
 
 	public String timeAnyClass = null;
 
+	public int nmodes;
+
 	public boolean isEmpty() {
-		return Double.isNaN(fanout) && joinStrategy == null && fanIn == null && weights == null && outlinks == null;
+		return Double.isNaN(fanOut) && joinStrategy == null && fanIn == null && weights == null && outlinks == null;
 	}
 }

@@ -26,7 +26,7 @@ public class SolverFluidOtherExamplesTest {
 
     Network model = ex1();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
 
@@ -163,7 +163,7 @@ public class SolverFluidOtherExamplesTest {
 
     Network model = ex2();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
 
@@ -394,7 +394,7 @@ public class SolverFluidOtherExamplesTest {
 
     model.link(model.serialRouting(delay, queue));
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solverFluid = new SolverFluid(model, options);
 
@@ -526,7 +526,7 @@ public class SolverFluidOtherExamplesTest {
     routingMatrix.addConnection(queue, delay, closedClass3, 1.0);
     model.link(routingMatrix);
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solverFluid = new SolverFluid(model, options);
 
@@ -707,7 +707,7 @@ public class SolverFluidOtherExamplesTest {
     routingMatrix.addConnection(queue, delay, closedClass3, 1.0);
     model.link(routingMatrix);
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solverFluid = new SolverFluid(model, options);
 

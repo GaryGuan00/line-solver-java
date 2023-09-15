@@ -4,6 +4,7 @@
 package jline.solvers.fluid.analyzers;
 
 import jline.lang.constant.GlobalConstants;
+import jline.lang.constant.VerboseLevel;
 import jline.util.Matrix;
 import jline.lang.JobClass;
 import jline.lang.NetworkStruct;
@@ -191,7 +192,7 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
       this.xvec_t = xVec;
     }
     else {
-      if (options.tol > GlobalConstants.CoarseTol && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
+      if (options.tol > GlobalConstants.CoarseTol && (options.verbose == VerboseLevel.DEBUG)) {
         System.err.println(
                 "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
       }
@@ -253,6 +254,8 @@ public class MatrixMethodAnalyzer implements MethodAnalyzer {
     result.UN = new Matrix(M, K);
     result.RN = new Matrix(M, K);
     result.TN = new Matrix(M, K);
+    result.WN = new Matrix(M, K); // TODO
+    result.AN = new Matrix(M, K); // TODO
     for (int i = 0; i < M; i++) {
       for (int j = 0; j < K; j++) {
         result.QN.set(i, j, result.QNt[i][j].get(Tmax - 1, 0));

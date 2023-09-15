@@ -7,6 +7,7 @@ import jline.lang.*;
 import jline.lang.constant.GlobalConstants;
 import jline.lang.constant.SchedStrategy;
 import jline.lang.constant.SolverType;
+import jline.lang.constant.VerboseLevel;
 import jline.lang.distributions.*;
 import jline.lang.nodes.Delay;
 import jline.lang.nodes.Queue;
@@ -78,12 +79,12 @@ public class RandomEnvironment {
 
     // envModel.printStageTable();
 
-    SolverOptions options = new SolverOptions(SolverType.ENV);
+    SolverOptions options = new SolverOptions(SolverType.Env);
     options.iter_tol = 0.01;
     options.timespan[0] = 0;
-    options.verbose = SolverOptions.VerboseLevel.STD;
+    options.verbose = VerboseLevel.STD;
 
-    SolverOptions fluidOptions = new SolverOptions(SolverType.FLUID);
+    SolverOptions fluidOptions = new SolverOptions(SolverType.Fluid);
     fluidOptions.timespan[1] = 1000;
     fluidOptions.stiff = false;
     fluidOptions.setODEMaxStep(0.25);
@@ -166,15 +167,15 @@ public class RandomEnvironment {
 
     // envModel.printStageTable();
 
-    SolverOptions options = new SolverOptions(SolverType.ENV);
+    SolverOptions options = new SolverOptions(SolverType.Env);
     options.iter_tol = 0.05;
     options.timespan[0] = 0;
-    options.verbose = SolverOptions.VerboseLevel.STD;
+    options.verbose = VerboseLevel.STD;
 
-    SolverOptions fluidOptions = new SolverOptions(SolverType.FLUID);
+    SolverOptions fluidOptions = new SolverOptions(SolverType.Fluid);
     fluidOptions.stiff = false;
     fluidOptions.setODEMaxStep(0.25);
-    fluidOptions.verbose = SolverOptions.VerboseLevel.SILENT;
+    fluidOptions.verbose = VerboseLevel.SILENT;
 
     NetworkSolver[] solvers = new NetworkSolver[E];
     for (int e = 0; e < E; e++) {
@@ -229,14 +230,14 @@ public class RandomEnvironment {
 
     // envModel.printStageTable();
 
-    SolverOptions options = new SolverOptions(SolverType.ENV);
+    SolverOptions options = new SolverOptions(SolverType.Env);
     options.iter_tol = 0.05;
     options.timespan[0] = 0;
 
-    SolverOptions fluidOptions = new SolverOptions(SolverType.FLUID);
+    SolverOptions fluidOptions = new SolverOptions(SolverType.Fluid);
     fluidOptions.stiff = false;
     fluidOptions.setODEMaxStep(0.25);
-    fluidOptions.verbose = SolverOptions.VerboseLevel.SILENT;
+    fluidOptions.verbose = VerboseLevel.SILENT;
 
     NetworkSolver[] solvers = new NetworkSolver[E];
     for (int e = 0; e < E; e++) {
@@ -295,16 +296,16 @@ public class RandomEnvironment {
     }
     envModel.resetEnvRatesFun[0][1] = resetEnvRatesFunction;
 
-    SolverOptions options = new SolverOptions(SolverType.ENV);
+    SolverOptions options = new SolverOptions(SolverType.Env);
     options.iter_tol = 0.01;
     options.timespan[0] = 0;
     options.method = "statedep";
 
-    SolverOptions fluidOptions = new SolverOptions(SolverType.FLUID);
+    SolverOptions fluidOptions = new SolverOptions(SolverType.Fluid);
     fluidOptions.method = "matrix";
     fluidOptions.stiff = false;
     fluidOptions.setODEMaxStep(0.1);
-    fluidOptions.verbose = SolverOptions.VerboseLevel.SILENT;
+    fluidOptions.verbose = VerboseLevel.SILENT;
 
     NetworkSolver[] solvers = new NetworkSolver[E];
     for (int e = 0; e < E; e++) {
@@ -355,15 +356,15 @@ public class RandomEnvironment {
       }
     }
 
-    SolverOptions options = new SolverOptions(SolverType.ENV);
+    SolverOptions options = new SolverOptions(SolverType.Env);
     options.iter_tol = 0.01;
     options.timespan[0] = 0;
 
-    SolverOptions fluidOptions = new SolverOptions(SolverType.FLUID);
+    SolverOptions fluidOptions = new SolverOptions(SolverType.Fluid);
     fluidOptions.method = "matrix";
     fluidOptions.stiff = false;
     fluidOptions.setODEMaxStep(0.1);
-    fluidOptions.verbose = SolverOptions.VerboseLevel.SILENT;
+    fluidOptions.verbose = VerboseLevel.SILENT;
 
     NetworkSolver[] solvers = new NetworkSolver[E];
     for (int e = 0; e < E; e++) {

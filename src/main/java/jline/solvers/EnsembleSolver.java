@@ -6,6 +6,7 @@ package jline.solvers;
 import jline.lang.Ensemble;
 import jline.lang.Network;
 import jline.lang.constant.SolverType;
+import jline.lang.constant.VerboseLevel;
 
 import java.util.*;
 
@@ -18,11 +19,17 @@ public abstract class EnsembleSolver extends Solver {
 
   protected Map<Integer, Map<Integer, SolverResult>> results;
 
+  protected EnsembleSolver(String name) {
+    this(null, name, EnsembleSolver.defaultOptions());
+  }
+
   protected EnsembleSolver(Ensemble ensModel, String name, SolverOptions options) {
     super(name);
-    this.options = options; // TODO: self.setOptions(options);
-    this.ensemble = ensModel.getEnsemble().toArray(new Network[0]);
-    this.solvers = new NetworkSolver[ensemble.length];
+    this.options = options;
+    if (ensModel != null) {
+      this.ensemble = ensModel.getEnsemble().toArray(new Network[0]);
+      this.solvers = new NetworkSolver[ensemble.length];
+    }
     this.results = new HashMap<>();
   }
 
@@ -42,7 +49,7 @@ public abstract class EnsembleSolver extends Solver {
   protected abstract void pre(int it);
 
   // Operations within an iteration
-  protected abstract void analyze(int e);
+  protected abstract SolverResult analyze(int it, int e);
 
   // Operations after an iteration
   protected abstract void post(int it);
@@ -77,30 +84,35 @@ public abstract class EnsembleSolver extends Solver {
       pre(it);
       long solveStartTime = System.nanoTime();
       if (Objects.equals(options.method, "para")) {
-        // TODO: add in parallel solving
+        // TODO: add here parallel solver
       } else {
         for (int e = 0; e < E; e++) {
-          analyze(e);
+          SolverResult results_it_e = analyze(it,e);
           if (results.containsKey(it)) {
-            results.get(it).put(e, solvers[e].result.deepCopy());
+            results.get(it).put(e, results_it_e);
           } else {
             HashMap<Integer, SolverResult> modelIdxToResultMap = new HashMap<>();
-            modelIdxToResultMap.put(e, solvers[e].result.deepCopy());
+            modelIdxToResultMap.put(e, results_it_e);
             results.put(it, modelIdxToResultMap);
           }
         }
       }
 
-      if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
+      if (options.verbose != VerboseLevel.SILENT) {
         solveRuntimes.add(((System.nanoTime() - solveStartTime) / 1000000000.0));
         totalRuntime = (System.nanoTime() - outerStartTime) / 1000000000.0;
-        System.out.format("Iter %d. ", it);
+        if (it > 2) {
+          //System.out.format("\nIter %d. ", it);
+          System.out.format("Iter %d. ", it);  //different from MATLAB
+        } else {
+          System.out.format("Iter %d. ", it);
+        }
       }
 
       long synchStartTime = System.nanoTime();
       post(it);
       synchRuntimes.add((System.nanoTime() - synchStartTime) / 1000000000.0);
-      if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
+      if (options.verbose != VerboseLevel.SILENT) {
         System.out.format(
             "Analyze time: %fs. Update time: %fs. Runtime: %fs. \n",
             solveRuntimes.get(it - 1), synchRuntimes.get(it - 1), totalRuntime);
@@ -110,7 +122,7 @@ public abstract class EnsembleSolver extends Solver {
     finish();
 
     double finalRuntime = (System.nanoTime() - outerStartTime) / 1000000000.0;
-    if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
+    if (options.verbose != VerboseLevel.SILENT) {
       double totalSolveRuntime = 0;
       double totalSynchRuntime = 0;
       for (Double runtime : solveRuntimes) {
@@ -136,7 +148,7 @@ public abstract class EnsembleSolver extends Solver {
 
   // Ensemble Solver options
   public static SolverOptions defaultOptions() {
-    return new SolverOptions(SolverType.ENV);
+    return new SolverOptions(SolverType.Env);
   }
 
   // NOTE: the following LINE methods have not been migrated to JLINE

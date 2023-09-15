@@ -9,9 +9,9 @@ import java.util.Random;
 
 public class Det extends Distribution implements Serializable {
 
-    public Det(double value) {
-        super("jline.Det", 1, new Interval(value, value));
-        this.setParam(1, "value", value);
+    public Det(double t) {
+        super("Det", 1, new Interval(t, t));
+        this.setParam(1, "t", t);
     }
 
     public boolean isDisabled() {
@@ -52,6 +52,7 @@ public class Det extends Distribution implements Serializable {
     }
 
     public double evalCDF(double t) {
+        // Evaluate the cumulative distribution function at t
         if (t < (double) this.getParam(1).getValue()) {
             return 0;
         } else {
@@ -60,6 +61,7 @@ public class Det extends Distribution implements Serializable {
     }
 
     public double evalLST(double s) {
+        // Evaluate the Laplace-Stieltjes transform of the distribution function at t
         return Math.exp(-s * (double) this.getParam(1).getValue());
     }
 
@@ -78,4 +80,16 @@ public class Det extends Distribution implements Serializable {
     public double getVar() {
         return 0;
     }
+
+    @Override
+    public boolean isContinuous() {
+        return true;
+    }
+
+    @Override
+    public boolean isDiscrete() {
+        return true;
+    }
+
+
 }

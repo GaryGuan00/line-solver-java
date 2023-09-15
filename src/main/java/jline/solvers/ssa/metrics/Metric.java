@@ -83,10 +83,6 @@ public abstract class Metric<T extends Number, U> {
     public abstract void fromEvent(double t, Event e, int n);
     public abstract T getMetric();
 
-    public void taper(double t) {
-        this.time = t;
-    }
-
     public String getName() {
         return this.name;
     }
@@ -96,6 +92,10 @@ public abstract class Metric<T extends Number, U> {
 
     public void setShortName(String shortName) {
         this.shortName = shortName;
+    }
+
+    public void taper(double t) {
+        this.time = t;
     }
 
     public void resetHistory() {

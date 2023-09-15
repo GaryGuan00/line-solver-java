@@ -4,8 +4,10 @@
 package jline.solvers;
 
 import jline.lang.Model;
+import jline.lang.Network;
 import jline.lang.constant.SolverType;
 
+import javax.xml.parsers.ParserConfigurationException;
 import java.util.Random;
 
 // Abstract class for model solution algorithms and tools
@@ -19,7 +21,7 @@ public abstract class Solver {
 
   protected Solver(String name, SolverOptions options) {
     this.name = name;
-    this.options = options;
+    this.setOptions(options);
     this.result = new SolverResult();
     this.enableChecks = true;
     this.random = new Random(options.seed);
@@ -30,17 +32,12 @@ public abstract class Solver {
   }
 
   // Generic method to run the solver
-  protected abstract void runAnalyzer() throws IllegalAccessException;
+  protected abstract void runAnalyzer() throws IllegalAccessException, ParserConfigurationException;
 
   protected void setChecks(boolean bool) {
     enableChecks = bool;
   }
 
-  // Check if input option data structure is valid for the given model
-  protected void checkOptions() {
-    // TODO: implementation
-    throw new RuntimeException("checkOptions() has not yet been implemented in JLINE.");
-  }
 
   // Check if the model has been solved
   protected boolean hasResults() {
@@ -59,8 +56,7 @@ public abstract class Solver {
 
   // Set a new options data structure
   protected void setOptions(SolverOptions options) {
-    // TODO: implementation
-    throw new RuntimeException("setOptions() has not yet been implemented in JLINE.");
+    this.options = options;
   }
 
   // Assign a new seed to the random number generator
@@ -75,8 +71,8 @@ public abstract class Solver {
   }
 
   // Return default options
-  protected static SolverOptions defaultOptions() {
-    return new SolverOptions(SolverType.MVA);
+  public static SolverOptions defaultOptions() {
+    return new SolverOptions(null);
     // The line below (iter_max = 100) appears in LINE but is very out of place here
     // Removed for now but leaving commented in case it serves an important purpose
     // options.iter_max = 100;
@@ -107,4 +103,6 @@ public abstract class Solver {
   // j) isValidOption() - all options are always available as part of SolverOptions class
   // k) getDefaultOptions() - duplicative with static method defaultOptions()
   // l) supports() - static method at specific Solver level rather than abstract within Solver class
+
+
 }

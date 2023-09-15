@@ -18,7 +18,7 @@ public class SolverFluidClosedExamplesTest {
 
     Network model = closed_ex1();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
     solver.options.stiff = true;
@@ -123,7 +123,7 @@ public class SolverFluidClosedExamplesTest {
 
     Network model = closed_ex2();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
 
@@ -250,7 +250,7 @@ public class SolverFluidClosedExamplesTest {
 
     Network model = closed_ex3();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
 
@@ -421,7 +421,7 @@ public class SolverFluidClosedExamplesTest {
 
     Network model = closed_ex4();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
 
@@ -550,7 +550,7 @@ public class SolverFluidClosedExamplesTest {
 
     Network model = closed_ex5();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
 
@@ -727,7 +727,7 @@ public class SolverFluidClosedExamplesTest {
 
     Network model = closed_ex6();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
 
@@ -1000,7 +1000,7 @@ public class SolverFluidClosedExamplesTest {
 
     Network model = closed_ex7();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
 
@@ -1127,7 +1127,7 @@ public class SolverFluidClosedExamplesTest {
 
     Network model = closed_ex8();
 
-    SolverOptions options = new SolverOptions(SolverType.FLUID);
+    SolverOptions options = new SolverOptions(SolverType.Fluid);
     options.iter_max = 200;
     SolverFluid solver = new SolverFluid(model, options);
 

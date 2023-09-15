@@ -11,14 +11,24 @@ import static jline.lib.KPCToolbox.*;
 @SuppressWarnings("unchecked")
 public class Coxian extends MarkovianDistribution{
 
+	List<Double> totalPhaseRate;
+
 	public Coxian(List<Double> mu, List<Double> phi) {
         super("Coxian", 1);
 		
         if (!checkParameter(mu, phi))
         	throw new RuntimeException("Parameter Error");
-        
+
+		int nPhases = mu.size();
         this.setParam(1, "mu", mu);
         this.setParam(2, "phi", phi);
+
+		this.totalPhaseRate = new ArrayList<Double>(nPhases);
+
+		for (int i = 0; i < nPhases; i++) {
+			double tpr = mu.get(i);
+			this.totalPhaseRate.add(tpr);
+		}
 	}
 
 	private boolean checkParameter(List<Double> p, List<Double> lambda) {	
@@ -133,8 +143,10 @@ public class Coxian extends MarkovianDistribution{
 			Matrix expression3 = expression1.add(1, expression2);
 			
 			//phi.*mu
-			Matrix expression4 = mu.mult(phi, null);
-			
+			Matrix expression4 = new Matrix(mu.numRows, 1);
+			for(int i = 0; i < mu.numRows; i++)
+				expression4.set(i, 0, mu.get(i, 0) * (phi.get(i, 0)));
+
 			//zeros(length(mu),length(mu)-1)
 			Matrix expression5 = new Matrix(mu.numRows, mu.numRows - 1);
 			
@@ -210,6 +222,10 @@ public class Coxian extends MarkovianDistribution{
 		Coxian cx = new Coxian(mu, phi);
 		cx.immediate = mean < GlobalConstants.CoarseTol;
 		return cx;
+	}
+
+	public double getTotalPhaseRate(int i) {
+		return totalPhaseRate.get(i);
 	}
 
 }

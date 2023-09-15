@@ -414,7 +414,7 @@ public class SolverFluid extends NetworkSolver {
 
     switch (options.method) {
       case "matrix":
-        if (hasOpenClasses && (options.verbose != SolverOptions.VerboseLevel.SILENT)) {
+        if (hasOpenClasses && (options.verbose != VerboseLevel.SILENT)) {
           System.err.println(
               "The matrix solver does not support open arrivals. Using options.method = 'closing' instead.");
           options.method = "closing";
@@ -438,7 +438,7 @@ public class SolverFluid extends NetworkSolver {
     result.method = options.method;
 
     if (isInfinite(options.timespan[0])) {
-      if (options.verbose == SolverOptions.VerboseLevel.DEBUG) {
+      if (options.verbose == VerboseLevel.DEBUG) {
         System.err.println(
             "SolverFluid requires options.timespan[0] to be finite. Setting it to 0.");
       }
@@ -1007,6 +1007,6 @@ public class SolverFluid extends NetworkSolver {
   }
 
   public static SolverOptions defaultOptions() {
-    return new SolverOptions(SolverType.FLUID);
+    return new SolverOptions(SolverType.Fluid);
   }
 }

@@ -44,7 +44,7 @@ public class DockerClient {
         Activity A1 = new Activity(model, "A1", new Exp(1.0));
         A1.on(T1);A1.boundTo(E1);A1.synchCall(E2,3);
         long t6 = System.nanoTime() - s6;
-        Activity A2 = new Activity(model, "A2", new Exp(2.0));//TODO: Cox.fitMeanAndSCV
+        Activity A2 = new Activity(model, "A2", new Exp(2.0));
         A2.on(T2);A2.boundTo(E2);
         A2.repliesTo(E2);
 

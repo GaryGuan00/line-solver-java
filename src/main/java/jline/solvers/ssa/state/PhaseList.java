@@ -1,6 +1,6 @@
 package jline.solvers.ssa.state;
 
-import jline.util.CumulativeDistribution;
+import jline.lang.distributions.CumulativeDistribution;
 import jline.util.Matrix;
 
 import java.util.*;
@@ -72,7 +72,7 @@ public class PhaseList {
             return 0;
         }
 
-        return this.startingPhaseProbabilities.get(classIdx).generate();
+        return this.startingPhaseProbabilities.get(classIdx).sample(random);
     }
 
     public void setPhaseVector(Integer[] nInPhase) {

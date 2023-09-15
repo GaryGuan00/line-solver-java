@@ -352,10 +352,10 @@ public class LayeredModel {
         T9.addPrecedence(ActivityPrecedence.Sequence("InternalAction_addcart__5JEHQMhoEeKON4DtRoKCMw_34_50", "StopAction_stop__EkCLMMhoEeKON4DtRoKCMw_34_5"));
 
         SolverLN solver = new SolverLN(model);
-        solver.getEnsemble()[7].getConnectionMatrix().print();
-        for(int i=0;i<solver.getEnsemble().length;i++) {
+        solver.getEnsemble().get(7).getConnectionMatrix().print();
+        for(int i=0;i<solver.getEnsemble().size();i++) {
             System.out.println("Solver result "+i);
-            Network layer = solver.getEnsemble()[i];
+            Network layer = solver.getEnsemble().get(i);
             SolverMVA layersolver = new SolverMVA(layer);
             layersolver.getAvgTable();
         }
@@ -370,14 +370,14 @@ public class LayeredModel {
         // Use this block to test single layer.
         // Layer 1
         System.out.println("The MVA solver result for Layer 1");
-        Network network1 = solver.getEnsemble()[0];
+        Network network1 = solver.getEnsemble().get(0);
         SolverMVA layersolver1 = new SolverMVA(network1);
         layersolver1.getAvgTable();
         System.out.println("----------------------------------------------------------------------------------------");
 
         //layer 2
         System.out.println("The MVA solver result for Layer 2");
-        Network network2 = solver.getEnsemble()[1];
+        Network network2 = solver.getEnsemble().get(1);
         SolverMVA layersolver2 = new SolverMVA(network2);
         layersolver2.getAvgTable();
         System.out.println("----------------------------------------------------------------------------------------");

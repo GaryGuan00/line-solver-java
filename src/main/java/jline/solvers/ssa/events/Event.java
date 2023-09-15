@@ -8,7 +8,6 @@ import java.util.Set;
 
 import jline.lang.nodes.Node;
 import jline.solvers.ctmc.EventData;
-import jline.solvers.ssa.Timeline;
 import jline.solvers.ssa.state.SSAStateMatrix;
 
 public class Event implements Serializable {
@@ -18,16 +17,6 @@ public class Event implements Serializable {
 
     public double getRate(SSAStateMatrix networkState) {
         return Double.NaN;
-    }
-
-    public boolean stateUpdate(SSAStateMatrix networkState, Random random, Timeline timeline) {
-        /*
-            stateUpdate -
-                Attempt to apply an event to the stateMatrix
-
-            Returns: (boolean) - whether the update was successful or not
-         */
-        return true;
     }
 
     public boolean updateStateSpace(SSAStateMatrix networkState, Random random, ArrayList<SSAStateMatrix> stateSpace, Queue<SSAStateMatrix> queue, Set<SSAStateMatrix> stateSet) {
@@ -41,22 +30,22 @@ public class Event implements Serializable {
     }
 
 
-    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, Timeline timeline) {
-        /*
-            stateUpdateN -
-                Attempt to apply N repetitions of an event to the stateMatrix
-
-            Returns: (int) - number of repetitions left unapplied
-         */
-        int rem = n;
-        for (int i = 0; i < n; i++) {
-            if (this.stateUpdate(networkState, random, timeline)) {
-                rem--;
-            }
-        }
-
-        return rem;
-    }
+//    public int stateUpdateN(int n, SSAStateMatrix networkState, Random random, SSARunner SSARunner) {
+//        /*
+//            stateUpdateN -
+//                Attempt to apply N repetitions of an event to the stateMatrix
+//
+//            Returns: (int) - number of repetitions left unapplied
+//         */
+//        int rem = n;
+//        for (int i = 0; i < n; i++) {
+//            if (this.stateUpdate(networkState, random, SSARunner)) {
+//                rem--;
+//            }
+//        }
+//
+//        return rem;
+//    }
 
     public void printSummary() {
         System.out.format("Generic event\n");

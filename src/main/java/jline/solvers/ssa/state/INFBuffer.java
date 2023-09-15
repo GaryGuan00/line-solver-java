@@ -9,9 +9,8 @@ public class INFBuffer extends SSAStateCell {
     protected int totalInQueue;
 
     protected PhaseList phaseList;
-    protected Random random;
 
-    public INFBuffer(Random random, int nClasses, PhaseList phaseList) {
+    public INFBuffer(int nClasses, PhaseList phaseList) {
         this.inQueue = new int[nClasses];
 
         for (int i = 0; i < nClasses; i++) {
@@ -20,12 +19,10 @@ public class INFBuffer extends SSAStateCell {
         this.totalInQueue = 0;
 
         this.phaseList = phaseList;
-
-        this.random = random;
     }
 
     public INFBuffer(int nClasses) {
-        this(new Random(), nClasses, null);
+        this(nClasses, null);
     }
 
 
@@ -67,7 +64,7 @@ public class INFBuffer extends SSAStateCell {
     }
 
     public SSAStateCell createCopy() {
-        INFBuffer copyBuffer = new INFBuffer(this.random, this.inQueue.length, this.phaseList.createCopy());
+        INFBuffer copyBuffer = new INFBuffer(this.inQueue.length, this.phaseList.createCopy());
         copyBuffer.totalInQueue = this.totalInQueue;
         copyBuffer.inQueue = Arrays.copyOf(this.inQueue,this.inQueue.length);
         return copyBuffer;

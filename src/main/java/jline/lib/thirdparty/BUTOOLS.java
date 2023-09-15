@@ -219,7 +219,7 @@ public class BUTOOLS {
         double ro = 0;
         for(int k=0;k<K;k++){
             lambda.set(k,theta.mult(D.get(k+1)).elementSum());
-            beta.put(k,CTMC.ctmc_solve(S.get(k).add(-1,S.get(k).sumRows()).mult(sigma.get(k))));
+            beta.put(k,CTMC.ctmc_solve(S.get(k).add(-1,S.get(k).sumRows().mult(sigma.get(k)))));
             Matrix neg_sk = S.get(k).clone();
             neg_sk.scale(-1);
             mu.set(k,beta.get(k).mult(neg_sk).elementSum());

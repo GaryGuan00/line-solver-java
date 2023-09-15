@@ -5,6 +5,7 @@ package jline.solvers.fluid.analyzers;
 
 
 import jline.lang.constant.GlobalConstants;
+import jline.lang.constant.VerboseLevel;
 import jline.util.Matrix;
 import jline.lang.JobClass;
 import jline.lang.NetworkStruct;
@@ -49,19 +50,29 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
     int slowrateRows = slowrate.getNumRows();
     int slowrateCols = slowrate.getNumCols();
     double minNonZeroRate = POSITIVE_INFINITY;
+
+    double maxNonZeroRate = 0;
     for (int i = 0; i < slowrateRows; i++) {
       for (int j = 0; j < slowrateCols; j++) {
         if ((slowrate.get(i, j) > GlobalConstants.CoarseTol)
-                && Double.isFinite(slowrate.get(i, j))
-                && (slowrate.get(i, j) < minNonZeroRate)) {
-          minNonZeroRate = slowrate.get(i, j);
+                && Double.isFinite(slowrate.get(i, j))){
+          if (slowrate.get(i, j) < minNonZeroRate) {
+            minNonZeroRate = slowrate.get(i, j);
+          }
+          if (slowrate.get(i, j) > maxNonZeroRate) {
+            maxNonZeroRate = slowrate.get(i, j);
+          }
         }
       }
     }
 
+
     // Initialise ODE
     FirstOrderDifferentialEquations ode =
             new ClosingAndStateDepMethodsODE(sn, mu, phi, sn.proc, sn.rt, S, options);
+
+    //decide whether to use stiff or non-stiff method
+    options.stiff = detectStiffnessUsingOstrowski(sn,slowrate);
 
     double T0 = options.timespan[0];
     int T = 0;
@@ -69,103 +80,92 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
     List<Matrix> tIterations = new LinkedList<>();
     List<Matrix> xVecIterations = new LinkedList<>();
 
-    while (((Double.isFinite(options.timespan[1])) && T < options.timespan[1])
-            || (goOn && iter < options.iter_max)) {
+    iter++;
 
-      iter++;
+    // Determine entry state vector in e
+    double[] initialState = new double[yDefault.length];
+    double[] nextState = new double[yDefault.length];
+    for (int i = 0; i < yDefault.length; i++) {
+      initialState[i] = xvec_it.get(0, i);
+      nextState[i] = 0;
+    }
 
-      // Determine entry state vector in e
-      double[] initialState = new double[yDefault.length];
-      double[] nextState = new double[yDefault.length];
-      for (int i = 0; i < yDefault.length; i++) {
-        initialState[i] = xvec_it.get(0, i);
-        nextState[i] = 0;
-      }
+    // Solve ode until T = 1 event with slowest exit rate
+    T = (int) min(options.timespan[1], abs(10 * options.iter_max / minNonZeroRate));
+    double[] tRange = {T0, T};
 
-      // Solve ode until T = 1 event with slowest exit rate
-      if (iter == 1) {
-        T = (int) min(options.timespan[1], abs(10 / minNonZeroRate));
+    if (options.tol > GlobalConstants.CoarseTol && (options.verbose == VerboseLevel.DEBUG)) {
+      System.err.println(
+              "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
+    }
+
+    int Tmax;
+    if (options.stiff) {
+      LSODA odeSolver;
+      if (options.tol > GlobalConstants.CoarseTol){
+        odeSolver = options.odesolvers.fastStiffODESolver;
       } else {
-        T = (int) min(options.timespan[1], abs(10 * iter / minNonZeroRate));
+        odeSolver = options.odesolvers.accurateStiffODESolver;
       }
-      double[] tRange = {T0, T};
 
-      if (options.tol > GlobalConstants.CoarseTol && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
+      try {
+        //System.out.print("Start ODE integration cycle...");
+        odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
+        //System.out.println("done.");
+
+      } catch (RuntimeException e) {
+        if (options.verbose != VerboseLevel.SILENT) {
+          System.out.println(
+                  "The initial point is invalid, Fluid solver switching to default initialization.");
+        }
+        odeSolver.integrate(ode, tRange[0], yDefault, tRange[1], nextState);
+      }
+      // transform the output format
+      Tmax = odeSolver.getStepsTaken()+1;
+      Matrix tVec = new Matrix(Tmax, 1);
+      Matrix xVec = new Matrix(Tmax,ode.getDimension());
+      ArrayList<Double> tHistory = odeSolver.getTvec();
+      ArrayList<Double[]> yHistory = odeSolver.getYvec();
+      for (int i = 0; i < Tmax; i++) {
+        tVec.set(i,0,tHistory.get(i));
+        for (int j = 0; j < ode.getDimension(); j++)
+          xVec.set(i,j,Math.max(0,yHistory.get(i)[j]));
+      }
+      tIterations.add(tVec);
+      xVecIterations.add(xVec);
+      this.xvec_it = Matrix.extractRows(xVec, Tmax - 1, Tmax, null);
+    } else {
+      FirstOrderIntegrator odeSolver;
+      if (options.tol > GlobalConstants.CoarseTol && (options.verbose == VerboseLevel.DEBUG)) {
         System.err.println(
                 "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
       }
+      odeSolver = options.odesolvers.accurateODESolver;
+      odeSolver.clearStepHandlers();
+      TransientDataHandler stepHandler = new TransientDataHandler(initialState.length);
+      odeSolver.addStepHandler(stepHandler);
 
-      int Tmax;
-      if (options.stiff) {
-        LSODA odeSolver;
-        if (options.tol > GlobalConstants.CoarseTol){
-          odeSolver = options.odesolvers.fastStiffODESolver;
-        } else {
-          odeSolver = options.odesolvers.accurateStiffODESolver;
+      try {
+        //System.out.print("Start ODE integration cycle...");
+        odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
+        //System.out.println("done.");
+
+      } catch (RuntimeException e) {
+        if (options.verbose != VerboseLevel.SILENT) {
+          System.out.println(
+                  "The initial point is invalid, Fluid solver switching to default initialization.");
         }
-
-        try {
-          //System.out.print("Start ODE integration cycle...");
-          odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
-          //System.out.println("done.");
-
-        } catch (RuntimeException e) {
-          if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
-            System.out.println(
-                    "The initial point is invalid, Fluid solver switching to default initialization.");
-          }
-          odeSolver.integrate(ode, tRange[0], yDefault, tRange[1], nextState);
-        }
-        // transform the output format
-        Tmax = odeSolver.getStepsTaken()+1;
-        Matrix tVec = new Matrix(Tmax, 1);
-        Matrix xVec = new Matrix(Tmax,ode.getDimension());
-        ArrayList<Double> tHistory = odeSolver.getTvec();
-        ArrayList<Double[]> yHistory = odeSolver.getYvec();
-        for (int i = 0; i < Tmax; i++) {
-          tVec.set(i,0,tHistory.get(i));
-          for (int j = 0; j < ode.getDimension(); j++)
-            xVec.set(i,j,Math.max(0,yHistory.get(i)[j]));
-        }
-        tIterations.add(tVec);
-        xVecIterations.add(xVec);
-        this.xvec_it = Matrix.extractRows(xVec, Tmax - 1, Tmax, null);
-      } else {
-        FirstOrderIntegrator odeSolver;
-        if (options.tol > GlobalConstants.CoarseTol && (options.verbose == SolverOptions.VerboseLevel.DEBUG)) {
-          System.err.println(
-                  "Fast, non-stiff ODE solver is not yet available in JLINE. Using accurate non-stiff ODE solver instead.");
-        }
-        odeSolver = options.odesolvers.accurateODESolver;
-        odeSolver.clearStepHandlers();
-        TransientDataHandler stepHandler = new TransientDataHandler(initialState.length);
-        odeSolver.addStepHandler(stepHandler);
-
-        try {
-          //System.out.print("Start ODE integration cycle...");
-          odeSolver.integrate(ode, tRange[0], initialState, tRange[1], nextState);
-          //System.out.println("done.");
-
-        } catch (RuntimeException e) {
-          if (options.verbose != SolverOptions.VerboseLevel.SILENT) {
-            System.out.println(
-                    "The initial point is invalid, Fluid solver switching to default initialization.");
-          }
-          odeSolver.integrate(ode, tRange[0], yDefault, tRange[1], nextState);
-        }
-
-        // Retrieve Transient Data
-        tIterations.add(stepHandler.tVec);
-        xVecIterations.add(stepHandler.xVec);
-        Tmax = stepHandler.tVec.getNumRows();
-        this.xvec_it = Matrix.extractRows(stepHandler.xVec, Tmax - 1, Tmax, null);
+        odeSolver.integrate(ode, tRange[0], yDefault, tRange[1], nextState);
       }
-      totalSteps += Tmax;
-      T0 = T; // for next iteration
-      if (T >= options.timespan[1]) {
-        goOn = false;
-      }
+
+      // Retrieve Transient Data
+      tIterations.add(stepHandler.tVec);
+      xVecIterations.add(stepHandler.xVec);
+      Tmax = stepHandler.tVec.getNumRows();
+      this.xvec_it = Matrix.extractRows(stepHandler.xVec, Tmax - 1, Tmax, null);
     }
+    totalSteps += Tmax;
+
 
     // Migrating tIterations and xVecIterations from Lists to concatenated JLineMatrix objects
     // Note this is done manually for performance purposes - concatRows is not as efficient
@@ -662,10 +662,45 @@ public class ClosingAndStateDepMethodsAnalyzer implements MethodAnalyzer {
         }
       }
     }
+    result.WN = new Matrix(M, K); // TODO
+    result.AN = new Matrix(M, K); // TODO
   }
 
   @Override
   public Matrix getXVecIt() {
     return this.xvec_it;
+  }
+
+  public boolean detectStiffnessUsingOstrowski(NetworkStruct sn, Matrix rate){
+    Matrix transitionMatrix = sn.rt;
+    for (int i=0; i<transitionMatrix.getNumRows(); i++) {
+      double p = 0;
+      for (int j=0; j<transitionMatrix.getNumCols(); j++){
+        if (i != j)
+          p -= transitionMatrix.get(i,j);
+      }
+      transitionMatrix.set(i,i,p);
+    }
+
+    Matrix expandRate = new Matrix(1,rate.numCols * rate.numRows);
+    for (int i = 0; i < rate.numCols * rate.numRows; i++){
+      int r = i / rate.numCols;
+      int c = i % rate.numCols;
+      expandRate.set(0,i,rate.get(r,c));
+    }
+    transitionMatrix = transitionMatrix.elementMultWithVector(expandRate);
+    double[][] bound = new double[transitionMatrix.getNumCols()][2];
+    int n = transitionMatrix.getNumCols();
+    double alpha = 0.5;
+    boolean stiff = false;
+
+    for (int i = 0; i < n; i++){
+      bound[i][0] = transitionMatrix.get(i,i);
+      double rSum = transitionMatrix.sumAbsRows(i) - Math.abs(transitionMatrix.get(i,i));
+      double cSum = transitionMatrix.sumAbsCols(i) - Math.abs(transitionMatrix.get(i,i));
+      bound[i][1] = Math.pow(rSum,alpha) * Math.pow(cSum,1-alpha);
+      stiff = stiff || (bound[i][0] < 0 && Math.abs(bound[i][1]) < Math.abs(bound[i][0]));
+    }
+    return stiff;
   }
 }

@@ -11,7 +11,7 @@ import jline.lang.nodes.*;
 import jline.solvers.NetworkSolver;
 import jline.solvers.SolverOptions;
 import jline.solvers.mva.SolverMVA;
-import jline.util.NetworkAvgTable;
+import jline.solvers.NetworkAvgTable;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,6 +41,41 @@ public class ForkJoin {
         routingMatrix.set(jobclass1, jobclass1, queue1, join, 1);
         routingMatrix.set(jobclass1, jobclass1, queue2, join, 1);
         routingMatrix.set(jobclass1, jobclass1, join, sink, 1);
+        model.link(routingMatrix);
+
+        return model;
+    }
+
+    public static Network ex1_line() {
+        Network model = new Network("model");
+
+        // Block 1: nodes
+        Source node1 = new Source(model, "Source");
+        Queue node2 = new Queue(model, "Queue1", SchedStrategy.FCFS);
+        Queue node3 = new Queue(model, "Queue2", SchedStrategy.FCFS);
+        Fork node4 = new Fork(model, "Fork");
+        Join node5 = new Join(model, "Join");
+        Sink node6 = new Sink(model, "Sink");
+
+        // Block 2: classes
+        OpenClass jobclass1 = new OpenClass(model, "class1", 0);
+
+        node1.setArrival(jobclass1, new Exp(0.05)); // (Source,class1)
+        node2.setService(jobclass1, new Exp(1.0)); // (Queue1,class1)
+        node3.setService(jobclass1, new Exp(2.0)); // (Queue2,class1)
+
+        // Block 3: topology
+        RoutingMatrix routingMatrix = new RoutingMatrix(model,
+                Arrays.asList(jobclass1),
+                Arrays.asList(node1, node2, node3, node4, node5, node6));
+
+        routingMatrix.set(jobclass1, jobclass1, node1, node4, 1.000000); // (Source,class1) -> (Fork,class1)
+        routingMatrix.set(jobclass1, jobclass1, node2, node5, 1.000000); // (Queue1,class1) -> (Join,class1)
+        routingMatrix.set(jobclass1, jobclass1, node3, node5, 1.000000); // (Queue2,class1) -> (Join,class1)
+        routingMatrix.set(jobclass1, jobclass1, node4, node2, 1.000000); // (Fork,class1) -> (Queue1,class1)
+        routingMatrix.set(jobclass1, jobclass1, node4, node3, 1.000000); // (Fork,class1) -> (Queue2,class1)
+        routingMatrix.set(jobclass1, jobclass1, node5, node6, 1.000000); // (Join,class1) -> (Sink,class1)
+
         model.link(routingMatrix);
 
         return model;

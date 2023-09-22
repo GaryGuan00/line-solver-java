@@ -3,6 +3,9 @@ package jline.lang;
 import jline.lang.JobClass;
 import jline.lang.Network;
 import jline.lang.constant.JobClassType;
+import jline.lang.constant.JoinStrategy;
+import jline.lang.nodes.Join;
+import jline.lang.nodes.Node;
 import jline.lang.nodes.Station;
 
 import java.io.Serializable;
@@ -17,6 +20,14 @@ public class ClosedClass extends JobClass implements Serializable {
         this.index = model.getNumberOfClasses()+1;
         model.addJobClass(this);
         this.population = njobs;
+        for (int i = 0; i < model.getNumberOfNodes(); i++) {
+            Node currentNode = model.getNodes().get(i);
+//            model.setNodeRouting(i, this, RoutingStrategy.RAND);
+            if (currentNode instanceof Join){
+                model.setJoinNodeStrategy(i, this, JoinStrategy.STD);
+                model.setJoinNodeRequired(i, this, -1);
+            }
+        }
         this.model = model;
         this.refstat = refstat;
         this.classIndex = -1;

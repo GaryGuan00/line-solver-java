@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.List;
 
 import jline.lang.*;
+import jline.lang.constant.JoinStrategy;
 import jline.lang.sections.Dispatcher;
 import jline.lang.sections.Joiner;
 import jline.lang.sections.ServiceTunnel;
@@ -38,5 +39,17 @@ public class Join extends Station implements Serializable {
     @Override
     public Network getModel() {
         return this.model;
+    }
+
+    public void setStrategy(JobClass jobClass, JoinStrategy joinStrategy){
+        Joiner joiner = (Joiner) this.input;
+        joiner.setStrategy(jobClass, joinStrategy);
+        this.input = joiner;
+    }
+
+    public void setRequired(JobClass jobClass, double njobs){
+        Joiner joiner = (Joiner) this.input;
+        joiner.setRequired(jobClass, njobs);
+        this.input = joiner;
     }
 }

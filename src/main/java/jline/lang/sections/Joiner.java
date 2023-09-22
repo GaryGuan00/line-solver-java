@@ -29,6 +29,14 @@ public class Joiner extends InputSection implements Serializable {
         }
     }
 
+    public void setStrategy(JobClass jobClass, JoinStrategy joinStrategy){
+        this.joinStrategy.put(jobClass, joinStrategy);
+    }
+
+    public void setRequired(JobClass jobClass, double njobs){
+        this.joinRequired.put(jobClass, njobs);
+    }
+
 //    @Override
 //    public void setOutputStrategy(JobClass jobClass, RoutingStrategy routingStrategy, Node destination, double probability) {
 //        for (OutputStrategy outputStrategy : this.outputStrategies) {

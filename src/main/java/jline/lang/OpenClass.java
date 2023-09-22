@@ -3,7 +3,12 @@ package jline.lang;
 import java.io.Serializable;
 
 import jline.lang.constant.JobClassType;
+import jline.lang.constant.JoinStrategy;
+import jline.lang.constant.RoutingStrategy;
+import jline.lang.constant.SchedStrategy;
+import jline.lang.nodes.Join;
 import jline.lang.nodes.Node;
+import jline.lang.nodes.Sink;
 import jline.lang.nodes.Source;
 
 public class OpenClass extends JobClass  implements Serializable {
@@ -14,7 +19,26 @@ public class OpenClass extends JobClass  implements Serializable {
         super(JobClassType.Open, name);
         this.index = model.getNumberOfClasses()+1;
         model.addJobClass(this);
+        try {
+            setReference(model.getSource());
+        } catch (Exception e){
+            System.err.println("The model requires a Source prior to instantiating open classes.");
+        }
         this.classIndex = -1;
+
+        for (int i = 0; i < model.getNumberOfNodes(); i++) {
+            Node currentNode = model.getNodes().get(i);
+            if (currentNode != null && !(currentNode instanceof Source) && !(currentNode instanceof Sink) && !(currentNode instanceof Join)){
+                model.setNodeScheduling(i, this, SchedStrategy.FCFS);
+            }
+            if (currentNode instanceof Join){
+                model.setJoinNodeStrategy(i, this, JoinStrategy.STD);
+                model.setJoinNodeRequired(i, this, -1);
+            }
+//            if (currentNode != null){
+//                model.setNodeRouting(i, this, RoutingStrategy.RAND);
+//            }
+        }
         this.model = model;
         this.setPriority(priority);
     }

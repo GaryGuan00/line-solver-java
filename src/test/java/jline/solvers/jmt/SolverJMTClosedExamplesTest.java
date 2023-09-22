@@ -23,7 +23,7 @@ public class SolverJMTClosedExamplesTest {
         options.seed = 23000;
         options.keep = false;
         SolverJMT solver = new SolverJMT(model, options);
-        solver.jsimgView();
+//        solver.jsimgView();
 
         NetworkAvgTable avgTable = solver.getAvgTable();
 
@@ -176,7 +176,7 @@ public class SolverJMTClosedExamplesTest {
             assertEquals(expectedTput[i], avgTable.get(4).get(i), 1e-4);
         }
 
-        solver.jsimgView(options);
+//        solver.jsimgView(options);
     }
 
     @Test
@@ -206,6 +206,6 @@ public class SolverJMTClosedExamplesTest {
             assertEquals(expectedTput[i], avgTable.get(4).get(i), 1e-2);
         }
 
-        solver.jsimgView(options);
+//        solver.jsimgView(options);
     }
 }

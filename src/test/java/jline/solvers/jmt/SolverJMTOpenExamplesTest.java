@@ -26,7 +26,7 @@ public class SolverJMTOpenExamplesTest {
         options.seed = 23000;
         options.iter_max = 200;
         SolverJMT solver = new SolverJMT(model, options);
-        solver.jsimgView();
+//        solver.jsimgView();
 
         NetworkAvgTable avgTable = solver.getAvgTable();
 
@@ -71,7 +71,7 @@ public class SolverJMTOpenExamplesTest {
         options.cutoff = 7;
         options.seed = 23000;
         SolverJMT solver = new SolverJMT(model, options);
-        solver.jsimgView();
+//        solver.jsimgView();
         NetworkAvgTable avgTable = solver.getAvgTable();
         // Expected values
         double[] expectedQLen = {0.0, 0.0, 0.0, 1.1982, 1.0325, 0.0, 0.0, 0.0, 0.81572};

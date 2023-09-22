@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import jline.lang.*;
+import jline.lang.constant.SchedStrategy;
 import jline.lang.constant.SchedStrategyType;
 import jline.lang.distributions.*;
 import jline.lang.nodes.*;
@@ -14,10 +15,12 @@ import jline.lang.sections.*;
 public class InputSection extends Section  implements Serializable {
     protected SchedStrategyType schedPolicy;
     protected List<InputBinding> inputJobProcesses;
+    protected List<SchedStrategy> inputJobClasses;
 
     public InputSection(String className) {
         super(className);
         this.inputJobProcesses = new ArrayList<InputBinding>();
+        this.inputJobClasses = new ArrayList<SchedStrategy>();
     }
 
     public void setInputJobProcess(InputBinding process) {
@@ -33,6 +36,16 @@ public class InputSection extends Section  implements Serializable {
             }
         }
     }
+
+    public void setInputJobClasses(int index, SchedStrategy schedStrategy) {
+        int diff = index - this.inputJobClasses.size() + 1;
+        while (diff > 0){
+            this.inputJobClasses.add(null);
+            diff--;
+        }
+        this.inputJobClasses.set(index, schedStrategy);
+    }
+
 
     public void setServiceProcess(ServiceBinding serviceProcess) {
 

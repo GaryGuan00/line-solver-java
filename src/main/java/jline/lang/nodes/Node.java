@@ -3,6 +3,7 @@ package jline.lang.nodes;
 import jline.lang.*;
 import jline.lang.constant.DropStrategy;
 import jline.lang.constant.RoutingStrategy;
+import jline.lang.constant.SchedStrategy;
 import jline.lang.sections.InputSection;
 import jline.lang.sections.OutputSection;
 import jline.lang.sections.ServiceSection;
@@ -48,6 +49,10 @@ public class Node extends NetworkElement implements Serializable {
 
     public Network getModel() {
         return this.model;
+    }
+
+    public void setScheduling(JobClass jobClass, SchedStrategy schedStrategy){
+        this.input.setInputJobClasses(jobClass.getIndex(), schedStrategy);
     }
 
     public void setRouting(JobClass jobClass, RoutingStrategy routingStrategy) {

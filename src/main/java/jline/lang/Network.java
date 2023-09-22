@@ -3088,6 +3088,27 @@ public class Network extends Model implements Serializable {
         return s;
     }
 
+    public void setNodeScheduling(int nodeIdx, JobClass jobClass, SchedStrategy schedStrategy){
+        this.nodes.get(nodeIdx).setScheduling(jobClass, schedStrategy);
+    }
+
+    public void setJoinNodeStrategy(int nodeIdx, JobClass jobClass, JoinStrategy joinStrategy){
+        Join join = (Join) this.nodes.get(nodeIdx);
+        join.setStrategy(jobClass, joinStrategy);
+        this.nodes.set(nodeIdx, join);
+    }
+
+    public void setJoinNodeRequired(int nodeIdx, JobClass jobClass, int njobs){
+        Join join = (Join) this.nodes.get(nodeIdx);
+        join.setRequired(jobClass, njobs);
+        this.nodes.set(nodeIdx, join);
+    }
+
+    public void setNodeRouting(int nodeIdx, JobClass jobClass, RoutingStrategy routingStrategy){
+        Node node = this.nodes.get(nodeIdx);
+        node.setRouting(jobClass, routingStrategy);
+        this.nodes.set(nodeIdx, node);
+    }
 
 }
 
